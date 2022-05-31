@@ -19,12 +19,10 @@ class Sequence:
     ----------
     img_sequence : `numpy.ndarray` (N) 
         1D array of the image sequence, `geopyv.Image` class objects.
-    stps_num : `int`
-        Number of images in the image sequence.
     SETUP PARAMETERS
     meshes : `numpy.ndarray` (N)
         1D array of the mesh sequence, `geopyv.Mesh` class objects.
-    miref : `numpy.ndarray` (N)s
+    f_img_index : `numpy.ndarray` (N)s
         1D array of the reference image indexes for the mesh sequence.
     ppp : `numpy.ndarray` (N,M,2)
         3D array of the numerical particle position paths (ppp). 
@@ -40,7 +38,7 @@ class Sequence:
         Computed by method :meth:`~particle`. 
     """
 
-    def __init__(self, img_sequence, aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_1000)):
+    def __init__(self, img_sequence, target_nodes=1000, boundary=None, exclusions=[]):
         """Initialisation of geopyv sequence object.
 
         Parameters
@@ -48,106 +46,36 @@ class Sequence:
         img_sequence : numpy.ndarray (N) 
             1D array of the image sequence of type `geopyv.Image` objects.
         """
+        self.initialised = False
+        # Check types.
+        if type(img_sequence) != np.ndarray:
+            raise TypeError("Image sequence array of invalid type. Cannot initialise sequence.")
+        elif type(target_nodes) != int:
+            raise TypeError("Maximum number of elements not of integer type.")
+        elif target_nodes <= 0:
+            raise ValueError("Invalid maximum number of elements.")
+        elif type(boundary) != np.ndarray:
+            raise TypeError("Boundary coordinate array of invalid type. Cannot initialise mesh.")
+        elif type(exclusions) != list:
+            raise TypeError("Exclusion coordinate array of invalid type. Cannot initialise mesh.")
+        for img in img_sequence:
+            if type(img) != Image:
+                raise TypeError("Sequence image not geopyv.image.Image type.")
+        for exclusion in exclusions:
+            if np.shape(exclusion)[1] != 2:
+                raise ValueError("Exclusion coordinate array of invalid shape. Must be numpy.ndarray of size (n, 2).")
 
+        
+        # Store variables.
         self.img_sequence = img_sequence
-        self.ref = self.img_sequence[0]
-        self.aruco_dict = aruco_dict
-        self.stps_num = len(self.img_sequence)
-        self.mesh_adaptivity_setup() # Default.
-        self.mesh_piv_setup() # Default.
-
-    def mesh_adaptivity_setup(self, max_iterations_adaptivity = 10, max_pts_num = 7500, alpha = 0.5, beta = 2, verbose = True):
-        """A method to set mesh adaptivity input variables.
+        self.target_nodes = target_nodes
+        self.boundary = boundary
+        self.exclusions = exclusions
         
-        Parameters
-        ----------
-        max_iterations_adaptivity : int
-            Maximum number of adaptivity iterations to be performed.
-        max_pts_num : int
-            Maximum number of mesh nodes to be generated (note, exceeding this value triggers the end of adaptivity).
-        alpha : float
-            Mesh adaptivity element area weighting limit (1/beta^2 <= W <= 1/alpha^2, A_i,new = W*A_i,old).
-        beta : float
-            Mesh adaptivity element area weighting limit (1/beta^2 <= W <= 1/alpha^2, A_i,new = W*A_i,old).
-        verbose : bool
-            Toggle terminal ouput (False: no output, True: output). 
-        """
-        
-        self.max_iterations_adaptivity = max_iterations_adaptivity
-        self.max_pts_num = max_pts_num
-        self.alpha = alpha
-        self.beta = beta 
-        self.verbose = verbose 
-    
-    def mesh_geometry_setup(self, area = None, roi = None, hls = None, obj = None, sed = None, manual = False):
-        """A method to set mesh geometry input variables.
-        
-        Parameters
-        ----------
-        area : float
-            Target element area pre-adaptivity.
-        roi : numpy.ndarray (N,2)
-            Coordinate array defining the edge of the mesh region.
-        hls : numpy.ndarray (M,N,2)
-            Exclusion regions within the roi. M hls, N, coordinates defining each. 
-        sed : numpy.ndarray (2)
-            Reliability-guided initial PIV coordinate specified in the far-field.
-        manual : bool
-            Toggle to manually select the roi, hls and sed (False: use input variables, True: use GUI).
-        """
-        
-        self.manual = manual
-        self.area = area
-        self.roi = roi
-        self.hls = hls
-        self.obj = obj
-        self.sed = sed
-        if self.manual == True:
-            self._manual()
-            self.manual = False
-
-    def _manual(self):
-        """Private method to manually select the roi, hls and sed.
-        """
-        manual_selection = Gui(self.ref.filepath)
-        self.roi, self.sed, self.obj, self.hls = manual_selection.main() # Run GUI and extract geometry data.
-
-    def mesh_piv_setup(self, template = Circle(50), max_norm=1e-5, max_iterations_piv=50, p_0 = np.zeros(6), sed_tol = 0.9, tol = 0.75, method="ICGN"):
-        """A method to set mesh PIV input variables.
-        
-        Parameters
-        ----------
-        template : object, optional
-            Subset template. Defaults to Circle(50).
-        max_norm : float, optional
-            Exit criterion for norm of increment in warp function. Defaults to value of :math:`1 \cdot 10^{-5}`.
-        max_iterations_piv: int, optional
-            Exit criterion for number of Gauss-Newton iterations. Defaults to value of 50.
-        p_0: numpy.ndarray, optional
-            1D array of warp function parameters with `float` type.
-        sed_tol : float, optional
-            Correlation coefficient threshold for sed subset (0<=sed_tol<=1). Defaults to value of 0.9.
-        tol : float, optional
-            Correlation coefficient thresholf for sed subset (0<=tol<=1). Defaults to value of 0.75.
-        method : str, optional
-            Solution method. Options are FAGN, WFAGN and ICGN. Default is ICGN since it is faster.
-
-        .. note::
-            * Any unspecified parameter will default in calling this method, even if specified in a previous call.  
-
-        """
-        self.template = template
-        self.max_norm = max_norm
-        self.max_iterations_piv = max_iterations_piv
-        self.p_0 = p_0
-        self.sed_tol = sed_tol
-        self.tol = tol
-        self.method = method
-        
-    def mesh(self, retain = False):
+    def solve(self, seed_coord=None, template=Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2):
         """A method to generate a mesh sequence for the image sequence input at initiation. A reliability guided (RG) approach is implemented, 
         updating the reference image according to correlation coefficient threshold criteria. An elemental shear strain-based mesh adaptivity is implemented.
-        The meshes are stored in self.meshes and the mesh-image index references are stored in self.miref. 
+        The meshes are stored in self.meshes and the mesh-image index references are stored in self.f_img_index. 
 
         .. note::
                 * For more details on the RG approach implemented, see:
@@ -156,60 +84,49 @@ class Sequence:
                 * For more details on the adaptivity method implemented, see:
                   Tapper, L. (2013) Bearing capacity of perforated offshore foundations under combined loading, University of Oxford PhD Thesis p.73-74.
         """
+
+        # Check inputs.
+        if type(seed_coord) != np.ndarray:
+            raise TypeError("Coordinate is not of numpy.ndarray type. Cannot initiate solver.")
+        elif type(adaptive_iterations) != int:
+            raise TypeError("Number of adaptive iterations of invalid type. Must be an integer greater than or equal to zero.")
         
-        ref = self.ref
-        self.meshes = np.empty(self.stps_num-1, dtype=object) # Adapted meshes. 
-        self.miref = np.zeros(self.stps_num-1, dtype=int) # Mesh-image reference.
-        it = 1 # Initial target image index (note, initial reference image index is implicitly 0). 
+        # Store variables.
+        self.seed_coord = seed_coord
+        self.template = template
+        self.max_iterations = max_iterations
+        self.max_norm = max_norm
+        self.adaptive_iterations = adaptive_iterations
+        self.method = method
+        self.order = order
+        self.tolerance = tolerance
+        self.alpha = alpha
+        self.beta = beta
+        if self.order == 1 and self.method != "WFAGN":
+            self.p_0 = np.zeros(6)
+        elif self.order == 1 and self.method == "WFAGN":
+            self.p_0 = np.zeros(7)
+        elif self.order == 2 and self.method != "WFAGN":
+            self.p_0 = np.zeros(12)
+
+        # Prepare output. 
+        self.meshes = np.empty(len(self.img_sequence)-1, dtype=object) # Adapted meshes. 
+        self.f_img_index = np.zeros(len(self.img_sequence)-1, dtype=int) # Mesh-image reference.
+
+        # Solve. 
+        iteration = 1 # Initial target image index (note, initial reference image index is implicitly 0). 
         update_flag = True
-        while it < self.stps_num:
-            tar = self.img_sequence[it] # Select target image from the image sequence.
-            if self.verbose == True:
-                print("Image Pair: {}-{}".format(self.miref[-1], it)) # Print to terminal.
-            mesh = Mesh(ref = ref, tar = tar, area = self.area, roi = self.roi, hls = self.hls, obj = self.obj, sed = self.sed, manual = self.manual) # Initialise mesh object.
-            mesh.piv_setup(template = self.template, max_norm=self.max_norm, max_iterations_piv=self.max_iterations_piv, p_0 = self.p_0, sed_tol = self.sed_tol, tol = self.tol, method=self.method) # Update PIV parameters within the mesh object.
-            mesh.adaptivity_setup(max_iterations_adaptivity = self.max_iterations_adaptivity, max_pts_num=self.max_pts_num, alpha=self.alpha, beta=self.beta, verbose=self.verbose) # Update adaptivity parameters within the mesh object.
-            if update_flag == False and retain == True:
-                mesh.pts = self.meshes[-1].pts
-                mesh.tri = self.meshes[-1].tri
-            mesh.strain_adapt(update_flag = update_flag) # Perform mesh adaptivity.
+        while iteration < len(self.img_sequence):
+            print("Solving for image pair {}-{}".format(self.f_img_index[iteration-1], iteration))
+            mesh = Mesh(f_img = self.img_sequence[self.f_img_index[iteration-1]], g_img = self.img_sequence[iteration], target_nodes = self.target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Initialise mesh object.
+            mesh.solve(seed_coord=self.seed_coord, template=self.template, max_iterations=self.max_iterations, max_norm=self.max_norm, adaptive_iterations=self.adaptive_iterations, method=self.method, order=self.order, tolerance=self.tolerance, alpha=self.alpha, beta=self.beta) # Solve mesh.
             if mesh.update: # Correlation coefficient thresholds not met (consequently no mesh generated).  
-                update_flag = False
-                if self.obj is not None:
-                    self._obj_track(ref, self.img_sequence[it-1]) # Track object.
-                ref = self.img_sequence[it-1] # Update reference image. 
-                self.miref[it-1:] = it-1 # Update recorded reference image for future meshes.
+                update_flag = False 
+                self.f_img_index[iteration-1:] = iteration-1 # Update recorded reference image for future meshes.
             else:
                 update_flag = True
-                self.meshes[it-1] = mesh # Store the generated mesh.
-                it += 1 # Iterate the target image index. 
-
-    def _obj_track(self,ref,tar):
-        """A private method which updates the object reference position by tracking a ChArUco marker.
-        
-        Parameters
-        ----------
-        ref :
-            Reference image. 
-        tar :
-            Target image. 
-        """
-        r_c, r_id, r_rej = cv2.aruco.detectMarkers(ref.image_gs, self.aruco_dict)
-        t_c, t_id, t_rej = cv2.aruco.detectMarkers(tar.image_gs, self.aruco_dict)
-        r_c = r_c[0]
-        t_c = t_c[0]
-        r_id = r_id.flatten()
-        t_id = t_id.flatten()
-        for j in range(len(self.obj)):
-            r_c_obj = []
-            t_c_obj = []
-            for i in range(len(r_c)):
-                if path.Path(self.obj[j]).contains_points(r_c[i]).all() and (r_id[i] in t_id): # Marker within object and in both images.
-                        r_c_obj.append(r_c[i])
-                        t_c_obj.append(t_c[np.where(t_id==r_id[i])])
-            r_c_obj = np.reshape(r_c_obj, (-1,2))
-            t_c_obj = np.reshape(t_c_obj, (-1,2))
-            self.obj[j] = affine(r_c_obj, t_c_obj, self.obj[j])
+                self.meshes[iteration-1] = mesh # Store the generated mesh.
+                iteration += 1 # Iterate the target image index. 
         
     def particle(self, key = 1, f = 0, par_pts = None, par_vols = None):
         """A method to generate strain paths using interpolation from the meshes to a distribution of numerical particles.
@@ -226,23 +143,23 @@ class Sequence:
 
         if key < 2:
             self.kde_dist(f = f)
-            particles = np.empty(len(self.comb_mesh.tri)*3**key, dtype=object)
-            self.ppp = np.empty((len(self.comb_mesh.tri)*3**key, self.stps_num, 2)) # Particle Position Path
-            self.psp = np.zeros((len(self.comb_mesh.tri)*3**key, self.stps_num, 3)) # Particle Strain Path
-            self.pvp = np.empty((len(self.comb_mesh.tri)*3**key, self.stps_num)) # Particle Volume Path
+            particles = np.empty(len(self.comb_mesh.triangulation)*3**key, dtype=object)
+            self.ppp = np.empty((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence), 2)) # Particle Position Path
+            self.psp = np.zeros((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence), 3)) # Particle Strain Path
+            self.pvp = np.empty((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence))) # Particle Volume Path
             self.ppp[:,0], self.pvp[:,0] = self.particle_distribution(mesh = self.comb_mesh, key = key) # Initial positions and volumes.
         else: 
             particles = np.empty(len(par_pts), dtype=object)
-            self.ppp = np.empty((len(par_pts), self.stps_num, 2)) # Particle Position Path
-            self.psp = np.zeros((len(par_pts), self.stps_num, 3)) # Particle Strain Path
-            self.pvp = np.empty((len(par_pts), self.stps_num)) # Particle Volume Path
+            self.ppp = np.empty((len(par_pts), len(self.img_sequence), 2)) # Particle Position Path
+            self.psp = np.zeros((len(par_pts), len(self.img_sequence), 3)) # Particle Strain Path
+            self.pvp = np.empty((len(par_pts), len(self.img_sequence))) # Particle Volume Path
             self.ppp[:,0] = self.par_pts
             self.pvp[:,0] = self.par_vols
         for i in range(len(particles)): # Create matrix of particle objects.
             particles[i] = Particle(self.ppp[i,0], self.psp[i,0], self.pvp[i,0])
-            for j in range(self.stps_num-1):
+            for j in range(len(self.img_sequence)-1):
                 ref_flag = False
-                if self.miref[j-1] != self.miref[j] or i == 0:
+                if self.f_img_index[j-1] != self.f_img_index[j] or i == 0:
                     ref_flag = True
                 particles[i].update(self.meshes[j], ref_flag=ref_flag)
                 self.ppp[i,j+1] = particles[i].coord
@@ -263,24 +180,24 @@ class Sequence:
         """
 
         if key == 0:
-            par_pts = np.mean(mesh.pts[mesh.tri], axis = 1)
-            M = np.ones((len(mesh.tri),3,3))
-            M[:,1] = mesh.pts[mesh.tri][:,:,0]
-            M[:,2] = mesh.pts[mesh.tri][:,:,1]
+            par_pts = np.mean(mesh.nodes[mesh.triangulation], axis = 1)
+            M = np.ones((len(mesh.triangulation),3,3))
+            M[:,1] = mesh.nodes[mesh.triangulation][:,:,0]
+            M[:,2] = mesh.nodes[mesh.triangulation][:,:,1]
             par_vols = abs(0.5*np.linalg.det(M))
         elif key == 1:
             # Find the element incentres
             BM = np.asarray([[0,1,-1],[-1,0,1],[1,-1,0]])
             MM = np.asarray([[0.,0.5,0.5],[0.5,0.,0.5],[0.5,0.5,0.]])
-            diff = np.einsum('ij,njk->nik', BM, mesh.pts[mesh.tri]) #BM@mesh.pts[mesh.tri]
-            mid = np.einsum('ij,njk->nik', MM, mesh.pts[mesh.tri])
+            diff = np.einsum('ij,njk->nik', BM, mesh.nodes[mesh.triangulation]) #BM@mesh.nodes[mesh.triangulation]
+            mid = np.einsum('ij,njk->nik', MM, mesh.nodes[mesh.triangulation])
             dist = np.sqrt(np.einsum('nij,nij->ni', diff, diff))
-            ctrs = np.einsum('ij,ijk->ik', dist, mesh.pts[mesh.tri])/np.einsum('ij->i', dist)[:,None]
-            par_vols = np.zeros((len(mesh.tri),3))
-            par_pts = np.empty((len(mesh.tri),3,2))
-            for i in range(len(mesh.tri)):
+            ctrs = np.einsum('ij,ijk->ik', dist, mesh.nodes[mesh.triangulation])/np.einsum('ij->i', dist)[:,None]
+            par_vols = np.zeros((len(mesh.triangulation),3))
+            par_pts = np.empty((len(mesh.triangulation),3,2))
+            for i in range(len(mesh.triangulation)):
                 for j in range(3):
-                    sub = np.asarray([ctrs[i], mid[i,j-2], mesh.pts[mesh.tri[i]][j], mid[i,j-1]])
+                    sub = np.asarray([ctrs[i], mid[i,j-2], mesh.nodes[mesh.triangulation[i]][j], mid[i,j-1]])
                     par_vols[i,j] = PolyArea(sub)
                     par_pts[i,j] = np.mean(sub, axis=0)
             par_pts = par_pts.reshape(-1,2)
@@ -294,13 +211,13 @@ class Sequence:
         f  : int
             Target element size function (f==0: 0.5*erfc(3.6*(Z_{bar}-0.5)), f==1: 100*10**(-4*Z_{bar})).
         """
-        self.comb_mesh = Mesh(ref = self.img_sequence[0], tar = self.img_sequence[1], area = self.area, roi = self.meshes[0].init_roi, hls = self.meshes[0].hls, sed = self.meshes[0].sed) # Create mesh object with roi corresponding to the first image.
-        self.comb_mesh.pts = self.comb_mesh.roi # Overwrite mesh points with roi.
+        self.comb_mesh = Mesh(f_img = self.img_sequence[0], g_img = self.img_sequence[1], target_nodes=target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Create mesh object with roi corresponding to the first image.
+        self.comb_mesh.nodes = self.comb_mesh.boundary # Overwrite mesh points with roi.
         for i in range(len(self.meshes)):
-            self.comb_mesh.pts = np.append(self.comb_mesh.pts, self.meshes[i].pts[len(self.comb_mesh.roi):], axis=0) # Append non-roi mesh points.
-        self.comb_mesh.tri = np.reshape(gmsh.model.mesh.triangulate(self.comb_mesh.pts.flatten())-1, (-1,3)) # Define triangles for combined points.
-        kernel = spst.gaussian_kde(self.comb_mesh.pts.T) # Create kde.
-        Z = kernel(np.mean(self.comb_mesh.pts[self.comb_mesh.tri], axis=1).T) # Sample kde at element centroids.
+            self.comb_mesh.nodes = np.append(self.comb_mesh.nodes, self.meshes[i].nodes[len(self.comb_mesh.boundary):], axis=0) # Append non-roi mesh points.
+        self.comb_mesh.triangulation = np.reshape(gmsh.model.mesh.triangulate(self.comb_mesh.nodes.flatten())-1, (-1,3)) # Define triangles for combined points.
+        kernel = spst.gaussian_kde(self.comb_mesh.nodes.T) # Create kde.
+        Z = kernel(np.mean(self.comb_mesh.nodes[self.comb_mesh.triangulation], axis=1).T) # Sample kde at element centroids.
         if f == 0:
             self.comb_mesh.areas = 0.5*spsp.erfc(3.6*((Z-np.min(Z))/(np.max(Z)-np.min(Z))-0.5))*self.area # Set target element areas.
         elif f == 1:
@@ -309,8 +226,8 @@ class Sequence:
             self.comb_mesh.areas = self.area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))
         elif f == 3:
             self.comb_mesh.areas = self.area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))**2
-        self.comb_mesh._bg_mesh_adapt() # Generate background field. 
-        self.comb_mesh._mesh_extract() # Extract the numerical particle control mesh. 
+        self.comb_mesh._adaptive_remesh() # Generate background field. 
+        self.comb_mesh._update_mesh() # Extract the numerical particle control mesh. 
 
 def PolyArea(pts):
     """A function that returns the area of the input polygon.
@@ -324,15 +241,3 @@ def PolyArea(pts):
     x = pts[:,0]
     y = pts[:,1]
     return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
-
-def affine(p,s, obj_pts):
-    
-    pad = lambda x: np.hstack([x, np.ones((x.shape[0],1))])
-    unpad = lambda x: x[:,:-1]
-    X = pad(p)
-    Y = pad(s)
-    A, res, rank, k = np.linalg.lstsq(X,Y, rcond = None)
-    transform = lambda x: unpad(np.dot(pad(x),A))
-    new_obj_pts = transform(obj_pts)
-    print("Max error: {}".format(np.abs(s-transform(p)).max()))
-    return new_obj_pts

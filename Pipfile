@@ -1,0 +1,29 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+scikit-build = "*"
+Sphinx = "*"
+sphinx-rtd-theme = "*"
+pytest = "*"
+flake8 = "*"
+black = "*"
+flake8-black = "*"
+matplotlib = "*"
+gmsh = "*"
+scipy = "*"
+PyQt5 = "*"
+opencv-contrib-python = "*"
+pyside6 = "*"
+geopyv = {path = "."}
+alive-progress = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3"
+
+[pipenv]
+allow_prereleases = true

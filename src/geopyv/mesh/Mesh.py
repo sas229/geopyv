@@ -100,6 +100,17 @@ class Mesh:
         else:
             print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))
 
+        # Store data in dict.
+        self.data = {}
+        self.data["nodes"] = self.nodes
+        self.data["triangulation"] = self.triangulation
+        self.data["C_CC"] = self.C_CC
+        self.data["u"] = self.u
+        self.data["v"] = self.v
+        self.data["iterations"] = self.iterations
+        self.data["norm"] = self.norm
+        self.data["subsets"] = self.subset_data
+
 
     def _update_mesh(self):
         """Private method to update the mesh variables."""
@@ -254,11 +265,15 @@ class Mesh:
         self.update = False
         m = np.shape(self.nodes)[0]
         n = np.shape(self.p_0)[0]
-        self.solved = np.zeros(m, dtype = int) # Solved/unsolved reference array (1 if unsolved, -1 if solved).
+        self.solved = np.zeros(m, dtype=int) # Solved/unsolved reference array (1 if unsolved, -1 if solved).
         self.C_CC = np.zeros(m, dtype=np.float64) # Correlation coefficient array. 
-        self.subsets = np.empty(m, dtype = object) # Initiate subset array.
+        self.subsets = np.empty(m, dtype=object) # Initiate subset array.
         self.p = np.zeros((m, n), dtype=np.float64) # Warp function array.
-        self.displacements = np.zeros((m, 2), dtype=np.float64) # Displacement output array.
+        self.u = np.zeros(m, dtype=np.float64) # Horizontal displacement output array.
+        self.v = np.zeros(m, dtype=np.float64) # Vertical displacement output array.
+        self.iterations = np.zeros(m, dtype=int) # Iterations output array.
+        self.norm = np.zeros(m, dtype=np.float64) # Convergence norm output array.
+        self.subset_data = np.empty(m, dtype=dict) # Dict of output data for each subset.
         
         # All nodes.
         entities = gmsh.model.getEntities()
@@ -290,10 +305,10 @@ class Mesh:
         with alive_bar(number_nodes, dual_line=True, bar='blocks', title=self.message) as self.bar:
             # Solve for seed.
             self.bar.text = "-> Solving seed subset..."
-            self.subsets[self.seed_node].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=self.p_0, method=self.method, tolerance=0.9) # Solve for seed subset.
+            success = self.subsets[self.seed_node].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=self.p_0, method=self.method, tolerance=0.9) # Solve for seed subset.
             self.bar()
-            if self.subsets[self.seed_node].solved:
-                self._store_variables(self.seed_node, seed=True)
+            if success:
+                self._store_data(self.seed_node, seed=True)
                 
                 # Solve for neighbours of the seed subset.
                 p_0 = self.subsets[self.seed_node].p # Set seed subset warp function as the preconditioning. 
@@ -341,16 +356,16 @@ class Mesh:
             * If arr is self.segments, connectivity finds the segments connected to the indexed node.
         """
         arr_idxs = np.argwhere(np.any(arr == idx, axis=1)==True).flatten()
-        pts_idxs = np.unique(arr[arr_idxs])
-        pts_idxs = np.delete(pts_idxs, np.argwhere(pts_idxs==idx))
+        nodes = np.unique(arr[arr_idxs])
+        nodes = np.delete(nodes, np.argwhere(nodes==idx))
 
-        return pts_idxs.tolist()
+        return nodes.tolist()
 
     def _neighbours(self, cur_idx, p_0):
         """
         Method to calculate the correlation coefficients and warp functions of the neighbouring nodes.
 
-        Parametersprint(pts_idxs)
+        Parameters
         p_0 : numpy.ndarray (N)
             Preconditioning warp function.
         """
@@ -359,9 +374,9 @@ class Mesh:
         for index in neighbours:
             if self.solved[index] == 0: # If not previously solved.
             # Use nearest-neighbout pre-conditioning.
-                self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
-                if self.subsets[index].solved: # Check against tolerance.
-                    self._store_variables(index)
+                success = self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
+                if success: # Check against tolerance.
+                    self._store_data(index)
                 else:
                     # Try more extrapolated pre-conditioning.
                     diff = self.nodes[index] - self.nodes[cur_idx]
@@ -373,23 +388,26 @@ class Mesh:
                         p_0[0] = p[0] + p[2]*diff[0] + p[3]*diff[1] + 0.5*p[6]*diff[0]**2 + p[7]*diff[0]*diff[1] + 0.5*p[8]*diff[1]**2 # CHECK!!
                         p_0[1] = p[1] + p[4]*diff[0] + p[5]*diff[1] + 0.5*p[9]*diff[0]**2 + p[10]*diff[0]*diff[1] + 0.5*p[11]*diff[1]**2 # CHECK!!
                     self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
-                    if self.subsets[index].solved:
-                        self._store_variables(index)
+                    if success:
+                        self._store_data(index)
                     else:
                         # Finally, try the NCC initial guess.
-                        self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0 = np.zeros(np.shape(p_0)), method=self.method, tolerance=self.tolerance)
-                        if self.subsets[index].C_CC>self.tolerance: # Check against tolerance.
-                            self._store_variables(index)
+                        success = self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0 = np.zeros(np.shape(p_0)), method=self.method, tolerance=self.tolerance)
+                        if success: # Check against tolerance.
+                            self._store_data(index)
                     
 
-    def _store_variables(self, index, seed=False):
-        """Store variables."""
+    def _store_data(self, index, seed=False):
+        """Store data."""
+        data = self.subsets[index].data
         if seed == True:
-            flag = -1
+            self.solved[index] = -1 # Don't add to queue.
         else:
-            flag = 1
-        self.solved[index] = flag
-        self.C_CC[index] = np.max((self.subsets[index].C_CC, 0)) # Clip correlation coefficient to positive values.
-        self.p[index] = self.subsets[index].p.flatten()
-        self.displacements[index, 0] = self.subsets[index].u
-        self.displacements[index, 1] = -self.subsets[index].v
+            self.solved[index] = 1 # Add to queue.
+        self.C_CC[index] = np.max(data["C_CC"], 0) # Clip correlation coefficient to positive values.
+        self.p[index] = data["p"].flatten()
+        self.u[index] = data["u"]
+        self.v[index] = data["v"]
+        self.iterations[index] = data["iterations"]
+        self.norm[index] = data["norm"]
+        self.subset_data[index] = data

@@ -218,7 +218,7 @@ class Subset:
         elif self.method == "WFAGN" and np.mod(self.p.shape[0],2) == 1:
             raise Exception("WFAGN method not yet fully implemented.")
             results = _solve_WFAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations, 1000)
-        
+
         # Unpack results.
         self.g_coords = results[0]
         self.g = results[1]
@@ -236,6 +236,24 @@ class Subset:
         # Check for tolerance.
         if self.C_CC > self.tolerance:
             self.solved = True
+
+        # Store data in dict.
+        self.data = {}
+        self.data["f_coord"] = self.f_coord
+        self.data["SSSIG"] = self.SSSIG
+        self.data["sigma_intensity"] = self.sigma_intensity
+        self.data["C_CC"] = self.C_CC
+        self.data["norm"] = self.norm
+        self.data["iterations"] = self.iterations
+        self.data["p"] = self.p.flatten()
+        self.data["u"] = self.u
+        self.data["v"] = self.v
+        self.data["history"] = self.history
+        self.data["f"] = self.f.flatten()
+        self.data["f_coords"] = self.f_coords
+        self.data["g"] = self.g.flatten()
+        self.data["g_coords"] = self.g_coords
+        self.data["solved"] = self.solved
     
         return self.solved
 

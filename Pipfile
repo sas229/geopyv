@@ -19,6 +19,9 @@ opencv-contrib-python = "*"
 pyside6 = "*"
 geopyv = {path = "."}
 alive-progress = "*"
+joblib = "*"
+h5py = "*"
+simple-h5py = "*"
 
 [dev-packages]
 

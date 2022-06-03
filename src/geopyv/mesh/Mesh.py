@@ -9,6 +9,7 @@ from scipy.optimize import minimize_scalar
 import PIL.Image as ImagePIL
 import PIL.ImageDraw as ImageDrawPIL
 from alive_progress import alive_bar
+from geopyv.io import save_to_HDF5
 
 import faulthandler
 faulthandler.enable()
@@ -112,6 +113,11 @@ class Mesh:
         self.data["subsets"] = self.subset_data
 
 
+    def save(self, filename, images=True):
+        """Method to save data in HDF5 file."""
+        save_to_HDF5(filename, self.data, images=images)
+
+
     def _update_mesh(self):
         """Private method to update the mesh variables."""
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node coordinates.
@@ -159,7 +165,7 @@ class Mesh:
     def _mesh(self):
         """Private method to optimize the element size to generate approximately the desired number of elements."""
         f = lambda size: self._initial_mesh(size, self.boundary, self.segments, self.curves, self.target_nodes)
-        res = minimize_scalar(f, bounds=(25, 250), method='bounded')
+        res = minimize_scalar(f, bounds=(10, 250), method='bounded')
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
@@ -273,7 +279,7 @@ class Mesh:
         self.v = np.zeros(m, dtype=np.float64) # Vertical displacement output array.
         self.iterations = np.zeros(m, dtype=int) # Iterations output array.
         self.norm = np.zeros(m, dtype=np.float64) # Convergence norm output array.
-        self.subset_data = np.empty(m, dtype=dict) # Dict of output data for each subset.
+        self.subset_data = {} # Dict of output data for each subset.
         
         # All nodes.
         entities = gmsh.model.getEntities()
@@ -308,7 +314,7 @@ class Mesh:
             success = self.subsets[self.seed_node].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=self.p_0, method=self.method, tolerance=0.9) # Solve for seed subset.
             self.bar()
             if success:
-                self._store_data(self.seed_node, seed=True)
+                self._store_subset_data(self.seed_node, seed=True)
                 
                 # Solve for neighbours of the seed subset.
                 p_0 = self.subsets[self.seed_node].p # Set seed subset warp function as the preconditioning. 
@@ -376,7 +382,7 @@ class Mesh:
             # Use nearest-neighbout pre-conditioning.
                 success = self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
                 if success: # Check against tolerance.
-                    self._store_data(index)
+                    self._store_subset_data(index)
                 else:
                     # Try more extrapolated pre-conditioning.
                     diff = self.nodes[index] - self.nodes[cur_idx]
@@ -389,16 +395,16 @@ class Mesh:
                         p_0[1] = p[1] + p[4]*diff[0] + p[5]*diff[1] + 0.5*p[9]*diff[0]**2 + p[10]*diff[0]*diff[1] + 0.5*p[11]*diff[1]**2 # CHECK!!
                     self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
                     if success:
-                        self._store_data(index)
+                        self._store_subset_data(index)
                     else:
                         # Finally, try the NCC initial guess.
                         success = self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0 = np.zeros(np.shape(p_0)), method=self.method, tolerance=self.tolerance)
                         if success: # Check against tolerance.
-                            self._store_data(index)
+                            self._store_subset_data(index)
                     
 
-    def _store_data(self, index, seed=False):
-        """Store data."""
+    def _store_subset_data(self, index, seed=False):
+        """Store subset data."""
         data = self.subsets[index].data
         if seed == True:
             self.solved[index] = -1 # Don't add to queue.
@@ -410,4 +416,4 @@ class Mesh:
         self.v[index] = data["v"]
         self.iterations[index] = data["iterations"]
         self.norm[index] = data["norm"]
-        self.subset_data[index] = data
+        self.subset_data[str(index+1)] = data

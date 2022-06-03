@@ -4,22 +4,28 @@ from geopyv.templates import Square, Circle
 from geopyv.subset import Subset
 from geopyv.mesh import Mesh
 from geopyv.sequence import Sequence
+from geopyv.io import load, save_to_HDF5
 from geopyv.geometry.exclusions import circular_exclusion, circular_exclusion_list
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
-import shelve
-# from simple_h5py import BasicH5File
-import h5py
 
 # # Subset test.
-# coord = np.asarray((100.0, 100.0))
+# coord1 = np.asarray((2000.0, 2000.0))
+# coord2 = np.asarray((2000.0, 2000.0))
 # ref = Image("./images/Uplift/IMG_30.jpg")
 # tar = Image("./images/Uplift/IMG_38.jpg")
 # template = Circle(25)
-# subset = Subset(coord, ref, tar, template)
-# success = subset.solve(p_0=np.zeros(12), method="ICGN")
-# subset.inspect()
-# subset.convergence()
+# subset1 = Subset(coord1, ref, tar, template)
+# success = subset1.solve(p_0=np.zeros(12), method="ICGN")
+# subset2 = Subset(coord2, ref, tar, template)
+# success = subset2.solve(p_0=np.zeros(12), method="ICGN")
+# # subset.inspect()
+# # subset.convergence()
+# # subset.save('subset_test.h5')
+# data = {}
+# data["1"] = subset1.data
+# data["2"] = subset2.data
+# save_to_HDF5('subsets_test.h5', data)
 
 # Uplift mesh test.
 ref = Image("./images/Uplift/IMG_30.jpg")
@@ -58,37 +64,6 @@ seed = np.asarray([300.0, 1500.0])
 # exclusions = []
 # exclusions.append(circular_exclusion(np.asarray([2880, 2035]), radius=130, size=50))
 # seed = np.asarray([300.0, 1500.0])
-
-
-# # Test 102.
-# ref = Image("./images/Test102/IMG_400.jpg")
-# tar = Image("./images/Test102/IMG_405.jpg") # m.create_dataset(key, data=mesh.data[key])
-        # elif mesh.data[key].dtype == object:
-            # g = hf.create_group(key)
-            # for i in range(np.shape(mesh.data[key])[0]):
-            #     g.create_dataset( )
-
-    
-
-#     print(key)
-# print(np.shape(mesh.data["subsets"]))
-# print(mesh.data["subsets"][0].keys())
-
-
-
-
-# hf = h5py.File('test.h5', 'w')
-# m = hf.create_group('IMG_30_IMG_38')
-# m.create_dataset('nodes', data=mesh.nodes)
-# m.create_dataset('triangulation', data=mesh.triangulation)
-# m.create_dataset('C_CC', data=mesh.C_CC)
-# m.create_dataset('u', data=mesh.u)
-# m.create_dataset('v', data=mesh.v)
-# m.create_dataset('p', data=mesh.p)
-# m.create_dataset('strains', data=mesh.strains)
-# m.create_dataset('iterations', data=mesh.iterations)
-# m.create_dataset('norm', data=mesh.norm)
-
 
 # Instantiate and solve mesh.
 mesh = Mesh(f_img=ref, g_img=tar, target_nodes=2000, boundary=boundary, exclusions=exclusions)
@@ -140,22 +115,15 @@ plt.tight_layout()
 # for i in range(np.shape(mesh.boundary_node_tags)[0]):
 #     ax.scatter(mesh.nodes[mesh.boundary_node_tags[i],0], mesh.nodes[mesh.boundary_node_tags[i],1], marker='o', color='blue')
 
+mesh.save('test.h5')
 
-# # print(store)
-# hf = h5py.File('test.h5', 'w')
-# m = hf.create_group('IMG_30_IMG_38')
-# for key in mesh.data.keys():
-#     # If a simple numpy array, save to file.
-#     if type(mesh.data[key]) == np.ndarray:
-#         # Simply numpy array.
-#         if mesh.data[key].dtype != np.ndarray:
-#             m.create_dataset(key, data=mesh.data[key])
-#         # Array of subsets.
-#         elif mesh.data[key].dtype == object:
-#             subsets = m.create_group(key)
-#             # For each subset in array of subsets.
-#             for i in range(np.shape(mesh.data[key])[0]):
-#                 # Create folder and parse subset dict for inner numpy arrays.
-#                 s = subsets.create_group(str(i+1))
-#                 for subset_key in mesh.data[key][i].keys():
-#                     s.create_dataset(subset_key, data=mesh.data[key][i][subset_key])
+data = load('test.h5')
+
+
+# print(list(data.keys()))
+# print(data["subsets"]["1"]["f_coord"][0])
+# print(data["subsets"]["1"]["C_CC"])
+# print(data["triangulation"])
+
+# subsets_data = load('subsets_test.h5')
+# print(subsets_data)

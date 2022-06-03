@@ -1,7 +1,8 @@
-import cv2
+import cv2, os
 import numpy as np
 from geopyv.image import Image
 from geopyv.templates import Circle, Square
+from geopyv.io import save_to_HDF5
 from ._subset_extensions import (
     _init_reference,
     _solve_ICGN,
@@ -243,19 +244,24 @@ class Subset:
         self.data["SSSIG"] = self.SSSIG
         self.data["sigma_intensity"] = self.sigma_intensity
         self.data["C_CC"] = self.C_CC
+        self.data["tolerance"] = self.tolerance
         self.data["norm"] = self.norm
         self.data["iterations"] = self.iterations
         self.data["p"] = self.p.flatten()
         self.data["u"] = self.u
         self.data["v"] = self.v
         self.data["history"] = self.history
-        self.data["f"] = self.f.flatten()
-        self.data["f_coords"] = self.f_coords
-        self.data["g"] = self.g.flatten()
-        self.data["g_coords"] = self.g_coords
         self.data["solved"] = self.solved
+        self.data["path"] = os.path.dirname(self.f_img.filepath)
+        self.data["f_img"] = os.path.basename(self.f_img.filepath)
+        self.data["g_img"] = os.path.basename(self.g_img.filepath)
     
         return self.solved
+
+    def save(self, filename, images=True):
+        """Method to save data in HDF5 file."""
+        save_to_HDF5(filename, self.data, images=images)
+
 
     def inspect(self):
         """Method to show the subset and associated quality metrics."""

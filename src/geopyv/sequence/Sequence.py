@@ -120,7 +120,7 @@ class Sequence:
             print("Solving for image pair {}-{}".format(self.f_img_index[iteration-1], iteration))
             mesh = Mesh(f_img = self.img_sequence[self.f_img_index[iteration-1]], g_img = self.img_sequence[iteration], target_nodes = self.target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Initialise mesh object.
             mesh.solve(seed_coord=self.seed_coord, template=self.template, max_iterations=self.max_iterations, max_norm=self.max_norm, adaptive_iterations=self.adaptive_iterations, method=self.method, order=self.order, tolerance=self.tolerance, alpha=self.alpha, beta=self.beta) # Solve mesh.
-            if mesh.update: # Correlation coefficient thresholds not met (consequently no mesh generated).  
+            if mesh.update and update_flag: # Correlation coefficient thresholds not met (consequently no mesh generated).  
                 update_flag = False 
                 self.f_img_index[iteration-1:] = iteration-1 # Update recorded reference image for future meshes.
             else:

@@ -4,12 +4,14 @@
 #include <Eigen/Eigen>
 #include <math.h>
 #include <iostream>
+#include <stdexcept>
 
 // -----------------------------------
 // geopyv subset module C++ extensions
 // -----------------------------------
 
 using namespace Eigen;
+using namespace std;
 
 MatrixXd _f_coords(
     const Ref<const VectorXd> &coord,
@@ -147,6 +149,10 @@ VectorXd _intensity(
     {
         x_floor = std::floor(coords(i,0));
         y_floor = std::floor(coords(i,1));
+        if ((x_floor < 0 || x_floor > QCQT.cols() / 6) || (y_floor < 0 || y_floor > QCQT.rows() / 6))
+        {
+            throw std::invalid_argument("Warp strayed outside of image boundary.");
+        }
         delta_x = coords(i,0) - x_floor;
         delta_y = coords(i,1) - y_floor;
         delta_x_vec(0) = one;
@@ -990,23 +996,31 @@ std::vector<MatrixXd> _solve_ICGN(
 
     // Iterate to solution.
     p = p_0;
-    while (iteration < max_iterations && norm > max_norm){
-        g_coord = _g_coord(f_coord, p);
-        g_coords = _g_coords(f_coord, p, f_coords);
-        g = _intensity(g_coords, g_QCQT);
-        g_m = g.mean();
-        Delta_g = _Delta_g(g, g_m);
-        Delta_p = _Delta_p_ICGN(hessian, f, g, f_m, g_m, Delta_f, Delta_g, sdi);
-        p_new = _p_new_ICGN(p, Delta_p);
-        norm = _norm(Delta_p, size);
-        C_LS = _ZNSSD(f, g, f_m, g_m, Delta_f, Delta_g);
-        C_CC = 1-(C_LS/2);
-        convergence(0,iteration-1) = iteration;
-        convergence(1,iteration-1) = norm;
-        convergence(2,iteration-1) = C_CC;
-        convergence(3,iteration-1) = C_LS;
-        iteration += 1;
-        p = p_new;
+    try{
+        while (iteration < max_iterations && norm > max_norm){
+            g_coord = _g_coord(f_coord, p);
+            g_coords = _g_coords(f_coord, p, f_coords);
+            g = _intensity(g_coords, g_QCQT);
+            g_m = g.mean();
+            Delta_g = _Delta_g(g, g_m);
+            Delta_p = _Delta_p_ICGN(hessian, f, g, f_m, g_m, Delta_f, Delta_g, sdi);
+            p_new = _p_new_ICGN(p, Delta_p);
+            norm = _norm(Delta_p, size);
+            C_LS = _ZNSSD(f, g, f_m, g_m, Delta_f, Delta_g);
+            C_CC = 1-(C_LS/2);
+            convergence(0,iteration-1) = iteration;
+            convergence(1,iteration-1) = norm;
+            convergence(2,iteration-1) = C_CC;
+            convergence(3,iteration-1) = C_LS;
+            iteration += 1;
+            p = p_new;
+        }
+    }
+    catch(const std::invalid_argument& e){
+        cerr << e.what() << endl;
+        PyErr_SetObject(PyExc_ValueError, PyUnicode_FromString(e.what()));
+        std::vector<Eigen::MatrixXd> output;
+        return output;
     }
     constants << g_m, Delta_g;
 
@@ -1178,6 +1192,8 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(_subset_extensions,m)
 {
+
+py::register_exception<invalid_argument>(m,"ValueError");
 m.doc() = "C++ subset module extensions for geopyv.";
 m.def("_f_coords", &_f_coords, py::return_value_policy::reference_internal, "C++ extension to compute the reference coordinates using the subset template.");
 m.def("_Delta_f", &_Delta_f, py::return_value_policy::reference_internal, "C++ extension to compute the square root of the sum of delta squared.");

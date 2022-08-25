@@ -1062,26 +1062,34 @@ std::vector<MatrixXd> _solve_FAGN(
 
     // Iterate to solution.
     p = p_0;
-    while (iteration < max_iterations && norm > max_norm){
-        g_coord = _g_coord(f_coord, p);
-        g_coords = _g_coords(f_coord, p, f_coords);
-        g = _intensity(g_coords, g_QCQT);
-        g_m = g.mean();
-        Delta_g = _Delta_g(g, g_m);
-        grad_g = _grad(g_coords, g_QCQT);
-        sdi = _sdi(g_coord, g_coords, grad_g, p);
-        hessian = _hessian(sdi);
-        Delta_p = _Delta_p_FAGN(hessian, f, g, f_m, g_m, Delta_f, Delta_g, sdi);
-        p_new = p + Delta_p;
-        norm = _norm(Delta_p, size);
-        C_LS = _ZNSSD(f, g, f_m, g_m, Delta_f, Delta_g);
-        C_CC = 1-(C_LS/2);
-        convergence(0,iteration-1) = iteration;
-        convergence(1,iteration-1) = norm;
-        convergence(2,iteration-1) = C_CC;
-        convergence(3,iteration-1) = C_LS;
-        iteration += 1;
-        p = p_new;
+    try{
+        while (iteration < max_iterations && norm > max_norm){
+            g_coord = _g_coord(f_coord, p);
+            g_coords = _g_coords(f_coord, p, f_coords);
+            g = _intensity(g_coords, g_QCQT);
+            g_m = g.mean();
+            Delta_g = _Delta_g(g, g_m);
+            grad_g = _grad(g_coords, g_QCQT);
+            sdi = _sdi(g_coord, g_coords, grad_g, p);
+            hessian = _hessian(sdi);
+            Delta_p = _Delta_p_FAGN(hessian, f, g, f_m, g_m, Delta_f, Delta_g, sdi);
+            p_new = p + Delta_p;
+            norm = _norm(Delta_p, size);
+            C_LS = _ZNSSD(f, g, f_m, g_m, Delta_f, Delta_g);
+            C_CC = 1-(C_LS/2);
+            convergence(0,iteration-1) = iteration;
+            convergence(1,iteration-1) = norm;
+            convergence(2,iteration-1) = C_CC;
+            convergence(3,iteration-1) = C_LS;
+            iteration += 1;
+            p = p_new;
+        }
+    }
+    catch(const std::invalid_argument& e){
+        cerr << e.what() << endl;
+        PyErr_SetObject(PyExc_ValueError, PyUnicode_FromString(e.what()));
+        std::vector<Eigen::MatrixXd> output;
+        return output;
     }
     constants << g_m, Delta_g;
 
@@ -1129,47 +1137,55 @@ std::vector<MatrixXd> _solve_WFAGN(
 
     // Iterate to solution.
     p = p_0;
-    while (iteration < max_iterations && norm > max_norm){
-        W_f = _W(D_f, D_0);
-        A_s = _A_s(W_f);
-        g_coord = _g_coord(f_coord, p);
-        g_coords = _g_coords(f_coord, p, f_coords);
-        g = _intensity(g_coords, g_QCQT);
-        g_m = g.mean();
-        Delta_g = _Delta_g(g, g_m);
-        grad_g = _grad(g_coords, g_QCQT);
-        D_g = _D(g_coord, g_coords);
-        W_g = _W(D_g, D_0);
-        sdi = _sdi(g_coord, g_coords, grad_g, p);
-        T_p = _T_p(f, g, f_m, g_m, Delta_f, Delta_g, W_f, W_g);
-        dg_m_dp = _dg_m_dp(sdi);
-        dW_g_dp = _dW_g_dp(f_coord, f_coords, W_g, p);
-        dDelta_g_dp = _dDelta_g_dp(g, g_m, Delta_g, sdi, dg_m_dp);
-        dg_n_dp = _dg_n_dp(g, g_m, Delta_g, sdi, dg_m_dp, dDelta_g_dp);
-        dT_p_dp = _dT_p_dp(f, g, f_m, g_m, Delta_f, Delta_g, p, W_f, W_g, D_f, D_g, dg_n_dp, dW_g_dp);
-        hessian = _hessian(dT_p_dp);
-        hessian = 2/A_s*hessian;
-        dA_s_dp = _dA_s_dp(W_f, D_f, p);
-        grad_C_W = _grad_C_W(f, g, f_m, g_m, Delta_f, Delta_g, p, W_f, W_g, D_f, D_g, T_p, dT_p_dp, dA_s_dp, A_s);
-        Delta_p = _Delta_p_WFAGN(hessian, grad_C_W);
-        p_new = p - Delta_p;      
-        norm = _norm(Delta_p, size);
-        C_LS = _WZNSSD(f, g, f_m, g_m, Delta_f, Delta_g, W_f, W_g, A_s);
-        C_CC = 1-(C_LS/2);
-        convergence(0,iteration-1) = iteration;
-        convergence(1,iteration-1) = norm;
-        convergence(2,iteration-1) = C_CC;
-        convergence(3,iteration-1) = C_LS;
-        iteration += 1;
-        p = p_new;
-        
-        // Enforce bounds on Gaussian window size.
-        if (p(m-1) < D_0_min){
-            p(m-1) = D_0_min;
-        } else if (p(m-1) > p_0(m-1)){
-            p(m-1) = p_0(m-1);
-        }
+    try{
+        while (iteration < max_iterations && norm > max_norm){
+            W_f = _W(D_f, D_0);
+            A_s = _A_s(W_f);
+            g_coord = _g_coord(f_coord, p);
+            g_coords = _g_coords(f_coord, p, f_coords);
+            g = _intensity(g_coords, g_QCQT);
+            g_m = g.mean();
+            Delta_g = _Delta_g(g, g_m);
+            grad_g = _grad(g_coords, g_QCQT);
+            D_g = _D(g_coord, g_coords);
+            W_g = _W(D_g, D_0);
+            sdi = _sdi(g_coord, g_coords, grad_g, p);
+            T_p = _T_p(f, g, f_m, g_m, Delta_f, Delta_g, W_f, W_g);
+            dg_m_dp = _dg_m_dp(sdi);
+            dW_g_dp = _dW_g_dp(f_coord, f_coords, W_g, p);
+            dDelta_g_dp = _dDelta_g_dp(g, g_m, Delta_g, sdi, dg_m_dp);
+            dg_n_dp = _dg_n_dp(g, g_m, Delta_g, sdi, dg_m_dp, dDelta_g_dp);
+            dT_p_dp = _dT_p_dp(f, g, f_m, g_m, Delta_f, Delta_g, p, W_f, W_g, D_f, D_g, dg_n_dp, dW_g_dp);
+            hessian = _hessian(dT_p_dp);
+            hessian = 2/A_s*hessian;
+            dA_s_dp = _dA_s_dp(W_f, D_f, p);
+            grad_C_W = _grad_C_W(f, g, f_m, g_m, Delta_f, Delta_g, p, W_f, W_g, D_f, D_g, T_p, dT_p_dp, dA_s_dp, A_s);
+            Delta_p = _Delta_p_WFAGN(hessian, grad_C_W);
+            p_new = p - Delta_p;      
+            norm = _norm(Delta_p, size);
+            C_LS = _WZNSSD(f, g, f_m, g_m, Delta_f, Delta_g, W_f, W_g, A_s);
+            C_CC = 1-(C_LS/2);
+            convergence(0,iteration-1) = iteration;
+            convergence(1,iteration-1) = norm;
+            convergence(2,iteration-1) = C_CC;
+            convergence(3,iteration-1) = C_LS;
+            iteration += 1;
+            p = p_new;
+            
+            // Enforce bounds on Gaussian window size.
+            if (p(m-1) < D_0_min){
+                p(m-1) = D_0_min;
+            } else if (p(m-1) > p_0(m-1)){
+                p(m-1) = p_0(m-1);
+            }
 
+        }
+    }
+    catch(const std::invalid_argument& e){
+        cerr << e.what() << endl;
+        PyErr_SetObject(PyExc_ValueError, PyUnicode_FromString(e.what()));
+        std::vector<Eigen::MatrixXd> output;
+        return output;
     }
     constants << g_m, Delta_g;
 

@@ -15,7 +15,7 @@ faulthandler.enable()
 
 class Mesh:
 
-    def __init__(self, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[]):
+    def __init__(self, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 25, size_upper_bound = 250):
         """Initialisation of geopyv mesh object."""
         self.initialised = False
         # Check types.
@@ -41,12 +41,13 @@ class Mesh:
         self.target_nodes = target_nodes
         self.boundary = boundary
         self.exclusions = exclusions
+        self.size_lower_bound = size_lower_bound
+        self.size_upper_bound = size_upper_bound
 
         # Initialise gmsh.
         print("Generating mesh using gmsh with approximately {n} nodes.".format(n=self.target_nodes))
         gmsh.initialize()
-        gmsh.option.setNumber("General.Verbosity", 1) # Only receive error messages. 
-
+        gmsh.option.setNumber("General.Verbosity", 2) # 0: silent except for fatal errors, 1: +errors, 2: +warnings, 3: +direct, 4: +information, 5: +status, 99: +debug
         # Create mesh.
         self._define_RoI()
         self._mesh()
@@ -149,7 +150,7 @@ class Mesh:
     def _mesh(self):
         """Private method to optimize the element size to generate approximately the desired number of elements."""
         f = lambda size: self._initial_mesh(size, self.boundary, self.segments, self.curves, self.target_nodes)
-        res = minimize_scalar(f, bounds=(25, 250), method='bounded')
+        res = minimize_scalar(f, bounds=(self.size_lower_bound, self.size_upper_bound), method='bounded')
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
@@ -164,7 +165,7 @@ class Mesh:
         """
         # Make mesh.
         gmsh.model.add("base") # Create model.
-        
+
         # Add points.
         for i in range(np.shape(boundary)[0]):
             gmsh.model.occ.addPoint(boundary[i,0], boundary[i,1], 0, size, i)       
@@ -351,7 +352,7 @@ class Mesh:
         """
         Method to calculate the correlation coefficients and warp functions of the neighbouring nodes.
 
-        Parametersprint(pts_idxs)
+        Parameters
         p_0 : numpy.ndarray (N)
             Preconditioning warp function.
         """
@@ -394,3 +395,16 @@ class Mesh:
         self.p[index] = self.subsets[index].p.flatten()
         self.displacements[index, 0] = self.subsets[index].u
         self.displacements[index, 1] = -self.subsets[index].v
+
+def PolyArea(pts):
+    """A function that returns the area of the input polygon.
+
+    Parameters
+    ----------
+    pts : numpy.ndarray (N,2)
+        Clockwise/anti-clockwise ordered coordinates.
+    """
+
+    x = pts[:,0]
+    y = pts[:,1]
+    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))

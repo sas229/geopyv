@@ -211,32 +211,34 @@ class Subset:
             self.p = p_0
 
         # Call appropriate iterative solver:
-        if self.method == "ICGN" and np.mod(self.p.shape[0],2) == 0:
-            results = _solve_ICGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
-        elif self.method == "FAGN" and np.mod(self.p.shape[0],2) == 0:
-            results = _solve_FAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
-        elif self.method == "WFAGN" and np.mod(self.p.shape[0],2) == 1:
-            raise Exception("WFAGN method not yet fully implemented.")
-            results = _solve_WFAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations, 1000)
-        
-        # Unpack results.
-        self.g_coords = results[0]
-        self.g = results[1]
-        self.g_m = results[2][0][0]
-        self.g_m = results[2][1][0]
-        self.iterations = np.max(results[3][0,:]).astype(int)
-        self.history = results[3][:,:self.iterations]
-        self.norm = self.history[1][-1]
-        self.C_CC = self.history[2][-1]
-        self.C_SSD = self.history[3][-1]
-        self.p = results[4]
-        self.u = self.p[0][0]
-        self.v = self.p[1][0]
+        try:
+            if self.method == "ICGN" and np.mod(self.p.shape[0],2) == 0:
+                results = _solve_ICGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
+            elif self.method == "FAGN" and np.mod(self.p.shape[0],2) == 0:
+                results = _solve_FAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
+            elif self.method == "WFAGN" and np.mod(self.p.shape[0],2) == 1:
+                raise Exception("WFAGN method not yet fully implemented.")
+                results = _solve_WFAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations, 1000)
+            # Unpack results.
+            self.g_coords = results[0]
+            self.g = results[1]
+            self.g_m = results[2][0][0]
+            self.g_m = results[2][1][0]
+            self.iterations = np.max(results[3][0,:]).astype(int)
+            self.history = results[3][:,:self.iterations]
+            self.norm = self.history[1][-1]
+            self.C_CC = self.history[2][-1]
+            self.C_SSD = self.history[3][-1]
+            self.p = results[4]
+            self.u = self.p[0][0]
+            self.v = self.p[1][0]
 
-        # Check for tolerance.
-        if self.C_CC > self.tolerance:
-            self.solved = True
-    
+            # Check for tolerance.
+            if self.C_CC > self.tolerance:
+                self.solved = True
+        except:
+            pass
+
         return self.solved
 
     def inspect(self):

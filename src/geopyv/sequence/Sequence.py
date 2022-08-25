@@ -28,8 +28,8 @@ class Sequence:
         3D array of the numerical particle position paths (ppp). 
         N: particle index, M: time step (M=0 initiation step, M=1 1st mesh applied), 2: (x,y) coordinates.
         Computed by method :meth:`~particle`. 
-    psp : `numpy.ndarray` (N,M,3)
-        3D array of the numerical particle strain paths (psp) (total strain). 
+    pep : `numpy.ndarray` (N,M,3)
+        3D array of the numerical particle strain paths (pep) (total strain). 
         N: particle index, M: time step (M=0 initiation step, M=1 1st mesh applied), 3: (du/dx, dv/dy, du/dy+dv/dx).
         Computed by method :meth:`~particle`. 
     pvp : `numpy.ndarray` (N,M)
@@ -72,7 +72,7 @@ class Sequence:
         self.boundary = boundary
         self.exclusions = exclusions
         
-    def solve(self, seed_coord=None, template=Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2):
+    def solve(self, seed_coord=None, template=Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2, size_lower_bound = 25, size_upper_bound = 250):
         """A method to generate a mesh sequence for the image sequence input at initiation. A reliability guided (RG) approach is implemented, 
         updating the reference image according to correlation coefficient threshold criteria. An elemental shear strain-based mesh adaptivity is implemented.
         The meshes are stored in self.meshes and the mesh-image index references are stored in self.f_img_index. 
@@ -102,6 +102,8 @@ class Sequence:
         self.tolerance = tolerance
         self.alpha = alpha
         self.beta = beta
+        self.size_lower_bound = size_lower_bound
+        self.size_upper_bound = size_upper_bound
         if self.order == 1 and self.method != "WFAGN":
             self.p_0 = np.zeros(6)
         elif self.order == 1 and self.method == "WFAGN":
@@ -118,7 +120,7 @@ class Sequence:
         update_flag = True
         while iteration < len(self.img_sequence):
             print("Solving for image pair {}-{}".format(self.f_img_index[iteration-1], iteration))
-            mesh = Mesh(f_img = self.img_sequence[self.f_img_index[iteration-1]], g_img = self.img_sequence[iteration], target_nodes = self.target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Initialise mesh object.
+            mesh = Mesh(f_img = self.img_sequence[self.f_img_index[iteration-1]], g_img = self.img_sequence[iteration], target_nodes = self.target_nodes, boundary = self.boundary, exclusions = self.exclusions, size_lower_bound = self.size_lower_bound, size_upper_bound = self.size_upper_bound) # Initialise mesh object.
             mesh.solve(seed_coord=self.seed_coord, template=self.template, max_iterations=self.max_iterations, max_norm=self.max_norm, adaptive_iterations=self.adaptive_iterations, method=self.method, order=self.order, tolerance=self.tolerance, alpha=self.alpha, beta=self.beta) # Solve mesh.
             if mesh.update and update_flag: # Correlation coefficient thresholds not met (consequently no mesh generated).  
                 update_flag = False 
@@ -145,25 +147,25 @@ class Sequence:
             self.kde_dist(f = f)
             particles = np.empty(len(self.comb_mesh.triangulation)*3**key, dtype=object)
             self.ppp = np.empty((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence), 2)) # Particle Position Path
-            self.psp = np.zeros((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence), 3)) # Particle Strain Path
+            self.pep = np.zeros((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence), 3)) # Particle Strain Path
             self.pvp = np.empty((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence))) # Particle Volume Path
             self.ppp[:,0], self.pvp[:,0] = self.particle_distribution(mesh = self.comb_mesh, key = key) # Initial positions and volumes.
         else: 
             particles = np.empty(len(par_pts), dtype=object)
             self.ppp = np.empty((len(par_pts), len(self.img_sequence), 2)) # Particle Position Path
-            self.psp = np.zeros((len(par_pts), len(self.img_sequence), 3)) # Particle Strain Path
+            self.pep = np.zeros((len(par_pts), len(self.img_sequence), 3)) # Particle Strain Path
             self.pvp = np.empty((len(par_pts), len(self.img_sequence))) # Particle Volume Path
             self.ppp[:,0] = self.par_pts
             self.pvp[:,0] = self.par_vols
         for i in range(len(particles)): # Create matrix of particle objects.
-            particles[i] = Particle(self.ppp[i,0], self.psp[i,0], self.pvp[i,0])
+            particles[i] = Particle(self.ppp[i,0], self.pep[i,0], self.pvp[i,0])
             for j in range(len(self.img_sequence)-1):
                 ref_flag = False
                 if self.f_img_index[j-1] != self.f_img_index[j] or i == 0:
                     ref_flag = True
                 particles[i].update(self.meshes[j], ref_flag=ref_flag)
                 self.ppp[i,j+1] = particles[i].coord
-                self.psp[i,j+1] = particles[i].strain
+                self.pep[i,j+1] = particles[i].strain
                 self.pvp[i,j+1] = particles[i].vol
 
     def particle_distribution(self, mesh, key = 0):
@@ -204,14 +206,14 @@ class Sequence:
             par_vols = par_vols.flatten()
         return par_pts, par_vols
     
-    def kde_dist(self, f = 0):
+    def kde_dist(self, f = 0, area= 200):
         """A method that combines the points through the mesh sequence to generate a Kernel Density Estimate (KDE)
         used as a background field to generate the numerical particle control mesh.
 
         f  : int
             Target element size function (f==0: 0.5*erfc(3.6*(Z_{bar}-0.5)), f==1: 100*10**(-4*Z_{bar})).
         """
-        self.comb_mesh = Mesh(f_img = self.img_sequence[0], g_img = self.img_sequence[1], target_nodes=target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Create mesh object with roi corresponding to the first image.
+        self.comb_mesh = Mesh(f_img = self.img_sequence[0], g_img = self.img_sequence[1], target_nodes=self.target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Create mesh object with roi corresponding to the first image.
         self.comb_mesh.nodes = self.comb_mesh.boundary # Overwrite mesh points with roi.
         for i in range(len(self.meshes)):
             self.comb_mesh.nodes = np.append(self.comb_mesh.nodes, self.meshes[i].nodes[len(self.comb_mesh.boundary):], axis=0) # Append non-roi mesh points.
@@ -219,16 +221,46 @@ class Sequence:
         kernel = spst.gaussian_kde(self.comb_mesh.nodes.T) # Create kde.
         Z = kernel(np.mean(self.comb_mesh.nodes[self.comb_mesh.triangulation], axis=1).T) # Sample kde at element centroids.
         if f == 0:
-            self.comb_mesh.areas = 0.5*spsp.erfc(3.6*((Z-np.min(Z))/(np.max(Z)-np.min(Z))-0.5))*self.area # Set target element areas.
+            self.comb_mesh.areas = 0.5*spsp.erfc(3.6*((Z-np.min(Z))/(np.max(Z)-np.min(Z))-0.5))*area # Set target element areas.
         elif f == 1:
-            self.comb_mesh.areas = self.area*10**(-2*(Z-np.min(Z))/(np.max(Z)-np.min(Z)))
+            self.comb_mesh.areas = area*10**(-2*(Z-np.min(Z))/(np.max(Z)-np.min(Z)))
         elif f == 2:
-            self.comb_mesh.areas = self.area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))
+            self.comb_mesh.areas = area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))
         elif f == 3:
-            self.comb_mesh.areas = self.area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))**2
-        self.comb_mesh._adaptive_remesh() # Generate background field. 
+            self.comb_mesh.areas = area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))**2
+        self.comb_mesh._adaptive_remesh(scale=1.7, target=self.target_nodes, nodes = self.comb_mesh.nodes, triangulation = self.comb_mesh.triangulation, areas = self.comb_mesh.areas) # Generate background field. 
         self.comb_mesh._update_mesh() # Extract the numerical particle control mesh. 
 
+#    def integrate(self, parms):
+#        """Apply constitutive model via UMAT and integrate work along strain-path.
+#        
+#        parms : 
+#            0 - M, slope of CSL.
+#            1 - lamda, slope of NCL/ICL (ln(1+e):ln(p) plane).
+#            2 - kappa, slope of URL (ln(1+e):ln(p) plane).
+#            3 - N, ln(1+e) @ reference stress.
+#            4 - nu, Poisson's ratio.
+#            5 - s_f, Reference sensitivity.
+#            6 - k, Rate of structure degradation.
+#            7 - A, Deviatoric/volumetric strain balance.
+#            8 - OCR, Initial overconsolidation ratio.
+#            9 - k_w, Pore water bulk modulus.
+#            10 - e, initial void ratio.
+#            11 - s_ep, Initial value of sensitivity.
+#            """
+#
+#        self.psp = np.zeros(self.pep.shape)
+#
+#        for p in range(len(particles)):
+#            
+#            
+#        # Calculate initial stress
+#
+#
+#
+#            
+#        #umat.umat()
+#
 def PolyArea(pts):
     """A function that returns the area of the input polygon.
 

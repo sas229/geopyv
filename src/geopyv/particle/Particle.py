@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.path as path
+#import umat
 
 class Particle:
     """Particle class for geopyv.
@@ -55,11 +56,11 @@ class Particle:
             The relevant mesh.
         """
 
-        diff = mesh.pts - self.coord # Particle-mesh node positional vector.
+        diff = mesh.nodes - self.coord # Particle-mesh node positional vector.
         dist = np.einsum('ij,ij->i',diff, diff) # Particle-mesh node "distances" (truly distance^2).
-        tri_idxs = np.argwhere(np.any(mesh.tri == np.argmin(dist), axis=1)==True).flatten() # Retrieve relevant element indices.
+        tri_idxs = np.argwhere(np.any(mesh.triangulation == np.argmin(dist), axis=1)==True).flatten() # Retrieve relevant element indices.
         for i in range(len(tri_idxs)):  
-            if path.Path(mesh.pts[mesh.tri[tri_idxs[i]]]).contains_point(self.coord): # Check if the element includes the particle coordinates.
+            if path.Path(mesh.nodes[mesh.triangulation[tri_idxs[i]]]).contains_point(self.coord): # Check if the element includes the particle coordinates.
                 break # If the correct element is identified, stop the search. 
         return tri_idxs[i] # Return the element index. 
 
@@ -74,8 +75,7 @@ class Particle:
             The index of the relevant element within mesh."""
 
         self.B = mesh.Bs[tri_idx] # Retrieve the element B matrix from the mesh object (where epsilon = Bu).
-        self.W = self._W(mesh.pts[mesh.tri[tri_idx]], mesh.areas[tri_idx]) # Calculate the element shape function matrix.
-
+        self.W = self._W(mesh.nodes[mesh.triangulation[tri_idx]], mesh.areas[tri_idx]) # Calculate the element shape function matrix.
 
     def _W(self, tri, area):
         """Private method to calculate the element shape functions.
@@ -112,6 +112,13 @@ class Particle:
             self.coord_ref = self.coord
             self.strain_ref = self.strain
             self.vol_ref = self.vol
-        self.coord = self.coord_ref+self.W@mesh.p_ar[mesh.tri[tri_idx], :2] # Update the particle positional coordinate (reference + mesh interpolation).
-        self.strain = self.strain_ref+self.B@(mesh.p_ar[mesh.tri[tri_idx],:2].flatten()) # Update the particle strain (reference + mesh interpolation).
+        self.coord = self.coord_ref+self.W@mesh.p[mesh.triangulation[tri_idx], :2] # Update the particle positional coordinate (reference + mesh interpolation).
+        self.strain = self.strain_ref+self.B@(mesh.p[mesh.triangulation[tri_idx],:2].flatten()) # Update the particle strain (reference + mesh interpolation).
         self.vol = self.vol_ref*(1 + self.strain[0] + self.strain[1]) # Update the particle volume (reference*(1 + volume altering strain components)).
+
+
+
+
+
+
+        

@@ -1,9 +1,12 @@
 from PIL import Image as Im
 from geopyv.image import Image
+from geopyv.templates import Circle
 from geopyv.sequence import Sequence
 import numpy as np 
 from scipy import special as sp
 import matplotlib.pyplot as plt 
+
+from geopyv.geometry.exclusions import circular_exclusion, circular_exclusion_list
 
 class Validator:
     """Validator image class:
@@ -27,7 +30,7 @@ class Validator:
         self.labels = []
         self.out = []
 
-    def isg(self, image_size = 401, img_typ = "jpg", speckle_no = 7640, rho = 4/np.sqrt(8), seq_len = 50, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = 1, a = 0, b = 0, origin = np.asarray([0.0,0.0]), noise = np.asarray([[0.0, 0.0],[0,0]])):
+    def isg(self, image_size = 1001, img_typ = "jpg", speckle_no = 4*7640, rho = 4/np.sqrt(8), seq_len = 50, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = 1, a = 0, b = 0, origin = np.asarray([0.0,0.0]), noise = np.asarray([[0.0, 0.0],[0,0]])):
         """ Image Sequence Generator (isg)
 
         Parameters
@@ -47,10 +50,10 @@ class Validator:
         typ : int
             Multiplier type. 0 - linear, 1 - log.
         comp : int 
-            0 - u or rotation
-            1 - v or sinusoidal
-            2 - dudx or bar
-            3 - dvdx 
+            0 - u 
+            1 - v or rotation
+            2 - dudx sinusoidal 
+            3 - dvdx or bar
             4 - dudy
             5 - dvdy 
             6 - d2udx2
@@ -134,39 +137,15 @@ class Validator:
             warp[:,1] = self.pm[i][1] + self.pm[i][3]*delta[:,0] + self.pm[i][5]*delta[:,1] + 0.5*self.pm[i][7]*delta[:,0]**2 + self.pm[i][9]*delta[:,0]*delta[:,1] + 0.5*self.pm[i][11]*delta[:,1]**2      
         elif self.key*self.comp == 1: # Rotation.
             delta = pt - self.origin
-            warp[:,0] = self.origin[0] + delta[:,0] * np.cos(self.am[i]) + delta[:,1] * np.sin(self.am[i])
-            warp[:,1] = self.origin[1] - delta[:,0] * np.sin(self.am[i]) + delta[:,1] * np.cos(self.am[i])
+            warp[:,0] =  delta[:,0] * np.cos(self.am[i]) + delta[:,1] * np.sin(self.am[i]) - delta[:,0] 
+            warp[:,1] =  - delta[:,0] * np.sin(self.am[i]) + delta[:,1] * np.cos(self.am[i]) - delta[:,1] 
         elif self.key*self.comp == 2: # Sinusoidal. 
             warp[:,0] = (self.am[i])*np.sin(2*np.pi*pt[:,0]/(self.bm[i]))*np.sin(2*np.pi*pt[:,1]/(self.bm[i]))
         
-        if map == True or self.key*self.comp == 1:
+        if map == True:
             return warp
         else:
             return warp+self.I_p
-
-#    def _warp(self, o, i, pt, map = False):
-#        """Private method that applies warp. 
-#        
-#        Parameters
-#        ----------
-#        """
-#
-#        warp = np.zeros(pt.shape)
-#        if self.key == 0: # Homogeneous strain.
-#            delta = pt - self.origin
-#            warp[:,0] = (self.pm[i][0]-self.pm[o][0]) + (self.pm[i][2]-self.pm[o][2])*delta[:,0] + (self.pm[i][4]-self.pm[o][4])*delta[:,1] + 0.5*(self.pm[i][6]-self.pm[o][6])*delta[:,0]**2 + (self.pm[i][8]-self.pm[o][8])*delta[:,0]*delta[:,1] + 0.5*(self.pm[i][10]-self.pm[o][10])*delta[:,1]**2
-#            warp[:,1] = (self.pm[i][1]-self.pm[o][1]) + (self.pm[i][3]-self.pm[o][3])*delta[:,0] + (self.pm[i][5]-self.pm[o][5])*delta[:,1] + 0.5*(self.pm[i][7]-self.pm[o][7])*delta[:,0]**2 + (self.pm[i][9]-self.pm[o][9])*delta[:,0]*delta[:,1] + 0.5*(self.pm[i][11]-self.pm[o][11])*delta[:,1]**2      
-#        elif self.key*self.comp == 1: # Rotation.
-#            delta = pt - self.origin
-#            warp[:,0] = self.origin[0] + delta[:,0] * np.cos(self.am[i]-self.am[o]) + delta[:,1] * np.sin(self.am[i]-self.am[o])
-#            warp[:,1] = self.origin[1] - delta[:,0] * np.sin(self.am[i]-self.am[o]) + delta[:,1] * np.cos(self.am[i]-self.am[o])
-#        elif self.key*self.comp == 2: # Sinusoidal. 
-#            warp[:,0] = (self.am[i]-self.am[o])*np.sin(2*np.pi*pt[:,0]/(self.bm[i]-self.bm[o]))*np.sin(2*np.pi*pt[:,1]/(self.bm[i]-self.bm[o]))
-#        
-#        if map == True or self.key*self.comp == 1:
-#            return warp
-#        else:
-#            return warp+self.I_p
     
     def _t2g(self, i, T_p):
         """ Target to grid (or noise applicator). Applies spatial noise to the speckle positions, generates an intensity grid and then applies
@@ -194,32 +173,29 @@ class Validator:
         im = Im.fromarray(np.uint8(grid))
         im.save(self.name+"_"+str(i)+"."+self.img_typ)
 
-    def validation(self, boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]), tar_area = 20,
-                    seed = np.asarray([200.,200.]), piv_order = 1, label = None):
+    def validation(self, target_nodes = 1681, boundary = np.asarray([[300.,300.],[300.,700.],[700.,700.],[700.,300.]]), exclusions = [],
+                    seed_coord = np.asarray([500.,500.]), template = Circle(30), order = 1, adaptive_iterations = 0, label = None):
         
         self.img_seq = self._seqload()
-        self.seq = Sequence(self.img_seq)
-        self.seq.mesh_adaptivity_setup(max_iterations_adaptivity = 1, verbose = True)
-        self.seq.mesh_geometry_setup(area = tar_area, roi = boundary, hls = None, obj = None, sed = seed, manual = False)
-        self.seq.mesh_piv_setup(p_0 = np.zeros(6*piv_order))
-        self.seq.mesh()
+        self.seq = Sequence(img_sequence = self.img_seq, target_nodes = target_nodes, boundary = boundary, exclusions = exclusions)
+        self.seq.solve(seed_coord = seed_coord, max_iterations = 50, max_norm = 1e-5, tolerance = 0.7, template = template, order = order, adaptive_iterations = 0, alpha = 0.25, beta = 4, size_lower_bound = 1)
         self._comparison()
         self.labels.append(label)
         
     def _comparison(self):
         series = np.zeros((self.seq_len-1, 2)) # Standard error array.
-        base = np.zeros((len(self.seq.meshes[0].pts), 2)) # Displacement pre-image update array.
-        prevref = 0
-        for i in range(len(self.seq.miref)):
-            if self.seq.miref[i] != prevref:
-                base = ob_warp_a
-            ap_warp_a = np.zeros((len(self.seq.meshes[i].pts), 2))
-            ap_warp_a = self._warp(i, self.seq.meshes[i].pts, map = True) #ap_warp_a = self._warp(self.seq.miref[i], i+1, self.seq.meshes[i].pts, map = True)
-            ob_warp_a = np.zeros((len(self.seq.meshes[i].pts), 2))
+        base = np.zeros((len(self.seq.meshes[0].nodes), 2)) # Displacement pre-image update array.
+        for i in range(len(self.seq.f_img_index)):
+            if i != 0:
+                if self.seq.f_img_index[i] != self.seq.f_img_index[i-1]: # If reference updated...
+                    base = ob_warp_a # ... record previous 
+            ap_warp_a = np.zeros((len(self.seq.meshes[i].nodes), 2))
+            ap_warp_a = self._warp(i, self.seq.meshes[i].nodes, map = True) #ap_warp_a = self._warp(self.seq.f_img_index[i], i+1, self.seq.meshes[i].nodes, map = True)
+            ob_warp_a = np.zeros((len(self.seq.meshes[i].nodes), 2))
             for n in range(len(self.seq.meshes[i].subsets)):
                 ob_warp_a[n] = np.asarray([self.seq.meshes[i].subsets[n].u, self.seq.meshes[i].subsets[n].v]) + base[n]
             series[i,1] = np.std(np.sqrt(np.sum((ap_warp_a-ob_warp_a)**2, axis=1)))
-            series[i,0] = self.mult[i+1] #-self.mult[self.seq.miref[i]]
+            series[i,0] = self.mult[i+1] #-self.mult[self.seq.f_img_index[i]]
         self.out.append(series)
 
     def _seqload(self):
@@ -250,50 +226,73 @@ class Validator:
 
 print("===================================================u====================================================")
 valid = Validator(name = "u", key = 0)
-valid.isg(seq_len=6, mmin = 0, mmax = 5, typ = 0, comp = 0, comp_val = -1)
-valid.validation(piv_order = 1, label = r"$1^{st}$ Order")
-valid.validation(piv_order = 2, label = r"$2^{st}$ Order")
-print(valid.out)
+valid.isg(seq_len=40, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = -1)
+valid.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
+valid.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
+valid.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
+valid.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
+valid.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
+valid.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
 valid.plotter(x=r"Displacement, $u$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
-fig, ax = plt.subplots(figsize = (20,20))
-col = ["r","g","b","m","y"]
-for i in range(len(valid.seq.meshes)): 
-    ax.scatter(valid.seq.meshes[i].pts[:,0], valid.seq.meshes[i].pts[:,1], color = col[i], s = 1)
-plt.savefig("u_meshes.png", dpi = 500)
 
 #print("===================================================dudx==================================================")
 #valid1 = Validator(name = "dudx", key = 0)
-#valid1.isg(seq_len=50, mmin = -3, mmax = -1, typ = 1, comp = 2, comp_val = -1)
-#valid1.validation(piv_order = 1,  label = r"$1^{st}$ Order")
-#valid1.validation(piv_order = 2,  label = r"$2^{st}$ Order")
+#valid1.isg(seq_len=50, mmin = -6, mmax = -1, typ = 1, comp = 2, comp_val = -1)
+#valid1.validation(order = 1,  label = r"$1^{st}$ Order")
+#valid1.validation(order = 2,  label = r"$2^{st}$ Order")
 #valid1.plotter(x=r"$1^{st}$ Order Strain Component, $du/dx$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
 #
 #print("===================================================dudy==================================================")
 #valid2 = Validator(name = "dudy", key = 0)
-#valid2.isg(seq_len=50, mmin = -3, mmax = -1, typ = 1, comp = 4, comp_val = -1)
-#valid2.validation(piv_order = 1, label = r"$1^{st}$ Order")
-#valid2.validation(piv_order = 2, label = r"$2^{st}$ Order")
+#valid2.isg(seq_len=10, mmin = -3, mmax = -1, typ = 1, comp = 4, comp_val = -1)
+#valid2.validation(order = 1, label = r"$1^{st}$ Order")
+#valid2.validation(order = 2, label = r"$2^{st}$ Order")
 #valid2.plotter(x=r"$1^{st}$ Order Strain Component, $du/dy$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
-#a = np.logspace(-5, -3, 30, endpoint = True)
-#for i in range(len(a)):
-#    print(i ,a[i])
+#
 #print("===================================================d2udx2================================================")
 #valid3 = Validator(name = "d2udx2", key = 0)
-#valid3.isg(seq_len=30, mmin = -5, mmax = -3, typ = 1, comp = 6, comp_val = -1)
-#valid3.validation(piv_order = 1, label = r"$1^{st}$ Order")
-#valid3.validation(piv_order = 2, label = r"$2^{st}$ Order")
+#valid3.isg(seq_len=20, mmin = -6, mmax = -3, typ = 1, comp = 6, comp_val = 1)
+#valid3.validation(order = 1, label = r"$1^{st}$ Order")
+#valid3.validation(order = 2, label = r"$2^{st}$ Order")
 #valid3.plotter(x=r"$2^{nd}$ Order Strain Component, $d^2u/dx^2$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")    
 #
 #print("===================================================d2udxdy===============================================")
 #valid4 = Validator(name = "d2udxdy", key = 0)
-#valid4.isg(seq_len=30, mmin = -5, mmax = -3, typ = 1, comp = 8, comp_val = -1)
-#valid4.validation(piv_order = 1, label = r"$1^{st}$ Order")
-#valid4.validation(piv_order = 2, label = r"$2^{st}$ Order")
+#valid4.isg(seq_len=10, mmin = -5, mmax = -3, typ = 1, comp = 8, comp_val = -1)
+#valid4.validation(order = 1, label = r"$1^{st}$ Order")
+#valid4.validation(order = 2, label = r"$2^{st}$ Order")
 #valid4.plotter(x=r"$2^{nd} Order Strain Component, $d^2u/dxdy$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")    
 #
 #print("===================================================d2udy2================================================")
 #valid5 = Validator(name = "d2udy2", key = 0)
-#valid5.isg(seq_len=30, mmin = -5, mmax = -3, typ = 1, comp = 10, comp_val = -1)
-#valid5.validation(piv_order = 1, label = r"$1^{st}$ Order")
-#valid5.validation(piv_order = 2, label = r"$2^{st}$ Order")
+#valid5.isg(seq_len=10, mmin = -5, mmax = -3, typ = 1, comp = 10, comp_val = -1)
+#valid5.validation(order = 1, label = r"$1^{st}$ Order")
+#valid5.validation(order = 2, label = r"$2^{st}$ Order")
 #valid5.plotter(x=r"$2^{nd}$ Order Shear Strain, $d^2u/dy^2$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")    
+#
+#print("===================================================Rotation================================================")
+#valid6 = Validator(name = "Rotation", key = 1)
+#valid6.isg(seq_len=20, mmin = -4, mmax = 0, typ = 1, comp = 1, a = np.pi*10/180, comp_val = 1, origin = np.asarray([200,200]))
+#valid6.validation(order = 1, label = r"$1^{st}$ Order")
+#valid6.validation(order = 2, label = r"$2^{st}$ Order")
+#valid6.plotter(x=r"Rotation, $\theta$ ($^o$)",y=r"Standard error, $\rho_{px}$ ($px$)") 
+
+
+#fig, ax = plt.subplots( figsize = (9,4.5))
+#for i in range(len(valid5.seq.meshes[0].subsets)):
+#    x = np.ones(len(valid5.seq.meshes)+1)
+#    y = np.ones(len(valid5.seq.meshes)+1)
+#    x *= valid5.seq.meshes[0].subsets[i].f_coord[0]
+#    y *= valid5.seq.meshes[0].subsets[i].f_coord[1]
+#    for j in range(len(valid5.seq.meshes)):
+#        x[j+1] += valid5.seq.meshes[j].subsets[i].u
+#        y[j+1] += valid5.seq.meshes[j].subsets[i].v
+#    ax.plot(x,y)
+#fig.savefig("map.jpg")
+
+#fig, ax = plt.subplots(figsize = (20,20))
+#col = ["r","g","b","m","y"]
+#for i in range(len(valid.seq.meshes)): 
+#    ax.scatter(valid.seq.meshes[i].nodes[:,0], valid.seq.meshes[i].nodes[:,1], color = col[i], s = 10)
+#plt.savefig("u_meshes.png", dpi = 500)
+

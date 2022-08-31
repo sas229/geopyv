@@ -103,11 +103,10 @@ class Validator:
         self._mult()
         for i in range(self.seq_len):
             T_p = self._warp(i, self.I_p)
-            #T_p = self._warp(0, i, self.I_p)
             grid = self._t2g(i, T_p)
             self._create(i, grid)
 
-    def _mult(self):
+    def _mult(self, cut):
         self.pm = np.zeros((self.seq_len, 12))
         self.noisem = np.zeros((self.seq_len, 2))
         self.am = np.zeros((self.seq_len))
@@ -122,6 +121,11 @@ class Validator:
             self.noisem[i] = self.noise[0]*self.noise[1]*self.mult[i]
             self.am[i] = self.a*self.mult[i]
             self.bm[i] =  self.b*self.mult[i]
+        if cut is not None:
+            self.pm = self.pm[:cut]
+            self.noisem = self.noisem[:cut]
+            self.am = self.am[:cut]
+            self.bm = self.bm[:cut]
 
     def _warp(self, i, pt, map = False):
         """Private method that applies warp. 
@@ -172,6 +176,7 @@ class Validator:
         """
         im = Im.fromarray(np.uint8(grid))
         im.save(self.name+"_"+str(i)+"."+self.img_typ)
+        im.close()
 
     def validation(self, target_nodes = 1681, boundary = np.asarray([[300.,300.],[300.,700.],[700.,700.],[700.,300.]]), exclusions = [],
                     seed_coord = np.asarray([500.,500.]), template = Circle(30), order = 1, adaptive_iterations = 0, label = None):
@@ -185,9 +190,8 @@ class Validator:
     def _comparison(self):
         series = np.zeros((self.seq_len-1, 2)) # Standard error array.
         base = np.zeros((len(self.seq.meshes[0].nodes), 2)) # Displacement pre-image update array.
-        for i in range(len(self.seq.f_img_index)):
-            if i != 0:
-                if self.seq.f_img_index[i] != self.seq.f_img_index[i-1]: # If reference updated...
+        for i in range(len(self.seq.meshes)):
+            if self.seq.update_register[i] == 1: # If reference updated...
                     base = ob_warp_a # ... record previous 
             ap_warp_a = np.zeros((len(self.seq.meshes[i].nodes), 2))
             ap_warp_a = self._warp(i, self.seq.meshes[i].nodes, map = True) #ap_warp_a = self._warp(self.seq.f_img_index[i], i+1, self.seq.meshes[i].nodes, map = True)
@@ -198,7 +202,34 @@ class Validator:
             series[i,0] = self.mult[i+1] #-self.mult[self.seq.f_img_index[i]]
         self.out.append(series)
 
+    def seq_info_load(self, image_size = 1001, img_typ = "jpg", speckle_no = 4*7640, rho = 4/np.sqrt(8), seq_len = 50, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = 1, a = 0, b = 0, origin = np.asarray([0.0,0.0]), noise = np.asarray([[0.0, 0.0],[0,0]]), cut = None):
+
+        self.image_size = image_size
+        self.img_typ = img_typ
+        self.speckle_no = speckle_no
+        self.rho = rho
+        self.seq_len = seq_len
+        self.mmin = mmin 
+        self.mmax = mmax 
+        self.typ = typ
+        self.comp = comp
+        self.comp_val = comp_val
+        self.noise = noise
+        self.a = a 
+        self.b = b  
+        self.origin = origin
+        self.cut = cut
+
+        self.p = np.zeros(12)
+        self.p[comp] = self.comp_val
+        self._mult(cut)
+        if self.cut is not None:
+            self.seq_len = self.cut
+
+        
+
     def _seqload(self):
+
         output = np.empty(self.seq_len, dtype=object)
         for i in range(self.seq_len):
             output[i] = Image(self.name+"_"+str(i)+"."+self.img_typ)
@@ -211,10 +242,11 @@ class Validator:
         ----------
         out: validator class objects"""
 
-        formatting = np.asarray((["o", "r"],["^", "b"],["s", "g"],["+", "o"]))
+        marker = ["o", "^", "s", "v", "o", "^"]
+        colour = ["red", "blue", "green", "orange", "cyan", "magenta"]
         fig, ax = plt.subplots( figsize = (9,4.5))
         for i in range(len(self.out)): 
-            ax.scatter(self.out[i][:,0], self.out[i][:,1], facecolors='none', edgecolors= formatting[i,1], marker = formatting[i,0], label=self.labels[i])
+            ax.scatter(self.out[i][:,0], self.out[i][:,1], edgecolors= colour[i], marker = marker[i], label=self.labels[i])
         plt.legend()
         ax.set_xlabel(x)
         ax.set_ylabel(y)
@@ -226,7 +258,8 @@ class Validator:
 
 print("===================================================u====================================================")
 valid = Validator(name = "u", key = 0)
-valid.isg(seq_len=40, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = -1)
+#valid.isg(seq_len=40, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = -1)
+valid.seq_info_load(seq_len=40, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = -1)
 valid.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
 valid.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
 valid.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
@@ -237,44 +270,68 @@ valid.plotter(x=r"Displacement, $u$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px
 
 #print("===================================================dudx==================================================")
 #valid1 = Validator(name = "dudx", key = 0)
-#valid1.isg(seq_len=50, mmin = -6, mmax = -1, typ = 1, comp = 2, comp_val = -1)
-#valid1.validation(order = 1,  label = r"$1^{st}$ Order")
-#valid1.validation(order = 2,  label = r"$2^{st}$ Order")
+#valid1.isg(seq_len=40, mmin = -6, mmax = -1, typ = 1, comp = 2, comp_val = -1)
+#valid1.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
+#valid1.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
+#valid1.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
+#valid1.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
+#valid1.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
+#valid1.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
 #valid1.plotter(x=r"$1^{st}$ Order Strain Component, $du/dx$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
 #
 #print("===================================================dudy==================================================")
 #valid2 = Validator(name = "dudy", key = 0)
-#valid2.isg(seq_len=10, mmin = -3, mmax = -1, typ = 1, comp = 4, comp_val = -1)
-#valid2.validation(order = 1, label = r"$1^{st}$ Order")
-#valid2.validation(order = 2, label = r"$2^{st}$ Order")
+#valid2.isg(seq_len=40, mmin = -3, mmax = -1, typ = 1, comp = 4, comp_val = -1)
+#valid2.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
+#valid2.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
+#valid2.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
+#valid2.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
+#valid2.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
+#valid2.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
 #valid2.plotter(x=r"$1^{st}$ Order Strain Component, $du/dy$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
 #
 #print("===================================================d2udx2================================================")
 #valid3 = Validator(name = "d2udx2", key = 0)
-#valid3.isg(seq_len=20, mmin = -6, mmax = -3, typ = 1, comp = 6, comp_val = 1)
-#valid3.validation(order = 1, label = r"$1^{st}$ Order")
-#valid3.validation(order = 2, label = r"$2^{st}$ Order")
+#valid3.isg(seq_len=40, mmin = -6, mmax = -3, typ = 1, comp = 6, comp_val = 1)
+#valid3.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
+#valid3.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
+#valid3.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
+#valid3.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
+#valid3.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
+#valid3.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
 #valid3.plotter(x=r"$2^{nd}$ Order Strain Component, $d^2u/dx^2$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")    
 #
 #print("===================================================d2udxdy===============================================")
 #valid4 = Validator(name = "d2udxdy", key = 0)
-#valid4.isg(seq_len=10, mmin = -5, mmax = -3, typ = 1, comp = 8, comp_val = -1)
-#valid4.validation(order = 1, label = r"$1^{st}$ Order")
-#valid4.validation(order = 2, label = r"$2^{st}$ Order")
+#valid4.isg(seq_len=40, mmin = -5, mmax = -3, typ = 1, comp = 8, comp_val = -1)
+#valid4.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
+#valid4.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
+#valid4.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
+#valid4.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
+#valid4.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
+#valid4.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
 #valid4.plotter(x=r"$2^{nd} Order Strain Component, $d^2u/dxdy$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")    
 #
 #print("===================================================d2udy2================================================")
 #valid5 = Validator(name = "d2udy2", key = 0)
-#valid5.isg(seq_len=10, mmin = -5, mmax = -3, typ = 1, comp = 10, comp_val = -1)
-#valid5.validation(order = 1, label = r"$1^{st}$ Order")
-#valid5.validation(order = 2, label = r"$2^{st}$ Order")
+#valid5.isg(seq_len=40, mmin = -5, mmax = -3, typ = 1, comp = 10, comp_val = -1)
+#valid5.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
+#valid5.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
+#valid5.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
+#valid5.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
+#valid5.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
+#valid5.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
 #valid5.plotter(x=r"$2^{nd}$ Order Shear Strain, $d^2u/dy^2$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")    
 #
 #print("===================================================Rotation================================================")
 #valid6 = Validator(name = "Rotation", key = 1)
-#valid6.isg(seq_len=20, mmin = -4, mmax = 0, typ = 1, comp = 1, a = np.pi*10/180, comp_val = 1, origin = np.asarray([200,200]))
-#valid6.validation(order = 1, label = r"$1^{st}$ Order")
-#valid6.validation(order = 2, label = r"$2^{st}$ Order")
+#valid6.isg(seq_len=40, mmin = -4, mmax = 1, typ = 1, comp = 1, a = np.pi*100/180, comp_val = 1, origin = np.asarray([200,200]))
+#valid6.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
+#valid6.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
+#valid6.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
+#valid6.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
+#valid6.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
+#valid6.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
 #valid6.plotter(x=r"Rotation, $\theta$ ($^o$)",y=r"Standard error, $\rho_{px}$ ($px$)") 
 
 

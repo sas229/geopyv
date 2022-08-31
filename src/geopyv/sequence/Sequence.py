@@ -22,7 +22,7 @@ class Sequence:
     SETUP PARAMETERS
     meshes : `numpy.ndarray` (N)
         1D array of the mesh sequence, `geopyv.Mesh` class objects.
-    f_img_index : `numpy.ndarray` (N)s
+    update_register : `numpy.ndarray` (N)s
         1D array of the reference image indexes for the mesh sequence.
     ppp : `numpy.ndarray` (N,M,2)
         3D array of the numerical particle position paths (ppp). 
@@ -75,7 +75,7 @@ class Sequence:
     def solve(self, seed_coord=None, template=Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2, size_lower_bound = 25, size_upper_bound = 250):
         """A method to generate a mesh sequence for the image sequence input at initiation. A reliability guided (RG) approach is implemented, 
         updating the reference image according to correlation coefficient threshold criteria. An elemental shear strain-based mesh adaptivity is implemented.
-        The meshes are stored in self.meshes and the mesh-image index references are stored in self.f_img_index. 
+        The meshes are stored in self.meshes and the mesh-image index references are stored in self.update_register. 
 
         .. note::
                 * For more details on the RG approach implemented, see:
@@ -113,154 +113,108 @@ class Sequence:
 
         # Prepare output. 
         self.meshes = np.empty(len(self.img_sequence)-1, dtype=object) # Adapted meshes. 
-        self.f_img_index = np.zeros(len(self.img_sequence)-1, dtype=int) # Mesh-image reference.
+        self.update_register = np.zeros(len(self.img_sequence)-1, dtype=int) # Mesh-image reference.
 
         # Solve. 
-        iteration = 1 # Initial target image index (note, initial reference image index is implicitly 0). 
-        update_flag = True
-        while iteration < len(self.img_sequence):
-            print("Solving for image pair {}-{}".format(self.f_img_index[iteration-1], iteration))
-            mesh = Mesh(f_img = self.img_sequence[self.f_img_index[iteration-1]], g_img = self.img_sequence[iteration], target_nodes = self.target_nodes, boundary = self.boundary, exclusions = self.exclusions, size_lower_bound = self.size_lower_bound, size_upper_bound = self.size_upper_bound) # Initialise mesh object.
+        f_index = 0
+        g_index = 1
+        while g_index < len(self.img_sequence):
+            print("Solving for image pair {}-{}".format(f_index, g_index))
+            mesh = Mesh(f_img = self.img_sequence[f_index], g_img = self.img_sequence[g_index], target_nodes = self.target_nodes, boundary = self.boundary, exclusions = self.exclusions, size_lower_bound = self.size_lower_bound, size_upper_bound = self.size_upper_bound) # Initialise mesh object.
             mesh.solve(seed_coord=self.seed_coord, template=self.template, max_iterations=self.max_iterations, max_norm=self.max_norm, adaptive_iterations=self.adaptive_iterations, method=self.method, order=self.order, tolerance=self.tolerance, alpha=self.alpha, beta=self.beta) # Solve mesh.
-            if mesh.update and update_flag: # Correlation coefficient thresholds not met (consequently no mesh generated).  
-                update_flag = False 
-                self.f_img_index[iteration-1:] = iteration-1 # Update recorded reference image for future meshes.
+            if mesh.update and self.update_register[g_index-1] == 0: # Correlation coefficient thresholds not met (consequently no mesh generated).  
+                f_index = g_index - 1
+                self.update_register[f_index] = 1 # Update recorded reference image for future meshes.
             else:
-                update_flag = True
-                self.meshes[iteration-1] = mesh # Store the generated mesh.
-                iteration += 1 # Iterate the target image index. 
+                self.meshes[g_index-1] = mesh # Store the generated mesh.
+                g_index += 1 # Iterate the target image index. 
         
-    def particle(self, key = 1, f = 0, par_pts = None, par_vols = None):
+    def particle(self, key = "AUTO", coords = None, vols = None, opt = 0): #key = 1, coord_opt = 0, par_pts = None, par_vols = None):
         """A method to generate strain paths using interpolation from the meshes to a distribution of numerical particles.
         
         Parameters
         ----------
         key : str
-            Particles defined at the centroid of the element, 0, or the centroids of the incircle sub-divisions, 1. 
-        coords : numpy.ndarray (N,2)
-            User-specified initial numerical particle positions.
+            "AUTO" : Particle positions defined according to a kernel density estimation using all meshes in the sequence,
+                    volumes defined using Voronoi method.
+                    inp : None.
+            "MANUAL" : Particle positions defined by the user via "inp", volumes defined using Voronoi method.
+                    inp : np.ndarray, (N,2). 
+            "MESH" : Particle positions defined using a user-selected mesh via "inp", volumes defined using Voronoi method.
+                    inp : geopyv.Mesh object. 
+        opt : int
+            0 - Combined kde particle distribution with size function 0:
+            1 - Combined kde particle distribution with size function 1:
+            2 - Combined kde particle distribution with size function 2:
+            3 - Combined kde particle distribution with size function 3:
+
         """
-        self.par_pts = par_pts
-        self.par_vols = par_vols
 
-        if key < 2:
-            self.kde_dist(f = f)
-            particles = np.empty(len(self.comb_mesh.triangulation)*3**key, dtype=object)
-            self.ppp = np.empty((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence), 2)) # Particle Position Path
-            self.pep = np.zeros((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence), 3)) # Particle Strain Path
-            self.pvp = np.empty((len(self.comb_mesh.triangulation)*3**key, len(self.img_sequence))) # Particle Volume Path
-            self.ppp[:,0], self.pvp[:,0] = self.particle_distribution(mesh = self.comb_mesh, key = key) # Initial positions and volumes.
-        else: 
-            particles = np.empty(len(par_pts), dtype=object)
-            self.ppp = np.empty((len(par_pts), len(self.img_sequence), 2)) # Particle Position Path
-            self.pep = np.zeros((len(par_pts), len(self.img_sequence), 3)) # Particle Strain Path
-            self.pvp = np.empty((len(par_pts), len(self.img_sequence))) # Particle Volume Path
-            self.ppp[:,0] = self.par_pts
-            self.pvp[:,0] = self.par_vols
-        for i in range(len(particles)): # Create matrix of particle objects.
-            particles[i] = Particle(self.ppp[i,0], self.pep[i,0], self.pvp[i,0])
-            for j in range(len(self.img_sequence)-1):
-                ref_flag = False
-                if self.f_img_index[j-1] != self.f_img_index[j] or i == 0:
-                    ref_flag = True
-                particles[i].update(self.meshes[j], ref_flag=ref_flag)
-                self.ppp[i,j+1] = particles[i].coord
-                self.pep[i,j+1] = particles[i].strain
-                self.pvp[i,j+1] = particles[i].vol
+        if key == "AUTO":
+            if type(opt) != int:
+                raise TypeError("opt must be an integer.")
+            elif opt > 3 or opt < 0:
+                raise ValueError("opt must be 0, 1, 2, or 3.")
+            init_coords, init_vols = _distribution(inp = opt)
+        elif key == "MANUAL":
+            if type(coords) != np.ndarray:
+                raise TypeError("Expected np.ndarray, instead recieved {} for coords.".format(type(input)))
+            elif type(vols) != np.ndarray:
+                raise TypeError("Expected np.ndarray, instead recieved {} for vols.".format(type(input)))
+            elif coords.shape[1] != 2:
+                raise ValueError("Expected an np.ndarray of shape (N,2) for coords, instead recieved np.ndarray of shape {}.".format(input.shape))
+            elif len(coords) != len(vols):
+                raise ValueError("Coordinate and volume lengths mismatched.")
+            init_coords = coords
+            init_vols = vols
+        else:
+            raise ValueError("Distribution key not recognised.")
+    
+        self.particles = np.empty(len(init_vols), dtype=object)
+        for i in range(len(self.particles)):
+            self.particles[i] = Particle(coord = init_coords[i], meshes = self.meshes, update_register = self.update_register, vol = init_vols[i])
+            self.particles[i].solve()
 
-    def particle_distribution(self, mesh, key = 0):
-        """A method to distribute the numerical particles and calculate attributal volumes.
+    def _distribution(self, opt = None):
+        """Internal method for distributing particles across the region of interest (RoI). 
         
         Parameters
         ----------
-        mesh : object
-            The mesh to base the distribution of numerical particles upon.
-        key : str
-            Particles defined at the centroid of the element, "E", or the centroids of the incircle sub-divisions, "S". 
-        coords : numpy.ndarray (N,2)
-            User-specified initial numerical particle positions.
-        """
+        opt : int
+            Specifies the size function for the kde produced mesh:
+            0 - Combined kde particle distribution with size function 0:
+            1 - Combined kde particle distribution with size function 1:
+            2 - Combined kde particle distribution with size function 2:
+            3 - Combined kde particle distribution with size function 3:"""
 
-        if key == 0:
-            par_pts = np.mean(mesh.nodes[mesh.triangulation], axis = 1)
-            M = np.ones((len(mesh.triangulation),3,3))
-            M[:,1] = mesh.nodes[mesh.triangulation][:,:,0]
-            M[:,2] = mesh.nodes[mesh.triangulation][:,:,1]
-            par_vols = abs(0.5*np.linalg.det(M))
-        elif key == 1:
-            # Find the element incentres
-            BM = np.asarray([[0,1,-1],[-1,0,1],[1,-1,0]])
-            MM = np.asarray([[0.,0.5,0.5],[0.5,0.,0.5],[0.5,0.5,0.]])
-            diff = np.einsum('ij,njk->nik', BM, mesh.nodes[mesh.triangulation]) #BM@mesh.nodes[mesh.triangulation]
-            mid = np.einsum('ij,njk->nik', MM, mesh.nodes[mesh.triangulation])
-            dist = np.sqrt(np.einsum('nij,nij->ni', diff, diff))
-            ctrs = np.einsum('ij,ijk->ik', dist, mesh.nodes[mesh.triangulation])/np.einsum('ij->i', dist)[:,None]
-            par_vols = np.zeros((len(mesh.triangulation),3))
-            par_pts = np.empty((len(mesh.triangulation),3,2))
-            for i in range(len(mesh.triangulation)):
-                for j in range(3):
-                    sub = np.asarray([ctrs[i], mid[i,j-2], mesh.nodes[mesh.triangulation[i]][j], mid[i,j-1]])
-                    par_vols[i,j] = PolyArea(sub)
-                    par_pts[i,j] = np.mean(sub, axis=0)
-            par_pts = par_pts.reshape(-1,2)
-            par_vols = par_vols.flatten()
-        return par_pts, par_vols
-    
-    def kde_dist(self, f = 0, area= 200):
-        """A method that combines the points through the mesh sequence to generate a Kernel Density Estimate (KDE)
-        used as a background field to generate the numerical particle control mesh.
+        mesh = _combination_mesh(opt)
+        init_coords = np.mean(mesh.nodes[mesh.triangulation], axis = 1)
+        M = np.ones((len(mesh.triangulation),3,3))
+        M[:,1] = mesh.nodes[mesh.triangulation][:,:,0]
+        M[:,2] = mesh.nodes[mesh.triangulation][:,:,1]
+        init_vols = abs(0.5*np.linalg.det(M))
 
-        f  : int
-            Target element size function (f==0: 0.5*erfc(3.6*(Z_{bar}-0.5)), f==1: 100*10**(-4*Z_{bar})).
-        """
-        self.comb_mesh = Mesh(f_img = self.img_sequence[0], g_img = self.img_sequence[1], target_nodes=self.target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Create mesh object with roi corresponding to the first image.
-        self.comb_mesh.nodes = self.comb_mesh.boundary # Overwrite mesh points with roi.
+        return init_coords, init_vols
+         
+    def _combination_mesh(self, opt):
+        mesh = Mesh(f_img = self.img_sequence[0], g_img = self.img_sequence[1], target_nodes=self.target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Create mesh object with roi corresponding to the first image.
+        mesh.nodes = self.mesh.boundary # Overwrite mesh points with roi.
         for i in range(len(self.meshes)):
-            self.comb_mesh.nodes = np.append(self.comb_mesh.nodes, self.meshes[i].nodes[len(self.comb_mesh.boundary):], axis=0) # Append non-roi mesh points.
-        self.comb_mesh.triangulation = np.reshape(gmsh.model.mesh.triangulate(self.comb_mesh.nodes.flatten())-1, (-1,3)) # Define triangles for combined points.
-        kernel = spst.gaussian_kde(self.comb_mesh.nodes.T) # Create kde.
-        Z = kernel(np.mean(self.comb_mesh.nodes[self.comb_mesh.triangulation], axis=1).T) # Sample kde at element centroids.
-        if f == 0:
-            self.comb_mesh.areas = 0.5*spsp.erfc(3.6*((Z-np.min(Z))/(np.max(Z)-np.min(Z))-0.5))*area # Set target element areas.
-        elif f == 1:
-            self.comb_mesh.areas = area*10**(-2*(Z-np.min(Z))/(np.max(Z)-np.min(Z)))
-        elif f == 2:
-            self.comb_mesh.areas = area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))
-        elif f == 3:
-            self.comb_mesh.areas = area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))**2
-        self.comb_mesh._adaptive_remesh(scale=1.7, target=self.target_nodes, nodes = self.comb_mesh.nodes, triangulation = self.comb_mesh.triangulation, areas = self.comb_mesh.areas) # Generate background field. 
-        self.comb_mesh._update_mesh() # Extract the numerical particle control mesh. 
+            mesh.nodes = np.append(mesh.nodes, self.meshes[i].nodes[len(mesh.boundary):], axis=0) # Append non-roi mesh points.
+        mesh.triangulation = np.reshape(gmsh.model.mesh.triangulate(mesh.nodes.flatten())-1, (-1,3)) # Define triangles for combined points.
+        kernel = spst.gaussian_kde(mesh.nodes.T) # Create kde.
+        Z = kernel(np.mean(mesh.nodes[mesh.triangulation], axis=1).T) # Sample kde at element centroids.
+        if opt == 0:
+            mesh.areas = 0.5*spsp.erfc(3.6*((Z-np.min(Z))/(np.max(Z)-np.min(Z))-0.5))*area # Set target element areas.
+        elif opt == 1:
+            mesh.areas = area*10**(-2*(Z-np.min(Z))/(np.max(Z)-np.min(Z)))
+        elif opt == 2:
+            mesh.areas = area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))
+        elif opt == 3:
+            mesh.areas = area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))**2
+        mesh._adaptive_remesh(scale=1.7, target=self.target_nodes, nodes = mesh.nodes, triangulation = mesh.triangulation, areas = mesh.areas) # Generate background field. 
+        mesh._update_mesh() # Extract the numerical particle control mesh.
 
-#    def integrate(self, parms):
-#        """Apply constitutive model via UMAT and integrate work along strain-path.
-#        
-#        parms : 
-#            0 - M, slope of CSL.
-#            1 - lamda, slope of NCL/ICL (ln(1+e):ln(p) plane).
-#            2 - kappa, slope of URL (ln(1+e):ln(p) plane).
-#            3 - N, ln(1+e) @ reference stress.
-#            4 - nu, Poisson's ratio.
-#            5 - s_f, Reference sensitivity.
-#            6 - k, Rate of structure degradation.
-#            7 - A, Deviatoric/volumetric strain balance.
-#            8 - OCR, Initial overconsolidation ratio.
-#            9 - k_w, Pore water bulk modulus.
-#            10 - e, initial void ratio.
-#            11 - s_ep, Initial value of sensitivity.
-#            """
-#
-#        self.psp = np.zeros(self.pep.shape)
-#
-#        for p in range(len(particles)):
-#            
-#            
-#        # Calculate initial stress
-#
-#
-#
-#            
-#        #umat.umat()
-#
 def PolyArea(pts):
     """A function that returns the area of the input polygon.
 

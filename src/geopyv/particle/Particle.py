@@ -113,9 +113,8 @@ class Particle:
         W[2] -= W[0] + W[1] # Calculate nodal weightings (W3).
         return W
     
-    def strain_path(self):
+    def _strain_path(self):
         """Method to calculate and store stress path data for the particle object."""
-        
         
         for m in range(self.length):
             tri_idx = self._triangulation_locator(m) # Identify the relevant element of the mesh.
@@ -128,7 +127,7 @@ class Particle:
             self.strains[m+1] = self.ref_strain+self.B@(self.meshes[m].p[self.meshes[m].triangulation[tri_idx],:2].flatten()) # Update the particle strain (reference + mesh interpolation).
             self.vols[m+1] = self.ref_vol*(1 + self.strains[m+1,0] + self.strains[m+1,1]) # Update the particle volume (reference*(1 + volume altering strain components)).
 
-    def stress_path(self, **kwargs):
+    def _stress_path(self, **kwargs):
         """Method to calculate and store stress path data for the particle object.
         
         Parameters

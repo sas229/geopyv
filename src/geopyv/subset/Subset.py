@@ -135,6 +135,7 @@ class Subset:
         self.SSSIG = output[4][0][0]
         self.sigma_intensity = output[4][1][0]
         self.solved = False
+        self.unsolvable = False
         self.initialised == True
         self.x = f_coord[0]
         self.y = f_coord[1]
@@ -237,9 +238,7 @@ class Subset:
             if self.C_CC > self.tolerance:
                 self.solved = True
         except:
-            pass
-
-        return self.solved
+            raise ValueError("Reporting value error...")
 
     def inspect(self):
         """Method to show the subset and associated quality metrics."""
@@ -352,107 +351,110 @@ class Subset:
         self.iterations = 0
         self.norm = 1
         self.size = len(self.f_coords)**0.5
+    
+        try:
 
-        if method == "ICGN":
-            # Compute reference quantities.
-            self._get_sdi_f()
-            self._get_hessian()
-            # Iterate to solution.
-            while self.iterations<self.max_iterations and self.norm>self.max_norm:
-                self._get_g_coord()
-                self._get_g_coords()
-                self._get_intensity_g()
-                self._get_g_m()
-                self._get_Delta_g()
-                self._get_Delta_p_ICGN()
-                self._get_p_new_ICGN()
-                self._get_norm()
-                self._get_ZNSSD()
-                self.C_CC = 1 - (self.C_SSD/2)
-                self.iterations += 1
-                self.p = self.p_new
-                self.u = self.p[0]
-                self.v = self.p[1]
-                if hasattr(self, "history"):
-                    self.history = np.hstack((self.history, np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)))
-                else:
-                    self.history = np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)
-        elif method == "FAGN":
-            # Iterate to solution.
-            while self.iterations<self.max_iterations and self.norm>self.max_norm:
-                self._get_g_coord()
-                self._get_g_coords()
-                self._get_intensity_g()
-                self._get_g_m()
-                self._get_Delta_g()
-                self._get_grad_g()
-                self._get_sdi_g()
+            if method == "ICGN":
+                # Compute reference quantities.
+                self._get_sdi_f()
                 self._get_hessian()
-                self._get_Delta_p_FAGN()
-                self.p_new = self.p + self.Delta_p
-                self._get_norm()
-                self._get_ZNSSD()
-                self.C_CC = 1 - (self.C_SSD/2)
-                self.iterations += 1
-                self.p = self.p_new
-                self.u = self.p[0]
-                self.v = self.p[1]
-                if hasattr(self, "history"):
-                    self.history = np.hstack((self.history, np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)))
-                else:
-                    self.history = np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)
-        elif method == "WFAGN":
-            raise Exception("WFAGN method not yet fully implemented.")
-            # Compute reference quantities.
-            self._get_D_f()
-            self.D_0_min = 10
-            self.D_0 = p_0[-1]
-            # Iterate to solution.
-            while self.iterations<self.max_iterations and self.norm>self.max_norm:
-                self._get_W_f()
-                self._get_A_s()
-                self._get_g_coord()
-                self._get_g_coords()
-                self._get_intensity_g()
-                self._get_g_m()
-                self._get_Delta_g()
-                self._get_grad_g()
-                self._get_D_g()
-                self._get_W_g()
-                self._get_sdi_g()
-                self._get_T_p()
-                self._get_dg_m_dp()
-                self._get_dW_g_dp()
-                self._get_dDelta_g_dp()
-                self._get_dg_n_dp()
-                self._get_dT_p_dp()
-                self._get_hessian_dT_p_dp()
-                self.hessian *= 2/self.A_s
-                self._get_dA_s_dp()
-                self._get_grad_C_W()
-                self._get_Delta_p_WFAGN()
-                self.p_new = self.p - self.Delta_p
-                self._get_norm()
-                self._get_WZNSSD()
-                self.C_CC = 1 - (self.C_SSD/2)
-                self.iterations += 1
-                self.p = self.p_new
-                self.u = self.p[0]
-                self.v = self.p[1]
-                if self.p[-1] < self.D_0_min:
-                    self.p[-1] = self.D_0_min
-                elif self.p[-1] > p_0[-1]:
-                    self.p[-1] = p_0[-1]
-                if hasattr(self, "history"):
-                    self.history = np.hstack((self.history, np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)))
-                else:
-                    self.history = np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)
+                # Iterate to solution.
+                while self.iterations<self.max_iterations and self.norm>self.max_norm:
+                    self._get_g_coord()
+                    self._get_g_coords()
+                    self._get_intensity_g()
+                    self._get_g_m()
+                    self._get_Delta_g()
+                    self._get_Delta_p_ICGN()
+                    self._get_p_new_ICGN()
+                    self._get_norm()
+                    self._get_ZNSSD()
+                    self.C_CC = 1 - (self.C_SSD/2)
+                    self.iterations += 1
+                    self.p = self.p_new
+                    self.u = self.p[0]
+                    self.v = self.p[1]
+                    if hasattr(self, "history"):
+                        self.history = np.hstack((self.history, np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)))
+                    else:
+                        self.history = np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)
+            elif method == "FAGN":
+                # Iterate to solution.
+                while self.iterations<self.max_iterations and self.norm>self.max_norm:
+                    self._get_g_coord()
+                    self._get_g_coords()
+                    self._get_intensity_g()
+                    self._get_g_m()
+                    self._get_Delta_g()
+                    self._get_grad_g()
+                    self._get_sdi_g()
+                    self._get_hessian()
+                    self._get_Delta_p_FAGN()
+                    self.p_new = self.p + self.Delta_p
+                    self._get_norm()
+                    self._get_ZNSSD()
+                    self.C_CC = 1 - (self.C_SSD/2)
+                    self.iterations += 1
+                    self.p = self.p_new
+                    self.u = self.p[0]
+                    self.v = self.p[1]
+                    if hasattr(self, "history"):
+                        self.history = np.hstack((self.history, np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)))
+                    else:
+                        self.history = np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)
+            elif method == "WFAGN":
+                raise Exception("WFAGN method not yet fully implemented.")
+                # Compute reference quantities.
+                self._get_D_f()
+                self.D_0_min = 10
+                self.D_0 = p_0[-1]
+                # Iterate to solution.
+                while self.iterations<self.max_iterations and self.norm>self.max_norm:
+                    self._get_W_f()
+                    self._get_A_s()
+                    self._get_g_coord()
+                    self._get_g_coords()
+                    self._get_intensity_g()
+                    self._get_g_m()
+                    self._get_Delta_g()
+                    self._get_grad_g()
+                    self._get_D_g()
+                    self._get_W_g()
+                    self._get_sdi_g()
+                    self._get_T_p()
+                    self._get_dg_m_dp()
+                    self._get_dW_g_dp()
+                    self._get_dDelta_g_dp()
+                    self._get_dg_n_dp()
+                    self._get_dT_p_dp()
+                    self._get_hessian_dT_p_dp()
+                    self.hessian *= 2/self.A_s
+                    self._get_dA_s_dp()
+                    self._get_grad_C_W()
+                    self._get_Delta_p_WFAGN()
+                    self.p_new = self.p - self.Delta_p
+                    self._get_norm()
+                    self._get_WZNSSD()
+                    self.C_CC = 1 - (self.C_SSD/2)
+                    self.iterations += 1
+                    self.p = self.p_new
+                    self.u = self.p[0]
+                    self.v = self.p[1]
+                    if self.p[-1] < self.D_0_min:
+                        self.p[-1] = self.D_0_min
+                    elif self.p[-1] > p_0[-1]:
+                        self.p[-1] = p_0[-1]
+                    if hasattr(self, "history"):
+                        self.history = np.hstack((self.history, np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)))
+                    else:
+                        self.history = np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)
         
-        # Check for tolerance.
-        if self.C_CC > self.tolerance:
-            self.solved = True
+            # Check for tolerance.
+            if self.C_CC > self.tolerance:
+                self.solved = True
+        except:
+            self.unsolvable = True
 
-        return self.solved
 
     # Aliases to C++ methods.
     def _get_f_coords(self):

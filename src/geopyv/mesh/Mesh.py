@@ -81,28 +81,31 @@ class Mesh:
         # Solve initial mesh.
         self.message = "Solving initial mesh"
         self._find_seed_node()
-        self._reliability_guided()
-      
-        # Solve adaptive iterations.
-        for iteration in range(1, adaptive_iterations+1):
-            self.message = "Adaptive iteration {}".format(iteration)
-            D = abs(self.strains[:,2])*self.areas # Elemental shear strain-area products.
-            D_b = np.mean(D) # Mean elemental shear strain-area product.
-            self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
-            f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.triangulation, self.areas)
-            minimize_scalar(f)
-            self._update_mesh()
-            self._find_seed_node()
+        try:
             self._reliability_guided()
+        
+            # Solve adaptive iterations.
+            for iteration in range(1, adaptive_iterations+1):
+                self.message = "Adaptive iteration {}".format(iteration)
+                D = abs(self.strains[:,2])*self.areas # Elemental shear strain-area products.
+                D_b = np.mean(D) # Mean elemental shear strain-area product.
+                self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
+                f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.triangulation, self.areas)
+                minimize_scalar(f)
+                self._update_mesh()
+                self._find_seed_node()
+                self._reliability_guided()
 
-        # Finalise.
-        if self.update == True:
-            print('Error! The minimum correlation coefficient is below tolerance {field:.3f} < {tolerance:.3f}'.format(field=np.min(self.C_CC), tolerance=self.tolerance))
-        else:
-            print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))
+            # Finalise.
+            if self.update == True:
+                print('Error! The minimum correlation coefficient is below tolerance {field:.3f} < {tolerance:.3f}'.format(field=np.min(self.C_CC), tolerance=self.tolerance))
+            else:
+                print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))
+        except ValueError:
+            print("Error! Could not solve for all subsets.")
+            self.update = True
         gmsh.finalize()
-
-
+        
     def _update_mesh(self):
         """Private method to update the mesh variables."""
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node coordinates.
@@ -110,7 +113,6 @@ class Mesh:
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
         self.triangulation = np.reshape((np.asarray(ent)-1).flatten(), (-1, 3)) # Element connectivity array. 
     
-
     def _find_seed_node(self):
         """Private method to find seed node given seed coordinate."""
         dist = np.sqrt((self.nodes[:,0]-self.seed_coord[0])**2 + (self.nodes[:,1]-self.seed_coord[1])**2)
@@ -146,7 +148,6 @@ class Mesh:
         # Finalise mask.
         self.mask = np.array(binary_img)
 
-
     def _mesh(self):
         """Private method to optimize the element size to generate approximately the desired number of elements."""
         f = lambda size: self._initial_mesh(size, self.boundary, self.segments, self.curves, self.target_nodes)
@@ -156,7 +157,6 @@ class Mesh:
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
         self.triangulation = np.reshape((np.asarray(ent)-1).flatten(), (-1, 3)) # Element connectivity array. 
         print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.triangulation)))
-
 
     @staticmethod
     def _initial_mesh(size, boundary, segments, curves, target_nodes):
@@ -218,7 +218,6 @@ class Mesh:
         error = (np.shape(nodes)[0] - target)**2
         return error
 
-
     def _element_area(self):
         """
         A private method to calculate the element areas.
@@ -228,7 +227,6 @@ class Mesh:
         M[:,1] = self.nodes[self.triangulation][:,:,0]
         M[:,2] = self.nodes[self.triangulation][:,:,1]
         self.areas = 0.5*np.linalg.det(M)
-
 
     def _element_strains(self):
         """
@@ -245,7 +243,6 @@ class Mesh:
         self.Bs[:,2,1::2] = diff[:,:,1]
         self.Bs = 1/(2*self.areas)[:,None,None]*self.Bs
         self.strains = np.einsum('ijk,ikl->ij', self.Bs, np.reshape(self.p[self.triangulation,:2], (-1,6,1)))
-
 
     def _reliability_guided(self):
         """
@@ -315,9 +312,12 @@ class Mesh:
                     count += 1
                     self.bar()
                 
-                # If minimum correlation coefficient less than tolerance, raise update flag.
-                if np.amin(self.C_CC) < self.tolerance:
-                    self.update = True
+                # Update
+                if not any(self.solved != -1): # If all solved...
+                    if np.amin(self.C_CC) < self.tolerance: # ...but minimum correlation coefficient is less than tolerance...
+                        self.update = True # ... raise update flag.
+                else: # If any remain unsolved...
+                    self.update = True #... raise update flag.
             else:
                 # Set update attribute flag if seed correlation threshold not exceeded.
                 self.update = True 
@@ -380,9 +380,8 @@ class Mesh:
                     else:
                         # Finally, try the NCC initial guess.
                         self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0 = np.zeros(np.shape(p_0)), method=self.method, tolerance=self.tolerance)
-                        if self.subsets[index].C_CC>self.tolerance: # Check against tolerance.
-                            self._store_variables(index)
-                    
+                        if self.subsets[index].solved:
+                                self._store_variables(index)
 
     def _store_variables(self, index, seed=False):
         """Store variables."""
@@ -407,4 +406,4 @@ def PolyArea(pts):
 
     x = pts[:,0]
     y = pts[:,1]
-    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
+    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1))) 

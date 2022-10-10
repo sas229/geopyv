@@ -744,11 +744,11 @@ MatrixXd _dW_g_dp(
         {
             Delta_x = f_coords(i,0) - f_coord(0);
             Delta_y = f_coords(i,1) - f_coord(1);
-            u_terms = u + (1+u_x)*Delta_x + u_y*Delta_y; 
-            v_terms = v + v_x*Delta_x + (1+v_y)*Delta_y;
+            u_terms = (1+u_x)*Delta_x + u_y*Delta_y; 
+            v_terms = v_x*Delta_x + (1+v_y)*Delta_y;
 
-            dW_g_dp(i,0) = -(W_g(i)/(D_0*D_0))*u_terms;
-            dW_g_dp(i,1) = -(W_g(i)/(D_0*D_0))*v_terms;
+            dW_g_dp(i,0) = 0; //-(W_g(i)/(D_0*D_0))*u_terms;
+            dW_g_dp(i,1) = 0; //-(W_g(i)/(D_0*D_0))*v_terms;
             dW_g_dp(i,2) = -(W_g(i)/(D_0*D_0))*u_terms*Delta_x;
             dW_g_dp(i,3) = -(W_g(i)/(D_0*D_0))*v_terms*Delta_x;
             dW_g_dp(i,4) = -(W_g(i)/(D_0*D_0))*u_terms*Delta_y;
@@ -761,11 +761,11 @@ MatrixXd _dW_g_dp(
         {
             Delta_x = f_coords(i,0) - f_coord(0);
             Delta_y = f_coords(i,1) - f_coord(1);
-            u_terms = u + (1+u_x)*Delta_x + u_y*Delta_y + 0.5*u_xx*Delta_x*Delta_x + u_xy*Delta_x*Delta_y + 0.5*u_yy*Delta_y*Delta_y; 
-            v_terms = v + v_x*Delta_x + (1+v_y)*Delta_y + 0.5*v_xx*Delta_x*Delta_x + v_xy*Delta_x*Delta_y + 0.5*v_yy*Delta_y*Delta_y;
+            u_terms = (1+u_x)*Delta_x + u_y*Delta_y + 0.5*u_xx*Delta_x*Delta_x + u_xy*Delta_x*Delta_y + 0.5*u_yy*Delta_y*Delta_y; 
+            v_terms = v_x*Delta_x + (1+v_y)*Delta_y + 0.5*v_xx*Delta_x*Delta_x + v_xy*Delta_x*Delta_y + 0.5*v_yy*Delta_y*Delta_y;
 
-            dW_g_dp(i,0)  = -(W_g(i)/(D_0*D_0))*u_terms;
-            dW_g_dp(i,1)  = -(W_g(i)/(D_0*D_0))*v_terms;
+            dW_g_dp(i,0)  = 0;
+            dW_g_dp(i,1)  = 0;
             dW_g_dp(i,2)  = -(W_g(i)/(D_0*D_0))*u_terms*Delta_x;
             dW_g_dp(i,3)  = -(W_g(i)/(D_0*D_0))*v_terms*Delta_x;
             dW_g_dp(i,4)  = -(W_g(i)/(D_0*D_0))*u_terms*Delta_y;
@@ -1126,7 +1126,7 @@ std::vector<MatrixXd> _solve_WFAGN(
     double norm = 1, C_LS, C_CC, size = pow(double(n),0.5);
     double A_s, D_0 = p_0(m-1);
     MatrixXd sdi(n,m), hessian(m,m);
-    VectorXd g_coord(2), p(m), g(n), Delta_p(m), p_new(m), constants(2);
+    VectorXd g_coord(2), p(m), g(n), Delta_p(m), p_new(m), constants(2), D_0_log(max_iterations);
     VectorXd D_f(n), D_g(n), W_f(n), W_g(n), T_p(n), dDelta_g_dp(m-1), dg_m_dp(m-1), grad_C_W(m);
     MatrixXd g_coords(n,2), grad_g(n,2), dT_p_dp(n,m), dg_n_dp(n,m-1), dW_g_dp(n,m-1);
     MatrixXd convergence = MatrixXd::Zero(4, max_iterations+1);
@@ -1139,7 +1139,7 @@ std::vector<MatrixXd> _solve_WFAGN(
     p = p_0;
     try{
         while (iteration < max_iterations && norm > max_norm){
-            W_f = _W(D_f, D_0);
+            W_f = _W(D_f, p_0(m-1));
             A_s = _A_s(W_f);
             g_coord = _g_coord(f_coord, p);
             g_coords = _g_coords(f_coord, p, f_coords);
@@ -1148,7 +1148,7 @@ std::vector<MatrixXd> _solve_WFAGN(
             Delta_g = _Delta_g(g, g_m);
             grad_g = _grad(g_coords, g_QCQT);
             D_g = _D(g_coord, g_coords);
-            W_g = _W(D_g, D_0);
+            W_g = _W(D_g, p_0(m-1));
             sdi = _sdi(g_coord, g_coords, grad_g, p);
             T_p = _T_p(f, g, f_m, g_m, Delta_f, Delta_g, W_f, W_g);
             dg_m_dp = _dg_m_dp(sdi);
@@ -1171,14 +1171,14 @@ std::vector<MatrixXd> _solve_WFAGN(
             convergence(3,iteration-1) = C_LS;
             iteration += 1;
             p = p_new;
-            
+
             // Enforce bounds on Gaussian window size.
             if (p(m-1) < D_0_min){
                 p(m-1) = D_0_min;
             } else if (p(m-1) > p_0(m-1)){
                 p(m-1) = p_0(m-1);
             }
-
+            D_0_log(iteration-1) = p_0(m-1);
         }
     }
     catch(const std::invalid_argument& e){
@@ -1196,6 +1196,7 @@ std::vector<MatrixXd> _solve_WFAGN(
     output.push_back(constants);
     output.push_back(convergence);
     output.push_back(p); 
+    output.push_back(D_0_log);
 
     return output;
 }

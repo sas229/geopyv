@@ -218,8 +218,9 @@ class Subset:
             elif self.method == "FAGN" and np.mod(self.p.shape[0],2) == 0:
                 results = _solve_FAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
             elif self.method == "WFAGN" and np.mod(self.p.shape[0],2) == 1:
-                raise Exception("WFAGN method not yet fully implemented.")
-                results = _solve_WFAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations, 1000)
+                #raise Exception("WFAGN method not yet fully implemented.")
+                self.p[-1] = 100000
+                results = _solve_WFAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations, 100)
             # Unpack results.
             self.g_coords = results[0]
             self.g = results[1]
@@ -233,6 +234,7 @@ class Subset:
             self.p = results[4]
             self.u = self.p[0][0]
             self.v = self.p[1][0]
+            self.D_0_log = results[5]
 
             # Check for tolerance.
             if self.C_CC > self.tolerance:
@@ -269,7 +271,6 @@ class Subset:
         plt.tight_layout()
         plt.show()
 
-
     def convergence(self):
         """Method to plot the rate of convergence for the subset."""
         if hasattr(self, "history"):
@@ -292,7 +293,6 @@ class Subset:
             plt.show()
         else:
             raise Exception("Warning: Subset not yet solved. Run the solve() method.")
-
 
     def _get_initial_guess_size(self):
         """Private method to estimate the size of square subset to use in the
@@ -322,9 +322,7 @@ class Subset:
         self.p_init[0] = (max_loc[0] + self.initial_guess_size / 2) - x
         self.p_init[1] = (max_loc[1] + self.initial_guess_size / 2) - y
 
-
     def pysolve(self, max_norm=1e-3, max_iterations=15, p_0=np.zeros(6), tolerance=0.75, method="ICGN"):
-
         # Check method and length of p_0.
         if method == "ICGN" or method == "FAGN":
             if np.shape(p_0)[0] != 6 and np.shape(p_0)[0] != 12:
@@ -353,7 +351,6 @@ class Subset:
         self.size = len(self.f_coords)**0.5
     
         try:
-
             if method == "ICGN":
                 # Compute reference quantities.
                 self._get_sdi_f()
@@ -403,11 +400,11 @@ class Subset:
                     else:
                         self.history = np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)
             elif method == "WFAGN":
-                raise Exception("WFAGN method not yet fully implemented.")
+                #raise Exception("WFAGN method not yet fully implemented.")
                 # Compute reference quantities.
+
                 self._get_D_f()
                 self.D_0_min = 10
-                self.D_0 = p_0[-1]
                 # Iterate to solution.
                 while self.iterations<self.max_iterations and self.norm>self.max_norm:
                     self._get_W_f()
@@ -440,10 +437,12 @@ class Subset:
                     self.p = self.p_new
                     self.u = self.p[0]
                     self.v = self.p[1]
+                    
                     if self.p[-1] < self.D_0_min:
                         self.p[-1] = self.D_0_min
                     elif self.p[-1] > p_0[-1]:
                         self.p[-1] = p_0[-1]
+
                     if hasattr(self, "history"):
                         self.history = np.hstack((self.history, np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)))
                     else:
@@ -510,9 +509,9 @@ class Subset:
     def _get_D_g(self):
         self.D_g = _D(self.g_coord, self.g_coords)
     def _get_W_f(self):
-        self.W_f = _W(self.D_f, self.D_0)
+        self.W_f = _W(self.D_f, self.p[-1])
     def _get_W_g(self):
-        self.W_g = _W(self.D_g, self.D_0)
+        self.W_g = _W(self.D_g, self.p[-1])
     def _get_A_s(self):
         self.A_s = _A_s(self.W_f)
     def _get_T_p(self):

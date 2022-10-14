@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.path as path
-#import umat
+from geopyv.umats import umat_mc
 
 class Particle:
     """Particle class for geopyv.
@@ -21,7 +21,7 @@ class Particle:
         Volume represented by the particle at an updatable reference time. 
     """
 
-    def __init__(self, coord, meshes, update_register, strain = np.zeros(3), vol=None):
+    def __init__(self, meshes, update_register=None, coord = np.zeros(2), p_init = np.zeros(6), vol=None):
         """Initialisation of geopyv particle object.
         
         Parameters
@@ -42,28 +42,29 @@ class Particle:
 
         self.meshes = meshes
         self.length = len(meshes)
-        self.update_register = update_register
-
-        self.coords = np.empty((self.length+1, 2))
-        self.strains = np.empty((self.length+1, 3))
-        self.vols = np.empty(self.length+1)
+        if update_register is None:
+            self.update_register = np.zeros(self.length)
+        else:
+            self.update_register = update_register
+        self.coords = np.zeros((self.length+1,2))
+        self.ps = np.zeros((self.length+1, 6))
+        self.vols = np.zeros(self.length+1)
+        self.stress_path = np.zeros((self.length+1,6))
 
         self.coords[0] = coord
-        self.strains[0] = strain
+        self.ps[0] = p_init
         self.vols[0] = vol
 
         self.ref_coord = coord
-        self.ref_strain = strain
+        self.ref_p = p_init
         self.ref_vol = vol
 
-
-    def solve(self):
+    def solve(self, model, statev, props):
         """Method to calculate the strain path of the particle from the mesh sequence and optionally the stress path
         employing the model specified by the input parameters."""
 
         self._strain_path()
-        self._stress_path()
-
+        self._stress_path(model, statev, props)
 
     def _triangulation_locator(self, m):
         """Method to locate the numerical particle within the mesh, returning the current element index.
@@ -74,16 +75,16 @@ class Particle:
             The relevant mesh.
         """
 
-        diff = self.meshes[m].nodes - self.ref_coord # Particle-mesh node positional vector.
+        diff = self.meshes[m].nodes - self.ref_coord[:2] # Particle-mesh node positional vector.
         dist = np.einsum('ij,ij->i',diff, diff) # Particle-mesh node "distances" (truly distance^2).
         tri_idxs = np.argwhere(np.any(self.meshes[m].triangulation == np.argmin(dist), axis=1)==True).flatten() # Retrieve relevant element indices.
         for i in range(len(tri_idxs)):  
-            if path.Path(self.meshes[m].nodes[self.meshes[m].triangulation[tri_idxs[i]]]).contains_point(self.ref_coord): # Check if the element includes the particle coordinates.
+            if path.Path(self.meshes[m].nodes[self.meshes[m].triangulation[tri_idxs[i]]]).contains_point(self.ref_coord[:2]): # Check if the element includes the particle coordinates.
                 break # If the correct element is identified, stop the search. 
         return tri_idxs[i] # Return the element index. 
 
-    def _shape(self, m, tri_idx):
-        """Method to calculate the element shape functions for position and strain calculations.
+    def _N_T(self, m, tri_idx):
+        """Private method to calculate the element shape functions for position and strain calculations.
         
         Parameters
         ----------
@@ -91,55 +92,82 @@ class Particle:
             The relevant mesh.
         tri_idx: `int`
             The index of the relevant element within mesh."""
-
-        self.B = self.meshes[m].Bs[tri_idx] # Retrieve the element B matrix from the mesh object (where epsilon = Bu).
-        self.W = self._weight(self.meshes[m].nodes[self.meshes[m].triangulation[tri_idx]], self.meshes[m].areas[tri_idx]) # Calculate the element shape function matrix.
-
-    def _weight(self, tri, area):
-        """Private method to calculate the element shape functions.
         
-        Parameters
-        ----------
-        tri : numpy.ndarray (N,2)
-            Clockwise/anti-clockwise ordered coordinates for the mesh element.
-        area : float
-            The area of the mesh element.
-        """
-        
-        WM = np.asarray([[0,1,-1],[-1,0,1],[1,-1,0]]) # Matrix multiplier.
-        diff = WM@tri # Create [[x2-x3, y2-y3],[x3-x1, y3-y1],[x1-x2, y1-y2]] matrix. 
-        W = np.ones(3) # Initiate nodal weighting vector.
-        W[:2] = (diff[:2,1]*(self.ref_coord[0]-tri[2,0])-diff[:2,0]*(self.ref_coord[1]-tri[2,1]))/(2*area) # Calculate nodal weightings (W1 and W2).
-        W[2] -= W[0] + W[1] # Calculate nodal weightings (W3).
-        return W
+        M =np.ones((4,3))
+        M[0,1:] = self.ref_coord
+        M[1:,1:] = self.meshes[m].nodes[self.meshes[m].triangulation[tri_idx]]
+        area = self.meshes[m].areas[tri_idx]
+
+        self.W = np.ones(3)
+        self.W[0] = abs(np.linalg.det(M[[0,2,3]]))/(2*abs(area))
+        self.W[1] = abs(np.linalg.det(M[[0,1,3]]))/(2*abs(area))
+        self.W[2] -= self.W[0]+self.W[1]
     
     def _strain_path(self):
         """Method to calculate and store stress path data for the particle object."""
-        
+        print("Strain path")
         for m in range(self.length):
-            tri_idx = self._triangulation_locator(m) # Identify the relevant element of the mesh.
-            self._shape(m, tri_idx) # Calculate the B and W matrices.
             if self.update_register[m]: # Check whether to update the reference values.
-                self.ref_coord = self.coords[m]
-                self.ref_strain = self.strains[m]
+                self.ref_coords = self.coords[m]
+                self.ref_p = self.ps[m]
                 self.ref_vol = self.vols[m]
+            tri_idx = self._triangulation_locator(m) # Identify the relevant element of the mesh.
+            self._N_T(m, tri_idx) # Calculate the nodal weightings.
             self.coords[m+1] = self.ref_coord+self.W@self.meshes[m].p[self.meshes[m].triangulation[tri_idx], :2] # Update the particle positional coordinate (reference + mesh interpolation).
-            self.strains[m+1] = self.ref_strain+self.B@(self.meshes[m].p[self.meshes[m].triangulation[tri_idx],:2].flatten()) # Update the particle strain (reference + mesh interpolation).
-            self.vols[m+1] = self.ref_vol*(1 + self.strains[m+1,0] + self.strains[m+1,1]) # Update the particle volume (reference*(1 + volume altering strain components)).
+            self.ps[m+1,:2] = self.ref_p[:2]+self.W@self.meshes[m].p[self.meshes[m].triangulation[tri_idx], :2]
+            self.ps[m+1,2:] = self.ref_p[2:]+self.meshes[m].strains[tri_idx].flatten() # Update the particle strains (reference + element strains)
+            self.vols[m+1] = self.ref_vol*(1 + self.ps[m+1,3] + self.ps[m+1,4]) # Update the particle volume (reference*(1 + volume altering strain components)).
 
-    def _stress_path(self, **kwargs):
-        """Method to calculate and store stress path data for the particle object.
+    def _stress_path(self, model, statev, props):
+        """Method to calculate and store stress path data for the particle object. Input taken as compression negative. 
         
         Parameters
         ----------
         model : str
-            Identifies the constitutive model to implement:
-                - "MC": Mohr-Coulomb.
-                - "SMCC": Structurally modified Cam-Clay (according to Singh et al. (2021))."""
+            Identifies the constitutive model to implement.
+        statev : numpy.ndarray(N)
+            - State environment variables relevant for the selected model.
+        props : numpy.ndarray(M)
+            - Material properties relevant for the selected model. 
 
-        pass
-#
-#        model = kwargs["model"] 
+        Configuration overview:
+        Mohr Coulomb:
+        - model = "MC"
+        - statev = [sigma0_xx sigma0_yy sigma0_zz tau0_yz tau0_xz tau0_xy]
+        - statev = [E G nu sphi spsi cohs tens]"""
+
+        model_list = ["MC"]
+        if model not in model_list:
+            raise ValueError("ValueError: constitutive model mis-named or unsupported. Ensure the model given is in: {}".format(model_list))
+        else: 
+            self.model = model
+        
+        if self.model == "MC":
+            self.stress_path = statev
+            self.props = props
+            nstatev = len(statev)
+            nprops = len(props)
+            ddsdde = np.asarray([[1/props[0], -props[2]/props[0], -props[2]/props[0], 0, 0, 0],
+                                [-props[2]/props[0], 1/props[0], -props[2]/props[0], 0, 0, 0],
+                                [-props[2]/props[0], -props[2]/props[0], 1/props[0], 0, 0, 0],
+                                [0, 0, 0, 1/props[1], 0, 0],
+                                [0, 0, 0, 0, 1/props[1], 0],
+                                [0, 0, 0, 0, 0, 1/props[1]]])
+            for i in range(self.length):
+                stran = self.ps[i, 2:]
+                dstran = self.ps[i+1, 2:] - self.ps[i, 2:]
+                coords = self.coords[i]
+                stress = self.stress_path[i]
+                umat_mc.umat(stress = stress, statev=np.zeros(6), ddsdde = ddsdde, sse = 0, 
+                                spd = 0, scd = 0, rpl = 0, ddsddt = np.zeros(6), drplde = np.zeros(6), drpldt = 0, 
+                                stran = stran, dstran= dstran, time = np.zeros(2), dtime = 0, temp = 0, dtemp = 0,
+                                predef = np.zeros(1), dpred = np.zeros(1), cmname = 0, ndi = 0, nshr = 0, ntens = 6, 
+                                nstatev=nstatev, props=props, nprops=nprops, coords = coords, drot = np.zeros((3,3)), pnewdt = 0,
+                                celent = 0, dfgrd0 = np.zeros((3,3)), dfgrd1 = np.zeros((3,3)), noel = 0, npt = 0, layer = 0, 
+                                kspt = 0, kstep = 0, kinc = 0)
+                self.stress_path[i+1] = stress
+
+
 #        if model == "MC":
 #            # Search for relevant variables and define defaults if non-specified. 
 #            pass
@@ -200,13 +228,3 @@ class Particle:
 #                    try:
 #
 #                    print("Warning: the yield surface size has not been given.")
-
-
-
-
-
-
-
-
-
-        

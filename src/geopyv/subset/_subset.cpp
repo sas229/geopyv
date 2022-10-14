@@ -1126,7 +1126,7 @@ std::vector<MatrixXd> _solve_WFAGN(
     double norm = 1, C_LS, C_CC, size = pow(double(n),0.5);
     double A_s, D_0 = p_0(m-1);
     MatrixXd sdi(n,m), hessian(m,m);
-    VectorXd g_coord(2), p(m), g(n), Delta_p(m), p_new(m), constants(2), D_0_log(max_iterations);
+    VectorXd g_coord(2), p(m), g(n), Delta_p(m), p_new(m), constants(2);
     VectorXd D_f(n), D_g(n), W_f(n), W_g(n), T_p(n), dDelta_g_dp(m-1), dg_m_dp(m-1), grad_C_W(m);
     MatrixXd g_coords(n,2), grad_g(n,2), dT_p_dp(n,m), dg_n_dp(n,m-1), dW_g_dp(n,m-1);
     MatrixXd convergence = MatrixXd::Zero(4, max_iterations+1);
@@ -1178,7 +1178,6 @@ std::vector<MatrixXd> _solve_WFAGN(
             } else if (p(m-1) > p_0(m-1)){
                 p(m-1) = p_0(m-1);
             }
-            D_0_log(iteration-1) = p_0(m-1);
         }
     }
     catch(const std::invalid_argument& e){
@@ -1196,7 +1195,6 @@ std::vector<MatrixXd> _solve_WFAGN(
     output.push_back(constants);
     output.push_back(convergence);
     output.push_back(p); 
-    output.push_back(D_0_log);
 
     return output;
 }

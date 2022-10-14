@@ -11,6 +11,7 @@ import PIL.ImageDraw as ImageDrawPIL
 from alive_progress import alive_bar
 
 import faulthandler
+import traceback
 faulthandler.enable()
 
 class Mesh:
@@ -87,7 +88,7 @@ class Mesh:
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations+1):
                 self.message = "Adaptive iteration {}".format(iteration)
-                D = abs(self.strains[:,2])*self.areas # Elemental shear strain-area products.
+                D = abs(self.strains[:,0,1]+self.strains[:,1,0])*self.areas # Elemental shear strain-area products.
                 D_b = np.mean(D) # Mean elemental shear strain-area product.
                 self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
                 f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.triangulation, self.areas)
@@ -102,6 +103,7 @@ class Mesh:
             else:
                 print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))
         except ValueError:
+            print(traceback.format_exc())
             print("Error! Could not solve for all subsets.")
             self.update = True
         gmsh.finalize()
@@ -233,16 +235,10 @@ class Mesh:
         A private method to calculate the elemental strain the "B" matrix relating 
         element node displacements to elemental strain..
         """
-
-        self.Bs = np.zeros((len(self.triangulation), 3, 6)) # Initiate B-matrix array. 
-        BM = np.asarray([[0,1,-1],[-1,0,1],[1,-1,0]]) # Matrix mutiplier. 
-        diff = BM@self.nodes[self.triangulation]
-        self.Bs[:,0,::2] = diff[:,:,1] # Input matrix values...
-        self.Bs[:,1,1::2] = -diff[:,:,0]
-        self.Bs[:,2,::2] = -diff[:,:,0]
-        self.Bs[:,2,1::2] = diff[:,:,1]
-        self.Bs = 1/(2*self.areas)[:,None,None]*self.Bs
-        self.strains = np.einsum('ijk,ikl->ij', self.Bs, np.reshape(self.p[self.triangulation,:2], (-1,6,1)))
+        A = np.asarray([[0,-1],[1,0]])
+        B = np.asarray([[0,1,-1],[-1,0,1],[1,-1,0]])
+        X_T = self.nodes[self.triangulation].transpose((0,2,1))
+        self.strains = 1/(2*self.areas[:,None,None])*(A@X_T@B@self.p[self.triangulation,:2])
 
     def _reliability_guided(self):
         """

@@ -218,7 +218,7 @@ class Subset:
             elif self.method == "FAGN" and np.mod(self.p.shape[0],2) == 0:
                 results = _solve_FAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
             elif self.method == "WFAGN" and np.mod(self.p.shape[0],2) == 1:
-                #raise Exception("WFAGN method not yet fully implemented.")
+                raise Exception("WFAGN method not yet fully implemented.")
                 self.p[-1] = 100000
                 results = _solve_WFAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations, 100)
             # Unpack results.
@@ -234,7 +234,6 @@ class Subset:
             self.p = results[4]
             self.u = self.p[0][0]
             self.v = self.p[1][0]
-            self.D_0_log = results[5]
 
             # Check for tolerance.
             if self.C_CC > self.tolerance:
@@ -400,7 +399,7 @@ class Subset:
                     else:
                         self.history = np.array([[self.iterations], [self.norm], [self.C_CC]], ndmin=2)
             elif method == "WFAGN":
-                #raise Exception("WFAGN method not yet fully implemented.")
+                raise Exception("WFAGN method not yet fully implemented.")
                 # Compute reference quantities.
 
                 self._get_D_f()

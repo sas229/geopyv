@@ -11,6 +11,7 @@ A DIC/PIV code for Python (with C++ extensions) using the Inverse-Compositional 
    validation
    support
    api
+   definitions
    license
    
 Indices and tables

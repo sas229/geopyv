@@ -140,7 +140,6 @@ class Subset:
         self.x = f_coord[0]
         self.y = f_coord[1]
 
-
     def solve(self, max_norm=1e-3, max_iterations=15, p_0=np.zeros(6), tolerance=0.75, method="ICGN"):
         """Method to solve for the subset displacements using the various methods.
 
@@ -452,7 +451,6 @@ class Subset:
                 self.solved = True
         except:
             self.unsolvable = True
-
 
     # Aliases to C++ methods.
     def _get_f_coords(self):

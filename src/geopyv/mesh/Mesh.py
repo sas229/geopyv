@@ -51,7 +51,7 @@ class Mesh:
         gmsh.option.setNumber("General.Verbosity", 2) # 0: silent except for fatal errors, 1: +errors, 2: +warnings, 3: +direct, 4: +information, 5: +status, 99: +debug
         # Create mesh.
         self._define_RoI()
-        self._mesh()
+        self._initial_mesh()
 
     def solve(self, seed_coord=None, template=Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2):
 
@@ -88,11 +88,7 @@ class Mesh:
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations+1):
                 self.message = "Adaptive iteration {}".format(iteration)
-                D = abs(self.strains[:,0,1]+self.strains[:,1,0])*self.areas # Elemental shear strain-area products.
-                D_b = np.mean(D) # Mean elemental shear strain-area product.
-                self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
-                f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.triangulation, self.areas)
-                minimize_scalar(f)
+                self._adaptive_mesh()
                 self._update_mesh()
                 self._find_seed_node()
                 self._reliability_guided()
@@ -113,7 +109,7 @@ class Mesh:
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
-        self.triangulation = np.reshape((np.asarray(ent)-1).flatten(), (-1, 3)) # Element connectivity array. 
+        self.triangulation = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
     
     def _find_seed_node(self):
         """Private method to find seed node given seed coordinate."""
@@ -130,7 +126,6 @@ class Mesh:
         ImageDrawPIL.Draw(binary_img).polygon(self.boundary.flatten().tolist(), outline=1, fill=1)
 
         # Create objects for mesh generation.
-        self.boundary = self.boundary
         self.segments = np.empty((np.shape(self.boundary)[0],2), dtype=np.int32) # Initiate segment array.
         self.segments[:,0] = np.arange(np.shape(self.boundary)[0], dtype=np.int32) # Fill segment array.
         self.segments[:,1] = np.roll(self.segments[:,0],-1) # Fill segment array.
@@ -150,18 +145,25 @@ class Mesh:
         # Finalise mask.
         self.mask = np.array(binary_img)
 
-    def _mesh(self):
+    def _initial_mesh(self):
         """Private method to optimize the element size to generate approximately the desired number of elements."""
-        f = lambda size: self._initial_mesh(size, self.boundary, self.segments, self.curves, self.target_nodes)
+        f = lambda size: self._uniform_remesh(size, self.boundary, self.segments, self.curves, self.target_nodes)
         res = minimize_scalar(f, bounds=(self.size_lower_bound, self.size_upper_bound), method='bounded')
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
-        self.triangulation = np.reshape((np.asarray(ent)-1).flatten(), (-1, 3)) # Element connectivity array. 
+        self.triangulation = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
         print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.triangulation)))
 
+    def _adaptive_mesh(self):
+        D = abs(self.du[:,0,1]+self.du[:,1,0])*self.areas # Elemental shear strain-area products.
+        D_b = np.mean(D) # Mean elemental shear strain-area product.
+        self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
+        f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.triangulation, self.areas)
+        minimize_scalar(f)
+
     @staticmethod
-    def _initial_mesh(size, boundary, segments, curves, target_nodes):
+    def _uniform_remesh(size, boundary, segments, curves, target_nodes):
         """
         Private method to prepare the initial mesh.
         """
@@ -188,7 +190,8 @@ class Mesh:
         gmsh.option.setNumber("Mesh.MeshSizeMin", 25)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
-        gmsh.model.mesh.optimize()  
+        gmsh.model.mesh.optimize() 
+        gmsh.model.mesh.setOrder(2)
         
         # Get mesh topology.
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
@@ -202,7 +205,7 @@ class Mesh:
         lengths = area_to_length(areas*scale) # Convert target areas to target characteristic lengths.
         bg = gmsh.view.add("bg", 1) # Create background view.
         data = np.pad(nodes[triangulation], ((0,0),(0,0),(0,2)), mode='constant') # Prepare data input (coordinates and buffer).
-        data[:,:,3] = np.reshape(np.repeat(lengths, 3), (-1,3)) # Fill data input buffer with target weights.
+        data[:,:,3] = np.reshape(np.repeat(lengths, 6), (-1,6)) # Fill data input buffer with target weights.
         data = np.transpose(data, (0,2,1)).flatten() # Reshape for input.
         gmsh.view.addListData(bg, "ST", len(triangulation),  data) # Add data to view.
         bgf = gmsh.model.mesh.field.add("PostView") # Add view to field. 
@@ -214,8 +217,8 @@ class Mesh:
         gmsh.model.mesh.clear() # Tidy.
         gmsh.model.mesh.generate(2) # Generate mesh.
         gmsh.model.mesh.optimize()
+        gmsh.model.mesh.setOrder(2)
         nt, nc, npar = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
-        ety, et, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
         nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
         error = (np.shape(nodes)[0] - target)**2
         return error
@@ -226,22 +229,55 @@ class Mesh:
         """
 
         M = np.ones((len(self.triangulation),3,3))
-        M[:,1] = self.nodes[self.triangulation][:,:,0]
-        M[:,2] = self.nodes[self.triangulation][:,:,1]
+        M[:,1] = self.nodes[self.triangulation[:,:3]][:,:,0] # [:3] will provide corner nodes in both 1st and 2nd order element case.
+        M[:,2] = self.nodes[self.triangulation[:,:3]][:,:,1]
         self.areas = 0.5*np.linalg.det(M)
 
     def _element_strains(self):
         """
         A private method to calculate the elemental strain the "B" matrix relating 
-        element node displacements to elemental strain..
+        element node displacements to elemental strain.
         """
-        A = np.asarray([[0,-1],[1,0]])
-        B = np.asarray([[0,1,-1],[-1,0,1],[1,-1,0]])
-        X_T = self.nodes[self.triangulation].transpose((0,2,1))
-        self.strains = 1/(2*self.areas[:,None,None])*(A@X_T@B@self.p[self.triangulation,:2])
+        # Local coordinates
+        A = np.ones((len(self.triangulation),3,3))
+        A[:,:,1:] = self.nodes[self.triangulation[:,:3]]
+        lc = np.ones((len(self.triangulation,),3))/3
+
+        # Weighting function (and derivatives to 2nd order)
+        N = np.zeros((len(self.triangulation),6))
+        N = np.asarray([1/9,1/9,1/9,4/9,4/9,4/9])
+        dN = np.asarray([[1/3,0,-1/3,4/3,-4/3,0],
+                        [0,1/3,-1/3,4/3,0,-4/3]])
+        d2N = np.asarray([[4,0,4,0,0,-8],
+                            [0,0,4,4,-4,-4],
+                            [0,4,4,0,-8,0]])
+
+        # 1st Order Strains
+        J_x_T = dN@self.nodes[self.triangulation]
+        J_u_T = dN@self.displacements[self.triangulation]
+        du = np.linalg.inv(J_x_T)@J_u_T
+
+        # 2nd Order Strains
+        d2udzeta2 = d2N@self.displacements[self.triangulation]    
+        J_zeta = np.zeros((len(self.triangulation),2,2))
+        J_zeta[:,0,0] = self.nodes[self.triangulation][:,1,1]-self.nodes[self.triangulation][:,2,1]
+        J_zeta[:,0,1] = self.nodes[self.triangulation][:,2,0]-self.nodes[self.triangulation][:,1,0]
+        J_zeta[:,1,0] = self.nodes[self.triangulation][:,2,1]-self.nodes[self.triangulation][:,0,1]
+        J_zeta[:,1,1] = self.nodes[self.triangulation][:,0,0]-self.nodes[self.triangulation][:,2,0]
+        J_zeta /= np.linalg.det(A)[:,None,None]
+        d2u = np.zeros((len(self.triangulation),3,2))
+        d2u[:,0,0] = d2udzeta2[:,0,0]*J_zeta[:,0,0]**2+2*d2udzeta2[:,1,0]*J_zeta[:,0,0]*J_zeta[:,1,0]+d2udzeta2[:,2,0]*J_zeta[:,1,0]**2
+        d2u[:,0,1] = d2udzeta2[:,0,1]*J_zeta[:,0,0]**2+2*d2udzeta2[:,1,1]*J_zeta[:,0,0]*J_zeta[:,1,0]+d2udzeta2[:,2,1]*J_zeta[:,1,0]**2
+        d2u[:,1,0] = d2udzeta2[:,0,0]*J_zeta[:,0,0]*J_zeta[:,0,1]+d2udzeta2[:,1,0]*(J_zeta[:,0,0]*J_zeta[:,1,1]+J_zeta[:,1,0]*J_zeta[:,0,1])+d2udzeta2[:,2,0]*J_zeta[:,1,0]*J_zeta[:,1,1]
+        d2u[:,1,1] = d2udzeta2[:,0,1]*J_zeta[:,0,0]*J_zeta[:,0,1]+d2udzeta2[:,1,1]*(J_zeta[:,0,0]*J_zeta[:,1,1]+J_zeta[:,1,0]*J_zeta[:,0,1])+d2udzeta2[:,2,1]*J_zeta[:,1,0]*J_zeta[:,1,1]
+        d2u[:,2,0] = d2udzeta2[:,0,0]*J_zeta[:,0,1]**2+2*d2udzeta2[:,1,0]*J_zeta[:,0,1]*J_zeta[:,1,1]+d2udzeta2[:,2,0]*J_zeta[:,1,1]**2
+        d2u[:,2,1] = d2udzeta2[:,0,1]*J_zeta[:,0,1]**2+2*d2udzeta2[:,1,1]*J_zeta[:,0,1]*J_zeta[:,1,1]+d2udzeta2[:,2,1]*J_zeta[:,1,1]**2
+        
+        self.du = du
+        self.d2u = d2u
 
     def _reliability_guided(self):
-        """
+        """N
         A private method to perform reliability-guided (RG) PIV analysis.
         """
 
@@ -341,6 +377,7 @@ class Mesh:
         arr_idxs = np.argwhere(np.any(arr == idx, axis=1)==True).flatten()
         pts_idxs = np.unique(arr[arr_idxs])
         pts_idxs = np.delete(pts_idxs, np.argwhere(pts_idxs==idx))
+        print(pts_idxs)
 
         return pts_idxs.tolist()
 
@@ -390,16 +427,3 @@ class Mesh:
         self.p[index] = self.subsets[index].p.flatten()
         self.displacements[index, 0] = self.subsets[index].u
         self.displacements[index, 1] = -self.subsets[index].v
-
-def PolyArea(pts):
-    """A function that returns the area of the input polygon.
-
-    Parameters
-    ----------
-    pts : numpy.ndarray (N,2)
-        Clockwise/anti-clockwise ordered coordinates.
-    """
-
-    x = pts[:,0]
-    y = pts[:,1]
-    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1))) 

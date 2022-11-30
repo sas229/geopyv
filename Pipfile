@@ -18,6 +18,7 @@ PyQt5 = "*"
 opencv-contrib-python = "*"
 pyside6 = "*"
 alive-progress = "*"
+geopyv = {path = "."}
 
 [dev-packages]
 
@@ -26,6 +27,3 @@ python_version = "3"
 
 [pipenv]
 allow_prereleases = true
-
-[packages.geopyv]
-path = "."

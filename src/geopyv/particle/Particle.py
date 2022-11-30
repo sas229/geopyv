@@ -21,7 +21,7 @@ class Particle:
         Volume represented by the particle at an updatable reference time. 
     """
 
-    def __init__(self, meshes, update_register=None, coord = np.zeros(2), p_init = np.zeros(6), vol=None):
+    def __init__(self, meshes, update_register=None, coord = np.zeros(2), p_init = np.zeros(12), vol=None):
         """Initialisation of geopyv particle object.
         
         Parameters
@@ -47,7 +47,7 @@ class Particle:
         else:
             self.update_register = update_register
         self.coords = np.zeros((self.length+1,2))
-        self.ps = np.zeros((self.length+1, 6))
+        self.ps = np.zeros((self.length+1, 12))
         self.vols = np.zeros(self.length+1)
         self.stress_path = np.zeros((self.length+1,6))
 
@@ -64,7 +64,7 @@ class Particle:
         employing the model specified by the input parameters."""
 
         self._strain_path()
-        self._stress_path(model, statev, props)
+        #self._stress_path(model, statev, props)
 
     def _triangulation_locator(self, m):
         """Method to locate the numerical particle within the mesh, returning the current element index.
@@ -102,7 +102,52 @@ class Particle:
         self.W[0] = abs(np.linalg.det(M[[0,2,3]]))/(2*abs(area))
         self.W[1] = abs(np.linalg.det(M[[0,1,3]]))/(2*abs(area))
         self.W[2] -= self.W[0]+self.W[1]
-    
+
+    def _p_inc(self, m, tri_idx):
+        
+        self.p_inc = np.zeros(12)
+        element = self.meshes[m].nodes[self.meshes[m].triangulation[tri_idx]]
+        displacements = self.meshes[m].displacements[self.meshes[m].triangulation[tri_idx]]
+
+        # Local coordinates
+        A = np.ones((3,4))
+        A[1:,0] = self.ref_coord
+        A[1:,1:] = element[:3,:2].transpose()
+        zeta = np.linalg.det(A[:,[0,2,3]])/np.linalg.det(A[:,[1,2,3]])
+        eta  = np.linalg.det(A[:,[0,3,1]])/np.linalg.det(A[:,[1,2,3]])
+        theta = 1-zeta-eta
+
+        # Weighting function (and derivatives to 2nd order)
+        N = np.asarray([zeta*(2*zeta-1), eta*(2*eta-1), theta*(2*theta-1), 4*zeta*eta, 4*eta*theta, 4*theta*zeta])
+        dN = np.asarray([[4*zeta-1, 0, 1-4*theta, 4*eta, -4*eta, 4*(theta-zeta)],
+                            [0, 4*eta-1, 1-4*theta, 4*zeta, 4*(theta-eta), -4*zeta]])
+        d2N = np.asarray([[4,0,4,0,0,-8],
+                            [0,0,4,4,-4,-4],
+                            [0,4,4,0,-8,0]])
+
+        # Displacements
+        self.p_inc[:2] = N@self.meshes[m].nodes[self.meshes[m].triangulation[tri_idx]]
+
+        # 1st Order Strains
+        J_x_T = dN@element
+        J_u_T = dN@displacements
+        self.p_inc[2:6] = (np.linalg.inv(J_x_T)@J_u_T).flatten()
+
+        # 2nd Order Strains
+        d2udzeta2 = d2N@displacements  
+        J_zeta = np.zeros((2,2))
+        J_zeta[0,0] = element[1,1]-element[2,1]
+        J_zeta[0,1] = element[2,0]-element[1,0]
+        J_zeta[1,0] = element[2,1]-element[0,1]
+        J_zeta[1,1] = element[0,0]-element[2,0]
+        J_zeta /= np.linalg.det(A[:,[1,2,3]])
+        self.p_inc[6] = d2udzeta2[0,0]*J_zeta[0,0]**2+2*d2udzeta2[1,0]*J_zeta[0,0]*J_zeta[1,0]+d2udzeta2[2,0]*J_zeta[1,0]**2
+        self.p_inc[7] = d2udzeta2[0,1]*J_zeta[0,0]**2+2*d2udzeta2[1,1]*J_zeta[0,0]*J_zeta[1,0]+d2udzeta2[2,1]*J_zeta[1,0]**2
+        self.p_inc[8] = d2udzeta2[0,0]*J_zeta[0,0]*J_zeta[0,1]+d2udzeta2[1,0]*(J_zeta[0,0]*J_zeta[1,1]+J_zeta[1,0]*J_zeta[0,1])+d2udzeta2[2,0]*J_zeta[1,0]*J_zeta[1,1]
+        self.p_inc[9] = d2udzeta2[0,1]*J_zeta[0,0]*J_zeta[0,1]+d2udzeta2[1,1]*(J_zeta[0,0]*J_zeta[1,1]+J_zeta[1,0]*J_zeta[0,1])+d2udzeta2[2,1]*J_zeta[1,0]*J_zeta[1,1]
+        self.p_inc[10] = d2udzeta2[0,0]*J_zeta[0,1]**2+2*d2udzeta2[1,0]*J_zeta[0,1]*J_zeta[1,1]+d2udzeta2[2,0]*J_zeta[1,1]**2
+        self.p_inc[11] = d2udzeta2[0,1]*J_zeta[0,1]**2+2*d2udzeta2[1,1]*J_zeta[0,1]*J_zeta[1,1]+d2udzeta2[2,1]*J_zeta[1,1]**2
+
     def _strain_path(self):
         """Method to calculate and store stress path data for the particle object."""
         print("Strain path")
@@ -112,10 +157,9 @@ class Particle:
                 self.ref_p = self.ps[m]
                 self.ref_vol = self.vols[m]
             tri_idx = self._triangulation_locator(m) # Identify the relevant element of the mesh.
-            self._N_T(m, tri_idx) # Calculate the nodal weightings.
-            self.coords[m+1] = self.ref_coord+self.W@self.meshes[m].p[self.meshes[m].triangulation[tri_idx], :2] # Update the particle positional coordinate (reference + mesh interpolation).
-            self.ps[m+1,:2] = self.ref_p[:2]+self.W@self.meshes[m].p[self.meshes[m].triangulation[tri_idx], :2]
-            self.ps[m+1,2:] = self.ref_p[2:]+self.meshes[m].strains[tri_idx].flatten() # Update the particle strains (reference + element strains)
+            self._p_inc(m, tri_idx) # Calculate the nodal weightings.
+            self.coords[m+1] = self.ref_coord+self.p_inc[:2] # Update the particle positional coordinate (reference + mesh interpolation).
+            self.ps[m+1] = self.ref_p + self.p_inc
             self.vols[m+1] = self.ref_vol*(1 + self.ps[m+1,3] + self.ps[m+1,4]) # Update the particle volume (reference*(1 + volume altering strain components)).
 
     def _stress_path(self, model, statev, props):

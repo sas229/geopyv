@@ -3,16 +3,9 @@ Theory
 
 This section describes the theory that underpins the `geopyv` package.
 
-Sequences
----------
-
-A sequence is a series of images that will be analysed using PIV/DIC computational techniques. 
-
-
 Images
 ------
-
-Image intensity interpolation is a necessary operation in all iterative local DIC algorithms. In `geopyv`, bi-quintic B-spline interpolation is adopted, which although computationally expensive, minimises bias errors (Schreier et al. 2000).
+Digital images, consisting of pixel intensity arrays, are discrete representations of a continuous field. Therefore, image intensity interpolation is a necessary operation in all iterative local DIC algorithms. In `geopyv`, bi-quintic B-spline interpolation is adopted, which although computationally expensive, minimises bias errors (Schreier et al. 2000).
 
 Computation of B-spline coefficients
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -126,16 +119,24 @@ where :math:`\lfloor x\rfloor` and :math:`\lfloor y\rfloor` are the floor of the
 
 where :math:`\mathbf{Q} \cdot \mathbf{C}_{f} \cdot \mathbf{Q}^T` is precomputed for the entirety of image :math:`f` by :py:meth:`geopyv.Image._get_QCQT`. The same method is used to interpolate pixel intensitites for both the reference image :math:`f` and the target image :math:`g` by :py:meth:`geopyv.Subset._get_intensity`.
 
-Mesh
-----
-
-The analysis mesh is the mesh of elements that is used to discretise the region of interest.
-
-
 Subsets
 -------
+A subset is a small region within an image defined via a coordinate and a template. Localised warp between an image pair is considered by applying warp to a subset iteratively according to a particular PIV algorithm. 
 
-Describe the subset template options. Show an example subset.
+Templates
+~~~~~~~~~
+Templates are defined by size and shape. In `geopyv` templates can be square or circular. Here are some examples:
+
+.. image:: images/subset_examples.png
+  :width: 600
+  :align: center
+
+The size of subset determines the data quantity and the scale of warp phenomena observed.  
+
+.. image:: images/subset_trends.png
+  :width: 600
+  :align: center
+
 
 Shape Functions
 ~~~~~~~~~~~~~~~
@@ -672,6 +673,17 @@ Similarly, for a second order Gaussian weighted subset warp function the norm is
 .. note::
     
     A typical exit criteria for the norm used in the iterative computations is :math:`\|\Delta p\|_{max} = 1 \cdot 10^{-3}` and the  maximum number of iterations is :math:`15`.
+
+
+Mesh
+----
+The analysis mesh is the mesh of elements that is used to discretise the region of interest.
+
+
+Sequences
+---------
+
+A sequence is a series of images that will be analysed using PIV/DIC computational techniques. 
 
 
 

@@ -16,7 +16,7 @@ faulthandler.enable()
 
 class Mesh:
 
-    def __init__(self, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 25, size_upper_bound = 250):
+    def __init__(self, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 5, size_upper_bound = 1000):
         """Initialisation of geopyv mesh object."""
         self.initialised = False
         # Check types.
@@ -109,7 +109,7 @@ class Mesh:
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
-        self.triangulation = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
+        self.elements = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
     
     def _find_seed_node(self):
         """Private method to find seed node given seed coordinate."""
@@ -134,9 +134,9 @@ class Mesh:
         # Add exclusions.
         for exclusion in self.exclusions:
             ImageDrawPIL.Draw(binary_img).polygon(exclusion.flatten().tolist(), outline=1, fill=0) # Add exclusion to binary mask.
-            current_max_index = np.amax(self.segments) # Highest index used by current segments.
+            cur_max_idx = np.amax(self.segments) # Highest index used by current segments.
             exclusion_segment = np.empty(np.shape(exclusion)) # Initiate exclusion segment array.
-            exclusion_segment[:,0] = np.arange(current_max_index+1, current_max_index+1+np.shape(exclusion)[0]) # Fill exclusion segment array.
+            exclusion_segment[:,0] = np.arange(cur_max_idx+1, cur_max_idx+1+np.shape(exclusion)[0]) # Fill exclusion segment array.
             exclusion_segment[:,1] = np.roll(exclusion_segment[:,0],-1) # Fill exclusion segment array.
             self.boundary = np.append(self.boundary, exclusion, axis=0) # Append exclusion to boundary array.
             self.segments = np.append(self.segments, exclusion_segment, axis=0).astype('int32') # Append exclusion segments to segment array.
@@ -149,18 +149,20 @@ class Mesh:
         """Private method to optimize the element size to generate approximately the desired number of elements."""
         f = lambda size: self._uniform_remesh(size, self.boundary, self.segments, self.curves, self.target_nodes)
         res = minimize_scalar(f, bounds=(self.size_lower_bound, self.size_upper_bound), method='bounded')
+        gmsh.fltk.run()
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
-        self.triangulation = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
-        print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.triangulation)))
+        self.elements = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
+        print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.elements)))
 
     def _adaptive_mesh(self):
         D = abs(self.du[:,0,1]+self.du[:,1,0])*self.areas # Elemental shear strain-area products.
         D_b = np.mean(D) # Mean elemental shear strain-area product.
         self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
-        f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.triangulation, self.areas)
+        f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.elements, self.areas)
         minimize_scalar(f)
+        gmsh.fltk.run()
 
     @staticmethod
     def _uniform_remesh(size, boundary, segments, curves, target_nodes):
@@ -228,9 +230,9 @@ class Mesh:
         A private method to calculate the element areas.
         """
 
-        M = np.ones((len(self.triangulation),3,3))
-        M[:,1] = self.nodes[self.triangulation[:,:3]][:,:,0] # [:3] will provide corner nodes in both 1st and 2nd order element case.
-        M[:,2] = self.nodes[self.triangulation[:,:3]][:,:,1]
+        M = np.ones((len(self.elements),3,3))
+        M[:,1] = self.nodes[self.elements[:,:3]][:,:,0] # [:3] will provide corner nodes in both 1st and 2nd order element case.
+        M[:,2] = self.nodes[self.elements[:,:3]][:,:,1]
         self.areas = 0.5*np.linalg.det(M)
 
     def _element_strains(self):
@@ -239,12 +241,12 @@ class Mesh:
         element node displacements to elemental strain.
         """
         # Local coordinates
-        A = np.ones((len(self.triangulation),3,3))
-        A[:,:,1:] = self.nodes[self.triangulation[:,:3]]
-        lc = np.ones((len(self.triangulation,),3))/3
+        A = np.ones((len(self.elements),3,3))
+        A[:,:,1:] = self.nodes[self.elements[:,:3]]
+        lc = np.ones((len(self.elements,),3))/3
 
         # Weighting function (and derivatives to 2nd order)
-        N = np.zeros((len(self.triangulation),6))
+        N = np.zeros((len(self.elements),6))
         N = np.asarray([1/9,1/9,1/9,4/9,4/9,4/9])
         dN = np.asarray([[1/3,0,-1/3,4/3,-4/3,0],
                         [0,1/3,-1/3,4/3,0,-4/3]])
@@ -253,19 +255,19 @@ class Mesh:
                             [0,4,4,0,-8,0]])
 
         # 1st Order Strains
-        J_x_T = dN@self.nodes[self.triangulation]
-        J_u_T = dN@self.displacements[self.triangulation]
+        J_x_T = dN@self.nodes[self.elements]
+        J_u_T = dN@self.displacements[self.elements]
         du = np.linalg.inv(J_x_T)@J_u_T
 
         # 2nd Order Strains
-        d2udzeta2 = d2N@self.displacements[self.triangulation]    
-        J_zeta = np.zeros((len(self.triangulation),2,2))
-        J_zeta[:,0,0] = self.nodes[self.triangulation][:,1,1]-self.nodes[self.triangulation][:,2,1]
-        J_zeta[:,0,1] = self.nodes[self.triangulation][:,2,0]-self.nodes[self.triangulation][:,1,0]
-        J_zeta[:,1,0] = self.nodes[self.triangulation][:,2,1]-self.nodes[self.triangulation][:,0,1]
-        J_zeta[:,1,1] = self.nodes[self.triangulation][:,0,0]-self.nodes[self.triangulation][:,2,0]
+        d2udzeta2 = d2N@self.displacements[self.elements]    
+        J_zeta = np.zeros((len(self.elements),2,2))
+        J_zeta[:,0,0] = self.nodes[self.elements][:,1,1]-self.nodes[self.elements][:,2,1]
+        J_zeta[:,0,1] = self.nodes[self.elements][:,2,0]-self.nodes[self.elements][:,1,0]
+        J_zeta[:,1,0] = self.nodes[self.elements][:,2,1]-self.nodes[self.elements][:,0,1]
+        J_zeta[:,1,1] = self.nodes[self.elements][:,0,0]-self.nodes[self.elements][:,2,0]
         J_zeta /= np.linalg.det(A)[:,None,None]
-        d2u = np.zeros((len(self.triangulation),3,2))
+        d2u = np.zeros((len(self.elements),3,2))
         d2u[:,0,0] = d2udzeta2[:,0,0]*J_zeta[:,0,0]**2+2*d2udzeta2[:,1,0]*J_zeta[:,0,0]*J_zeta[:,1,0]+d2udzeta2[:,2,0]*J_zeta[:,1,0]**2
         d2u[:,0,1] = d2udzeta2[:,0,1]*J_zeta[:,0,0]**2+2*d2udzeta2[:,1,1]*J_zeta[:,0,0]*J_zeta[:,1,0]+d2udzeta2[:,2,1]*J_zeta[:,1,0]**2
         d2u[:,1,0] = d2udzeta2[:,0,0]*J_zeta[:,0,0]*J_zeta[:,0,1]+d2udzeta2[:,1,0]*(J_zeta[:,0,0]*J_zeta[:,1,1]+J_zeta[:,1,0]*J_zeta[:,0,1])+d2udzeta2[:,2,0]*J_zeta[:,1,0]*J_zeta[:,1,1]
@@ -371,13 +373,12 @@ class Mesh:
             Mesh array. 
             
         .. note::
-            * If arr is self.triangulation, connectivity finds the nodes connected to the indexed node.
+            * If arr is self.elements, connectivity finds the nodes connected to the indexed node.
             * If arr is self.segments, connectivity finds the segments connected to the indexed node.
         """
         arr_idxs = np.argwhere(np.any(arr == idx, axis=1)==True).flatten()
         pts_idxs = np.unique(arr[arr_idxs])
         pts_idxs = np.delete(pts_idxs, np.argwhere(pts_idxs==idx))
-        print(pts_idxs)
 
         return pts_idxs.tolist()
 
@@ -390,16 +391,16 @@ class Mesh:
             Preconditioning warp function.
         """
         
-        neighbours = self._connectivity(cur_idx, self.triangulation)
-        for index in neighbours:
-            if self.solved[index] == 0: # If not previously solved.
+        neighbours = self._connectivity(cur_idx, self.elements)
+        for idx in neighbours:
+            if self.solved[idx] == 0: # If not previously solved.
             # Use nearest-neighbout pre-conditioning.
-                self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
-                if self.subsets[index].solved: # Check against tolerance.
-                    self._store_variables(index)
+                self.subsets[idx].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
+                if self.subsets[idx].solved: # Check against tolerance.
+                    self._store_variables(idx)
                 else:
                     # Try more extrapolated pre-conditioning.
-                    diff = self.nodes[index] - self.nodes[cur_idx]
+                    diff = self.nodes[idx] - self.nodes[cur_idx]
                     p = self.subsets[cur_idx].p
                     if np.shape(p)[0] == 6:
                         p_0[0] = p[0] + p[2]*diff[0] + p[3]*diff[1]
@@ -407,23 +408,23 @@ class Mesh:
                     elif np.shape(p)[0] == 12:
                         p_0[0] = p[0] + p[2]*diff[0] + p[3]*diff[1] + 0.5*p[6]*diff[0]**2 + p[7]*diff[0]*diff[1] + 0.5*p[8]*diff[1]**2 # CHECK!!
                         p_0[1] = p[1] + p[4]*diff[0] + p[5]*diff[1] + 0.5*p[9]*diff[0]**2 + p[10]*diff[0]*diff[1] + 0.5*p[11]*diff[1]**2 # CHECK!!
-                    self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
-                    if self.subsets[index].solved:
-                        self._store_variables(index)
+                    self.subsets[idx].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
+                    if self.subsets[idx].solved:
+                        self._store_variables(idx)
                     else:
                         # Finally, try the NCC initial guess.
-                        self.subsets[index].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0 = np.zeros(np.shape(p_0)), method=self.method, tolerance=self.tolerance)
-                        if self.subsets[index].solved:
-                                self._store_variables(index)
+                        self.subsets[idx].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0 = np.zeros(np.shape(p_0)), method=self.method, tolerance=self.tolerance)
+                        if self.subsets[idx].solved:
+                                self._store_variables(idx)
 
-    def _store_variables(self, index, seed=False):
+    def _store_variables(self, idx, seed=False):
         """Store variables."""
         if seed == True:
             flag = -1
         else:
             flag = 1
-        self.solved[index] = flag
-        self.C_CC[index] = np.max((self.subsets[index].C_CC, 0)) # Clip correlation coefficient to positive values.
-        self.p[index] = self.subsets[index].p.flatten()
-        self.displacements[index, 0] = self.subsets[index].u
-        self.displacements[index, 1] = -self.subsets[index].v
+        self.solved[idx] = flag
+        self.C_CC[idx] = np.max((self.subsets[idx].C_CC, 0)) # Clip correlation coefficient to positive values.
+        self.p[idx] = self.subsets[idx].p.flatten()
+        self.displacements[idx, 0] = self.subsets[idx].u
+        self.displacements[idx, 1] = -self.subsets[idx].v

@@ -16,7 +16,7 @@ faulthandler.enable()
 
 class Mesh:
 
-    def __init__(self, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 5, size_upper_bound = 1000):
+    def __init__(self, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 1, size_upper_bound = 1000):
         """Initialisation of geopyv mesh object."""
         self.initialised = False
         # Check types.
@@ -189,7 +189,7 @@ class Mesh:
         gmsh.model.occ.addPlaneSurface(curve_indices, 0)
         
         # Generate mesh.
-        gmsh.option.setNumber("Mesh.MeshSizeMin", 25)
+        gmsh.option.setNumber("Mesh.MeshSizeMin", 1)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
         gmsh.model.mesh.optimize() 
@@ -206,8 +206,8 @@ class Mesh:
     def _adaptive_remesh(scale, target, nodes, triangulation, areas):
         lengths = area_to_length(areas*scale) # Convert target areas to target characteristic lengths.
         bg = gmsh.view.add("bg", 1) # Create background view.
-        data = np.pad(nodes[triangulation], ((0,0),(0,0),(0,2)), mode='constant') # Prepare data input (coordinates and buffer).
-        data[:,:,3] = np.reshape(np.repeat(lengths, 6), (-1,6)) # Fill data input buffer with target weights.
+        data = np.pad(nodes[triangulation[:,:3]], ((0,0),(0,0),(0,2)), mode='constant') # Prepare data input (coordinates and buffer).
+        data[:,:,3] = np.reshape(np.repeat(lengths, 3), (-1,3)) # Fill data input buffer with target weights.
         data = np.transpose(data, (0,2,1)).flatten() # Reshape for input.
         gmsh.view.addListData(bg, "ST", len(triangulation),  data) # Add data to view.
         bgf = gmsh.model.mesh.field.add("PostView") # Add view to field. 

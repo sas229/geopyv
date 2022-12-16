@@ -147,9 +147,9 @@ class Mesh:
 
     def _initial_mesh(self):
         """Private method to optimize the element size to generate approximately the desired number of elements."""
-        f = lambda size: self._uniform_remesh(size, self.boundary, self.segments, self.curves, self.target_nodes)
+        f = lambda size: self._uniform_remesh(size, self.boundary, self.segments, self.curves, self.target_nodes, self.size_lower_bound)
         res = minimize_scalar(f, bounds=(self.size_lower_bound, self.size_upper_bound), method='bounded')
-        gmsh.fltk.run()
+        #gmsh.fltk.run()
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
@@ -162,10 +162,10 @@ class Mesh:
         self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
         f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.elements, self.areas)
         minimize_scalar(f)
-        gmsh.fltk.run()
+        #gmsh.fltk.run()
 
     @staticmethod
-    def _uniform_remesh(size, boundary, segments, curves, target_nodes):
+    def _uniform_remesh(size, boundary, segments, curves, target_nodes, size_lower_bound):
         """
         Private method to prepare the initial mesh.
         """
@@ -189,7 +189,7 @@ class Mesh:
         gmsh.model.occ.addPlaneSurface(curve_indices, 0)
         
         # Generate mesh.
-        gmsh.option.setNumber("Mesh.MeshSizeMin", 1)
+        gmsh.option.setNumber("Mesh.MeshSizeMin", size_lower_bound)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
         gmsh.model.mesh.optimize() 
@@ -361,7 +361,7 @@ class Mesh:
             self._element_area()
             self._element_strains()
 
-    def _connectivity(self, idx, arr):
+    def _connectivity(self,idx):
         """
         A private method that returns the indices of nodes connected to the index node according to the input array.
         
@@ -371,16 +371,26 @@ class Mesh:
             Index of node. 
         arr : numpy.ndarray (N) 
             Mesh array. 
-            
-        .. note::
-            * If arr is self.elements, connectivity finds the nodes connected to the indexed node.
-            * If arr is self.segments, connectivity finds the segments connected to the indexed node.
-        """
-        arr_idxs = np.argwhere(np.any(arr == idx, axis=1)==True).flatten()
-        pts_idxs = np.unique(arr[arr_idxs])
-        pts_idxs = np.delete(pts_idxs, np.argwhere(pts_idxs==idx))
 
-        return pts_idxs.tolist()
+        """
+        element_idxs = np.argwhere(self.elements==idx)
+        pts_idxs = []
+        for i in range(len(element_idxs)):
+            if element_idxs[i,1] == 0: # If 1
+                pts_idxs.append(self.elements[element_idxs[i,0],3::2]) # Add 4,6
+            elif element_idxs[i,1] == 1: #If 2
+                pts_idxs.append(self.elements[element_idxs[i,0],3:5]) # Add 4,5
+            elif element_idxs[i,1] == 2: # If 3
+                pts_idxs.append(self.elements[element_idxs[i,0],4:]) # Add 5,6
+            elif element_idxs[i,1] == 3: # If 4
+                pts_idxs.append(self.elements[element_idxs[i,0],:2]) # Add 1,2
+            elif element_idxs[i,1] == 4: # If 5
+                pts_idxs.append(self.elements[element_idxs[i,0],1:3]) # Add 2,3
+            elif element_idxs[i,1] == 5: # If 6
+                pts_idxs.append(self.elements[element_idxs[i,0],:3:2]) # Add 1,3
+        pts_idxs = np.unique(pts_idxs)
+        
+        return pts_idxs
 
     def _neighbours(self, cur_idx, p_0):
         """
@@ -391,7 +401,7 @@ class Mesh:
             Preconditioning warp function.
         """
         
-        neighbours = self._connectivity(cur_idx, self.elements)
+        neighbours = self._connectivity(cur_idx)
         for idx in neighbours:
             if self.solved[idx] == 0: # If not previously solved.
             # Use nearest-neighbout pre-conditioning.

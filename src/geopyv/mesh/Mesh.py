@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 from geopyv.templates import Circle
 from geopyv.image import Image
 from geopyv.subset import Subset
@@ -72,6 +73,8 @@ class Mesh:
         self.tolerance = tolerance
         self.alpha = alpha
         self.beta = beta
+        self.subset_bgf_nodes = None
+        self.subset_bgf_values = None
         if self.order == 1 and self.method != "WFAGN":
             self.p_0 = np.zeros(6)
         elif self.order == 1 and self.method == "WFAGN":
@@ -84,12 +87,14 @@ class Mesh:
         self._find_seed_node()
         try:
             self._reliability_guided()
-        
+            
+
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations+1):
                 self.message = "Adaptive iteration {}".format(iteration)
                 self._adaptive_mesh()
                 self._update_mesh()
+                self._adaptive_subset()
                 self._find_seed_node()
                 self._reliability_guided()
 
@@ -103,6 +108,7 @@ class Mesh:
             print("Error! Could not solve for all subsets.")
             self.update = True
         gmsh.finalize()
+        del(self.subsets)
         
     def _update_mesh(self):
         """Private method to update the mesh variables."""
@@ -149,7 +155,6 @@ class Mesh:
         """Private method to optimize the element size to generate approximately the desired number of elements."""
         f = lambda size: self._uniform_remesh(size, self.boundary, self.segments, self.curves, self.target_nodes, self.size_lower_bound)
         res = minimize_scalar(f, bounds=(self.size_lower_bound, self.size_upper_bound), method='bounded')
-        #gmsh.fltk.run()
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
@@ -162,7 +167,6 @@ class Mesh:
         self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
         f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.elements, self.areas)
         minimize_scalar(f)
-        #gmsh.fltk.run()
 
     @staticmethod
     def _uniform_remesh(size, boundary, segments, curves, target_nodes, size_lower_bound):
@@ -224,6 +228,22 @@ class Mesh:
         nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
         error = (np.shape(nodes)[0] - target)**2
         return error
+
+    def _adaptive_subset(self):
+        subset_bgf = sp.interpolate.RBFInterpolator(self.subset_bgf_nodes,self.subset_bgf_values,neighbors = 10, kernel = "cubic")
+        subset_sizes = subset_bgf(self.nodes)
+
+    def _update_subset_bgf(self):
+        if self.subset_bgf_nodes is not None:
+            self.subset_bgf_nodes = np.append(self.subset_bgf_nodes, np.mean(self.nodes[self.elements], axis = 1),axis=0)
+            self.subset_bgf_values = np.append(self.subset_bgf_values, np.mean(self.d2u, axis=(1,2)), axis = 0)
+        else:
+            self.subset_bgf_nodes = np.mean(self.nodes[self.elements], axis = 1)
+            self.subset_bgf_values = np.mean(self.d2u, axis=(1,2))
+
+
+    
+
 
     def _element_area(self):
         """
@@ -360,6 +380,7 @@ class Mesh:
             # Compute element areas and strains.
             self._element_area()
             self._element_strains()
+            self._update_subset_bgf()
 
     def _connectivity(self,idx):
         """

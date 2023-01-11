@@ -5,6 +5,7 @@ from geopyv.sequence import Sequence
 import numpy as np 
 from scipy import special as sp
 import matplotlib.pyplot as plt 
+import matplotlib.tri as tri
 
 from geopyv.geometry.exclusions import circular_exclusion, circular_exclusion_list
 
@@ -27,8 +28,8 @@ class Validator:
 
         self.name = name
         self.key = key
-        self.labels = []
         self.out = []
+        self.labels = []
 
     def isg(self, image_size = 1001, img_typ = "jpg", speckle_no = 4*7640, rho = 4/np.sqrt(8), seq_len = 50, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = 1, a = 0, b = 0, origin = np.asarray([0.0,0.0]), noise = np.asarray([[0.0, 0.0],[0,0]])):
         """ Image Sequence Generator (isg)
@@ -180,28 +181,42 @@ class Validator:
         im.close()
 
     def validation(self, target_nodes = 1681, boundary = np.asarray([[300.,300.],[300.,700.],[700.,700.],[700.,300.]]), exclusions = [],
-                    seed_coord = np.asarray([500.,500.]), template = Circle(30), order = 1, adaptive_iterations = 0, label = None):
+                    seed_coord = np.asarray([500.,500.]), size = 20, order = 1, adaptive_iterations = 0, label = None):
         
-        self.img_seq = self._seqload()
+        #self.img_seq = self._seqload()
+        self.order = order
+        self.size = size
         self.seq = Sequence(img_sequence = self.img_seq, target_nodes = target_nodes, boundary = boundary, exclusions = exclusions)
-        self.seq.solve(seed_coord = seed_coord, max_iterations = 50, max_norm = 1e-5, tolerance = 0.7, template = template, order = order, adaptive_iterations = 0, alpha = 0.25, beta = 4, size_lower_bound = 1)
+        self.seq.solve(seed_coord = seed_coord, max_iterations = 50, max_norm = 1e-5, tolerance = 0.7, template = Circle(size), order = order, adaptive_iterations = 0, alpha = 0.25, beta = 4, size_lower_bound = 1)
         self._comparison()
         self.labels.append(label)
+        del(self.seq)
+
+
         
     def _comparison(self):
         series = np.zeros((self.seq_len-1, 2)) # Standard error array.
         base = np.zeros((len(self.seq.meshes[0].nodes), 2)) # Displacement pre-image update array.
+        print(self.seq.meshes[0].nodes[0])
         for i in range(len(self.seq.meshes)):
             if self.seq.update_register[i] == 1: # If reference updated...
                     base = ob_warp_a # ... record previous 
-            ap_warp_a = np.zeros((len(self.seq.meshes[i].nodes), 2))
-            ap_warp_a = self._warp(i, self.seq.meshes[i].nodes, map = True) #ap_warp_a = self._warp(self.seq.f_img_index[i], i+1, self.seq.meshes[i].nodes, map = True)
-            ob_warp_a = np.zeros((len(self.seq.meshes[i].nodes), 2))
-            for n in range(len(self.seq.meshes[i].subsets)):
-                ob_warp_a[n] = np.asarray([self.seq.meshes[i].subsets[n].u, self.seq.meshes[i].subsets[n].v]) + base[n]
+            #ap_warp_a = np.zeros((len(self.seq.meshes[i].nodes), 2))
+            ap_warp_a = self._warp(i+1, self.seq.meshes[i].nodes, map = True) #ap_warp_a = self._warp(self.seq.f_img_index[i], i+1, self.seq.meshes[i].nodes, map = True)
+            #ob_warp_a = np.zeros((len(self.seq.meshes[i].nodes), 2))
+            ob_warp_a = self.seq.meshes[i].displacements+base
+            #for n in range(len(self.seq.meshes[i].nodes)):
+            #    ob_warp_a[n] = np.asarray([self.seq.meshes[i].displacements[n,0], self.seq.meshes[i].displacements[n,1]]) + base[n]
             series[i,1] = np.std(np.sqrt(np.sum((ap_warp_a-ob_warp_a)**2, axis=1)))
             series[i,0] = self.mult[i+1] #-self.mult[self.seq.f_img_index[i]]
+            print(ap_warp_a[0])
+            print(ob_warp_a[0])
+            print()
         self.out.append(series)
+        #_write(series)
+
+    def _write(self, series):
+        np.savetxt(self.name+"_"+self.order+"_"+self.size+".csv", series, header = self.order+"_"+self.size)
 
     def seq_info_load(self, image_size = 1001, img_typ = "jpg", speckle_no = 4*7640, rho = 4/np.sqrt(8), seq_len = 50, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = 1, a = 0, b = 0, origin = np.asarray([0.0,0.0]), noise = np.asarray([[0.0, 0.0],[0,0]]), cut = None):
 
@@ -232,9 +247,9 @@ class Validator:
         output = np.empty(self.seq_len, dtype=object)
         for i in range(self.seq_len):
             output[i] = Image(self.name+"_"+str(i)+"."+self.img_typ)
-        return output
+        self.img_seq = output
 
-    def plotter(self, x, y):
+    def plotter(self, x, y, name = None):
         """Graphical output.
         
         Parameters
@@ -246,42 +261,168 @@ class Validator:
         fig, ax = plt.subplots( figsize = (9,4.5))
         for i in range(len(self.out)): 
             ax.scatter(self.out[i][:,0], self.out[i][:,1], color= colour[i], marker = marker[i], label=self.labels[i])
-        plt.legend()
+        plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
         ax.set_xlabel(x)
         ax.set_ylabel(y)
+        #if name is None:
+        #    fig.savefig(self.name+"_error_lin."+self.img_typ, bbox_inches = "tight")
+        #else:
+        #    fig.savefig(name+"_error_lin."+self.img_typ, bbox_inches = "tight")
         ax.set_yscale("log")
-        if self.typ == 1:
-            ax.set_xscale("log")
-        plt.show()
-        plt.tight_layout()
-        fig.savefig(self.name+"_error."+self.img_typ)
+        ax.set_xscale("log")
+        if name is None:
+            fig.savefig(self.name+"_error."+self.img_typ, bbox_inches = "tight", dpi = 600)
+        else:
+            fig.savefig(name+"_error."+self.img_typ, bbox_inches = "tight", dpi = 600)
 
-valid = Validator(name = "u", key = 0)
-valid.isg(image_size = 401, speckle_no = 7640, seq_len=2, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = -1)
+#valid = Validator(name = "u", key = 0)
+#valid.isg(image_size = 401, speckle_no = 7640, seq_len=6, mmin = -3, mmax = 2, typ = 1, comp = 0, comp_val = -1)
+#valid._seqload()
+#valid.validation(order = 1, label = r"$1^{st}$ Order, $20px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(20))
+#valid.validation(order = 2, label = r"$2^{nd}$ Order, $20px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(20))
+#valid.validation(order = 1, label = r"$1^{st}$ Order, $40px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(40))
+#valid.validation(order = 2, label = r"$2^{nd}$ Order, $40px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(40))
+#valid.validation(order = 1, label = r"$1^{st}$ Order, $80px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(80))
+#valid.validation(order = 2, label = r"$2^{nd}$ Order, $80px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(80))
+#valid.plotter(x=r"Displacement, $u$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
+
+#valid = Validator(name = "dudx", key = 0)
+#valid.isg(image_size = 401, speckle_no = 7640, seq_len=60, mmin = -6, mmax = 0, typ = 1, comp = 2, comp_val = -1)
+#valid.seq_info_load(image_size = 401, speckle_no = 7640, seq_len=60, mmin = -6, mmax = 0, typ = 1, comp = 2, comp_val = -1)
+#valid._seqload()
+#valid.validation(order = 1, label = r"$20px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(20))
+#valid.validation(order = 2, label = r"$20px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(20))
+#valid.validation(order = 1, label = r"$40px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(40))
+#valid.validation(order = 2, label = r"$40px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(40))
+#valid.validation(order = 1, label = r"$80px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(80))
+#valid.validation(order = 2, label = r"$80px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(80))
+#valid.plotter(x=r"$1^{st}$ Order Strain Component, $du/dx$ ($-$)",y=r"Standard error, $\rho_{px}$ ($px$)")
+
+#valid = Validator(name = "dudy", key = 0)
+##valid.isg(image_size = 401, speckle_no = 7640, seq_len=50, mmin = -6, mmax = 0, typ = 1, comp = 4, comp_val = -1, origin = np.asarray([201,201]))
+#valid.seq_info_load(image_size = 401, speckle_no = 7640, seq_len=50, mmin = -6, mmax = 0, typ = 1, comp = 4, comp_val = -1, cut = 44)
+#valid._seqload()
+#valid.validation(order = 1, label = r"$20px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(20))
+#valid.validation(order = 2, label = r"$20px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(20))
+#valid.validation(order = 1, label = r"$40px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(40))
+#valid.validation(order = 2, label = r"$40px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(40))
+#valid.validation(order = 1, label = r"$80px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(80))
+#valid.validation(order = 2, label = r"$80px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+#                    seed_coord = np.asarray([200.,200.]), template = Circle(80))
+#valid.plotter(x=r"$1^{st}$ Order Strain Component, $du/dy$ ($-$)",y=r"Standard error, $\rho_{px}$ ($px$)")
+
+valid = Validator(name = "d2udx2", key = 0)
+#valid.isg(image_size = 401, speckle_no = 7640, seq_len=100, mmin = -6, mmax = 0, typ = 1, comp = 6, comp_val = -1)
+valid.seq_info_load(image_size = 401, speckle_no = 7640, seq_len=100, mmin = -6, mmax = 0, typ = 1, comp = 6, comp_val = -1, cut = 50)
+valid._seqload()
+valid.validation(order = 1, label = r"$20px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+                    seed_coord = np.asarray([200.,200.]), size = 20)
+valid.validation(order = 2, label = r"$20px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+                    seed_coord = np.asarray([200.,200.]), size = 20)
+valid.validation(order = 1, label = r"$40px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+                    seed_coord = np.asarray([200.,200.]), size = 40)
+valid.validation(order = 2, label = r"$40px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+                    seed_coord = np.asarray([200.,200.]), size = 40)
+valid.validation(order = 1, label = r"$80px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+                    seed_coord = np.asarray([200.,200.]), size = 80)
+valid.validation(order = 2, label = r"$80px$ dia.", boundary = np.asarray([[100.,100.],[100.,300.],[300.,300.],[300.,100.]]),
+                    seed_coord = np.asarray([200.,200.]), size = 80)
+valid.plotter(x=r"$2^{nd}$ Order Strain Component, $d^2u/dx^2$ ($-$)",y=r"Standard error, $\rho_{px}$ ($px$)")
+
+#for i in range(valid.seq_len-1):
+#    mesh = valid.seq.meshes[i]
+#    quantity = mesh.p[:,0]
+#    maximum = np.round(np.ceil(np.max(np.abs(quantity))),0)
+#    levels = np.arange(-maximum, maximum, maximum/10)
+#    fig, ax = plt.subplots()
+#    triangulation = tri.Triangulation(mesh.nodes[:,0], mesh.nodes[:,1], mesh.elements[:,:3])
+#    #triangulation = tri.Triangulation(mesh.nodes[:,0], mesh.nodes[:,1], mesh.triangulation)
+#    ax.imshow(valid.img_seq[0].image_gs, cmap="gist_gray")
+#    contours = ax.tricontourf(triangulation, quantity, alpha=0.75, levels=levels, extend='both')
+#    ax.triplot(triangulation, linewidth=1, color='k', linestyle='-', alpha=0.25)
+#    plt.colorbar(contours, ax=ax, fraction=0.02, pad=0.04)
+#    #ax.scatter(mesh.nodes[:,0],mesh.nodes[:,1])
+#    ax.axis('equal')
+#    ax.set_axis_off()
+#    plt.show()
+#    plt.tight_layout()
 
 #print("===================================================u====================================================")
 #valid = Validator(name = "u", key = 0)
 ##valid.isg(seq_len=40, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = -1)
 #valid.seq_info_load(seq_len=40, mmin = 0, mmax = 1, typ = 0, comp = 0, comp_val = -1)
-#valid.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
-#valid.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
-#valid.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
-#valid.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
-#valid.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
-#valid.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
-#valid.plotter(x=r"Displacement, $u$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
+#valid.validation(order = 1, label = r"$20px dia.", template = Circle(20))
+##valid.validation(order = 1, label = r"$30px dia.", template = Circle(30))
+#valid.validation(order = 1, label = r"$40px dia.", template = Circle(40))
+##valid.validation(order = 1, label = r"$50px dia.", template = Circle(50))
+#valid.validation(order = 1, label = r"$60px dia.", template = Circle(60))
+##valid.validation(order = 1, label = r"$70px dia.", template = Circle(70))
+##valid.validation(order = 1, label = r"$80px dia.", template = Circle(80))
+##valid.validation(order = 1, label = r"$90px dia.", template = Circle(90))
+##valid.validation(order = 1, label = r"$100px dia.", template = Circle(100))
+#valid.plotter(x=r"Displacement, $u$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)", name = "u_subset_size")
 
 #print("===================================================dudx==================================================")
 #valid1 = Validator(name = "dudx", key = 0)
-#valid1.isg(seq_len=40, mmin = -6, mmax = -1, typ = 1, comp = 2, comp_val = -1)
-#valid1.validation(order = 1, label = r"$1^{st}$ Order, 25px dia.", template = Circle(25))
-#valid1.validation(order = 2, label = r"$2^{st}$ Order, 25px dia.", template = Circle(25))
-#valid1.validation(order = 1, label = r"$1^{st}$ Order, 50px dia.", template = Circle(50))
-#valid1.validation(order = 2, label = r"$2^{st}$ Order, 50px dia.", template = Circle(50))
-#valid1.validation(order = 1, label = r"$1^{st}$ Order, 100px dia.", template = Circle(100))
-#valid1.validation(order = 2, label = r"$2^{st}$ Order, 100px dia.", template = Circle(100))
+#valid1.seq_info_load(seq_len=40, mmin = -6, mmax = -1, typ = 1, comp = 2, comp_val = -1)
+#valid1._seqload()
+#print("====================================================1====================================================")
+#valid1.validation(order = 1, label = r"$20px$ dia.", template = Circle(20))
+#print("====================================================2====================================================")
+#valid1.validation(order = 2, label = r"$20px$ dia.", template = Circle(20))
+#print("====================================================3====================================================")
+#valid1.validation(order = 1, label = r"$40px$ dia.", template = Circle(40))
+#print("====================================================4====================================================")
+#valid1.validation(order = 2, label = r"$40px$ dia.", template = Circle(40))
+#print("====================================================5====================================================")
+#valid1.validation(order = 1, label = r"$60px$ dia.", template = Circle(60))
+#print("====================================================6====================================================")
+#valid1.validation(order = 2, label = r"$60px$ dia.", template = Circle(60))
+#print("====================================================5====================================================")
+#valid1.validation(order = 1, label = r"$100px dia.", template = Circle(100))
+#print("====================================================6====================================================")
+#valid1.validation(order = 2, label = r"$100px dia.", template = Circle(100))
+
+#valid1.validation(order = 1, label = r"$80px dia.", template = Circle(80))
+#valid1.validation(order = 1, label = r"$90px dia.", template = Circle(90))
+#valid1.validation(order = 1, label = r"$100px dia.", template = Circle(100))
 #valid1.plotter(x=r"$1^{st}$ Order Strain Component, $du/dx$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
-#
+
+#print("===================================================d2udx2================================================")
+#valid3 = Validator(name = "d2udx2", key = 0)
+#valid3.seq_info_load(seq_len=40, mmin = -6, mmax = -3, typ = 1, comp = 6, comp_val = 1, cut = 32)
+#valid3._seqload()
+#print("====================================================1====================================================")
+#valid3.validation(order = 1, label = r"$20px$ dia.", template = Circle(20))
+#print("====================================================2====================================================")
+#valid3.validation(order = 2, label = r"$20px$ dia.", template = Circle(20))
+#print("====================================================3====================================================")
+#valid3.validation(order = 1, label = r"$40px$ dia.", template = Circle(40))
+#print("====================================================4====================================================")
+#valid3.validation(order = 2, label = r"$40px$ dia.", template = Circle(40))
+#print("====================================================5====================================================")
+#valid3.validation(order = 1, label = r"$60px$ dia.", template = Circle(60))
+#print("====================================================6====================================================")
+#valid3.validation(order = 2, label = r"$60px$ dia.", template = Circle(60))
+#valid3.plotter(x=r"$2^{nd}$ Order Strain Component, $d^2u/dx^2$ ($px$)",y=r"Standard error, $\rho_{px}$ ($px$)")
+
 #print("===================================================dudy==================================================")
 #valid2 = Validator(name = "dudy", key = 0)
 #valid2.isg(seq_len=40, mmin = -6, mmax = -1, typ = 1, comp = 4, comp_val = -1)

@@ -5,8 +5,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -DEIGEN_DONT_PARALLELIZE")
 message(${CMAKE_CXX_FLAGS})
 
-find_package (Eigen3 3.3 REQUIRED)
-find_package (pybind11 REQUIRED)
+add_subdirectory(external)
 
 pybind11_add_module(_image_extensions src/geopyv/image/_image.cpp)
 target_link_libraries(_image_extensions PUBLIC Eigen3::Eigen)

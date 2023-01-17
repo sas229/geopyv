@@ -51,8 +51,8 @@ class Template:
     
     def mask(self, centre, mask):
         """Method to mask subset based on binary mask from mesh."""
-        x_coords = (self.coords[:,0] + centre[0]).astype(np.int)
-        y_coords = (self.coords[:,1] + centre[1]).astype(np.int)
+        x_coords = (self.coords[:,0] + centre[0]).astype(np.intc)
+        y_coords = (self.coords[:,1] + centre[1]).astype(np.intc)
         masked_coords = np.zeros((1,2))
         count = 0
         for i in range(np.shape(self.coords)[0]):

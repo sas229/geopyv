@@ -59,7 +59,7 @@ class Particle:
         self.ref_p = p_init
         self.ref_vol = vol
 
-    def solve(self, model, statev, props):
+    def solve(self): #model, statev, props):
         """Method to calculate the strain path of the particle from the mesh sequence and optionally the stress path
         employing the model specified by the input parameters."""
 
@@ -77,9 +77,9 @@ class Particle:
 
         diff = self.meshes[m].nodes - self.ref_coord[:2] # Particle-mesh node positional vector.
         dist = np.einsum('ij,ij->i',diff, diff) # Particle-mesh node "distances" (truly distance^2).
-        tri_idxs = np.argwhere(np.any(self.meshes[m].triangulation == np.argmin(dist), axis=1)==True).flatten() # Retrieve relevant element indices.
+        tri_idxs = np.argwhere(np.any(self.meshes[m].elements == np.argmin(dist), axis=1)==True).flatten() # Retrieve relevant element indices.
         for i in range(len(tri_idxs)):  
-            if path.Path(self.meshes[m].nodes[self.meshes[m].triangulation[tri_idxs[i]]]).contains_point(self.ref_coord[:2]): # Check if the element includes the particle coordinates.
+            if path.Path(self.meshes[m].nodes[self.meshes[m].elements[tri_idxs[i]]]).contains_point(self.ref_coord[:2]): # Check if the element includes the particle coordinates.
                 break # If the correct element is identified, stop the search. 
         return tri_idxs[i] # Return the element index. 
 
@@ -95,7 +95,7 @@ class Particle:
         
         M =np.ones((4,3))
         M[0,1:] = self.ref_coord
-        M[1:,1:] = self.meshes[m].nodes[self.meshes[m].triangulation[tri_idx]]
+        M[1:,1:] = self.meshes[m].nodes[self.meshes[m].elements[tri_idx]]
         area = self.meshes[m].areas[tri_idx]
 
         self.W = np.ones(3)
@@ -106,8 +106,8 @@ class Particle:
     def _p_inc(self, m, tri_idx):
         
         self.p_inc = np.zeros(12)
-        element = self.meshes[m].nodes[self.meshes[m].triangulation[tri_idx]]
-        displacements = self.meshes[m].displacements[self.meshes[m].triangulation[tri_idx]]
+        element = self.meshes[m].nodes[self.meshes[m].elements[tri_idx]]
+        displacements = self.meshes[m].displacements[self.meshes[m].elements[tri_idx]]
 
         # Local coordinates
         A = np.ones((3,4))
@@ -126,7 +126,7 @@ class Particle:
                             [0,4,4,0,-8,0]])
 
         # Displacements
-        self.p_inc[:2] = N@self.meshes[m].nodes[self.meshes[m].triangulation[tri_idx]]
+        self.p_inc[:2] = N@self.meshes[m].nodes[self.meshes[m].elements[tri_idx]]
 
         # 1st Order Strains
         J_x_T = dN@element

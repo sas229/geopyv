@@ -458,4 +458,4 @@ class Mesh:
         self.C_CC[idx] = np.max((self.subsets[idx].C_CC, 0)) # Clip correlation coefficient to positive values.
         self.p[idx] = self.subsets[idx].p.flatten()
         self.displacements[idx, 0] = self.subsets[idx].u
-        self.displacements[idx, 1] = -self.subsets[idx].v
+        self.displacements[idx, 1] = self.subsets[idx].v

@@ -11,6 +11,7 @@ ref = Image("./tests/ref.jpg")
 tar = Image("./tests/tar.jpg")
 seed = np.asarray([300.,300.])
 subset = Subset(seed, ref, tar, template=Circle(25))
+subset.inspect()
 success = subset.solve()
 print("Horizontal displacement: {} px; Vertical displacement: {} px\n".format(subset.u, subset.v))
 

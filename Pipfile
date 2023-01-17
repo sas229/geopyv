@@ -18,8 +18,8 @@ PyQt5 = "*"
 opencv-contrib-python = "*"
 pyside6 = "*"
 alive-progress = "*"
-geopyv = {path = "."}
 opencv-python = "*"
+geopyv = {path = "."}
 
 [dev-packages]
 

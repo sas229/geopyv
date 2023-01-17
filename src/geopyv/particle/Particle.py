@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.path as path
-from geopyv.umats import umat_mc
+# from geopyv.umats import umat_mc
 
 class Particle:
     """Particle class for geopyv.
@@ -202,13 +202,13 @@ class Particle:
                 dstran = self.ps[i+1, 2:] - self.ps[i, 2:]
                 coords = self.coords[i]
                 stress = self.stress_path[i]
-                umat_mc.umat(stress = stress, statev=np.zeros(6), ddsdde = ddsdde, sse = 0, 
-                                spd = 0, scd = 0, rpl = 0, ddsddt = np.zeros(6), drplde = np.zeros(6), drpldt = 0, 
-                                stran = stran, dstran= dstran, time = np.zeros(2), dtime = 0, temp = 0, dtemp = 0,
-                                predef = np.zeros(1), dpred = np.zeros(1), cmname = 0, ndi = 0, nshr = 0, ntens = 6, 
-                                nstatev=nstatev, props=props, nprops=nprops, coords = coords, drot = np.zeros((3,3)), pnewdt = 0,
-                                celent = 0, dfgrd0 = np.zeros((3,3)), dfgrd1 = np.zeros((3,3)), noel = 0, npt = 0, layer = 0, 
-                                kspt = 0, kstep = 0, kinc = 0)
+                # umat_mc.umat(stress = stress, statev=np.zeros(6), ddsdde = ddsdde, sse = 0, 
+                #                 spd = 0, scd = 0, rpl = 0, ddsddt = np.zeros(6), drplde = np.zeros(6), drpldt = 0, 
+                #                 stran = stran, dstran= dstran, time = np.zeros(2), dtime = 0, temp = 0, dtemp = 0,
+                #                 predef = np.zeros(1), dpred = np.zeros(1), cmname = 0, ndi = 0, nshr = 0, ntens = 6, 
+                #                 nstatev=nstatev, props=props, nprops=nprops, coords = coords, drot = np.zeros((3,3)), pnewdt = 0,
+                #                 celent = 0, dfgrd0 = np.zeros((3,3)), dfgrd1 = np.zeros((3,3)), noel = 0, npt = 0, layer = 0, 
+                #                 kspt = 0, kstep = 0, kinc = 0)
                 self.stress_path[i+1] = stress
 
 

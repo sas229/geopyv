@@ -30,21 +30,16 @@ class Image:
         """Initialisation of geopyv image object."""
         self.filepath = filepath
         self.border = np.int_(border)
-        self._get_image()
         self._get_image_gs()
         self._get_QCQT()
 
-    def _get_image(self):
-        """Private method to load image using OpenCV function 'imread'."""
-        self.image = cv2.imread(self.filepath, cv2.IMREAD_COLOR)
-        return
-
     def _get_image_gs(self):
         """Private method to convert colour image to grayscale image for image
-        processing purposes using OpenCV function 'cvtColor', and apply Gaussian
+        processing purposes using OpenCV functions 'imread' and 'cvtColor', and apply Gaussian
         prefilter with 5x5 kernel after Pan et al. (2013), assuming
         :math:`\sigma_{x} = \sigma_{y} = 0.3 \cdot (0.5 \cdot (k-1)-1) + 0.8 = 1.1`."""
-        self.image_gs = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        image = cv2.imread(self.filepath, cv2.IMREAD_COLOR)
+        self.image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         self.image_gs = cv2.GaussianBlur(self.image_gs, ksize=(5,5), sigmaX=1.1, sigmaY=1.1)
         return        
 

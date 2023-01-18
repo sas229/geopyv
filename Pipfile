@@ -19,6 +19,7 @@ opencv-contrib-python = "*"
 pyside6 = "*"
 alive-progress = "*"
 opencv-python = "*"
+plyer = "*"
 geopyv = {path = "."}
 
 [dev-packages]

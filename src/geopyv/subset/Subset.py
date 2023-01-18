@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from plyer import filechooser
 from geopyv.image import Image
 from geopyv.templates import Circle, Square
 from ._subset_extensions import (
@@ -96,35 +97,37 @@ class Subset:
         :meth:`~_get_correlation`.
     """
 
-    def __init__(self, f_coord, f_img, g_img, template=Circle(50)):
+    def __init__(self, f_coord=None, f_img=None, g_img=None, template=Circle(50)):
         """Initialisation of geopyv subset object."""
         self.initialised = False
+        self.f_coord = f_coord
+        self.f_img = f_img
+        self.g_img = g_img
+        self.template = template
+
         # Check types.
-        if type(f_coord) != np.ndarray:
-            raise TypeError("Coordinate is not of numpy.ndarray type.")
-        elif type(f_img) != Image:
-            raise TypeError("Reference image not geopyv.image.Image type.")
-        elif type(g_img) != Image:
-            raise TypeError("Target image not geopyv.image.Image type.")
-        elif type(template) != Circle:
+        if type(self.f_img) != Image:
+            self.f_img = self._load_f_img()
+        if type(self.g_img) != Image:
+            self.g_img = self._load_g_img()
+        if type(self.f_coord) != np.ndarray:
+            self.f_coord = np.empty(2)
+            self._select_f_coord()
+        if type(self.template) != Circle:
             if type(template) != Square:
                 raise TypeError("Template is not a type defined in geopyv.templates.")
         
         # Check subset is entirely within the reference image.
         subset_list = np.array([
-            [f_coord[0]-template.size, f_coord[1]-template.size],
-            [f_coord[0]+template.size, f_coord[1]+template.size],
-            [f_coord[0]-template.size, f_coord[1]+template.size],
-            [f_coord[0]+template.size, f_coord[1]-template.size]
+            [self.f_coord[0]-self.template.size, self.f_coord[1]-template.size],
+            [self.f_coord[0]+self.template.size, self.f_coord[1]+template.size],
+            [self.f_coord[0]-self.template.size, self.f_coord[1]+template.size],
+            [self.f_coord[0]+self.template.size, self.f_coord[1]-template.size]
             ])
         if np.any(subset_list<0):
             raise ValueError("Subset reference partially falls outside reference image.")
 
         # Initialise subset.
-        self.f_coord = f_coord
-        self.f_img = f_img
-        self.g_img = g_img
-        self.template = template
         self._get_initial_guess_size()
         output = _init_reference(self.f_coord, self.template.coords, self.f_img.QCQT)
         self.f_coords = output[0]
@@ -137,8 +140,8 @@ class Subset:
         self.solved = False
         self.unsolvable = False
         self.initialised == True
-        self.x = f_coord[0]
-        self.y = f_coord[1]
+        self.x = self.f_coord[0]
+        self.y = self.f_coord[1]
 
     def solve(self, max_norm=1e-3, max_iterations=15, p_0=np.zeros(6), tolerance=0.75, method="ICGN"):
         """Method to solve for the subset displacements using the various methods.
@@ -239,6 +242,77 @@ class Subset:
                 self.solved = True
         except:
             raise ValueError("Reporting value error...")
+
+    def _load_img(self, message):
+        """Private method to open a file dialog and slect an image."""
+        imglist = filechooser.open_file(title=message, filters=['*.jpg','*.png','*.bmp'])
+        imgpath = imglist[0]
+        img = Image(imgpath)
+        return img
+
+    def _load_f_img(self):
+        """Private method to load the reference image."""
+        print("No reference image supplied. Please select the reference image.")
+        return self._load_img("Select reference image.")
+
+    def _load_g_img(self):
+        """Private method to load the target image."""
+        print("No target image supplied. Please select the target image.")
+        return self._load_img("Select target image.")
+
+    def _on_select_f_coord(self, event):
+        """Private method to print the selected coordinates."""
+        print("Coordinate selected: {}, {}".format(self.f_coord[0], self.f_coord[1]))
+
+    def _on_click_f_coord(self, event):
+        """Private method to store and plot the currently selected coordinate in self.f_coord."""
+        if event.button==3:
+            if event.xdata != None and event.ydata != None:
+                if event.xdata > self.template.size and event.xdata < np.shape(self.f_img.image_gs)[0]-self.template.size:
+                    if event.ydata > self.template.size and event.ydata < np.shape(self.f_img.image_gs)[1]-self.template.size:
+                        self.f_coord[0] = np.round(event.xdata, 0)
+                        self.f_coord[1] = np.round(event.ydata, 0)
+                        ax = event.inaxes
+                        f = ax.get_figure()
+                        num_lines = len(ax.lines)
+                        while num_lines > 0:
+                            ax.lines.pop()
+                            num_lines = len(ax.lines)
+                        ax.plot(self.f_coord[0], self.f_coord[1], marker="+", color="y", zorder=10)
+                        if type(self.template) == Circle:
+                            theta = np.linspace(0, 2*np.pi, 150)
+                            radius = self.template.size
+                            x = self.f_coord[0]+radius*np.cos(theta)
+                            y = self.f_coord[1]+radius*np.sin(theta)
+                            ax.plot(x, y, color='y')
+                        elif type(self.template) == Square:
+                            x = [
+                                self.f_coord[0]-self.template.size, 
+                                self.f_coord[0]-self.template.size,
+                                self.f_coord[0]+self.template.size,
+                                self.f_coord[0]+self.template.size,
+                                self.f_coord[0]-self.template.size,
+                            ]
+                            y = [
+                                self.f_coord[1]-self.template.size, 
+                                self.f_coord[1]+self.template.size,
+                                self.f_coord[1]+self.template.size,
+                                self.f_coord[1]-self.template.size,
+                                self.f_coord[1]-self.template.size,
+                            ]
+                            ax.plot(x, y, color='y')
+                        f.canvas.draw()
+                        f.canvas.flush_events()
+
+    def _select_f_coord(self):
+        """Private method to select f_coord if not supplied by the user."""
+        print("No coordinate supplied. Please select the target coordinate for the subset.")
+        f, ax = plt.subplots(num="Right click on the target coordinate for the subset and close to save")
+        f.canvas.mpl_connect('button_press_event', self._on_click_f_coord)
+        f.canvas.mpl_connect('close_event', self._on_select_f_coord)
+        ax.imshow(self.f_img.image_gs, cmap="gist_gray")
+        plt.tight_layout()
+        plt.show()   
 
     def inspect(self):
         """Method to show the subset and associated quality metrics."""

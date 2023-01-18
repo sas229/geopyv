@@ -359,7 +359,7 @@ class modQMainWindow(QMainWindow):
             close = QMessageBox.question(self, "EXIT", 
                                         "Exiting now will terminate the process due to problematic input (e.g. seed outside RoI, RoI not defined). Do you want to proceed?", 
                                         QMessageBox.Yes | QMessageBox.No)
-            if close == QMessageBox.Yes:
+            if x == QMessageBox.Yes:
                 event.accept()
             else:
                 event.ignore

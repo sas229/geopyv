@@ -20,6 +20,8 @@ pyside6 = "*"
 alive-progress = "*"
 opencv-python = "*"
 plyer = "*"
+colorlog = "*"
+notebook = "*"
 geopyv = {path = "."}
 
 [dev-packages]

@@ -1,9 +1,10 @@
+import logging 
 import cv2
 import os
 import numpy as np
 from geopyv.image import Image
 from geopyv.templates import Circle, Square
-from geopyv.gui import ImageSelector
+from geopyv.gui import ImageSelector, CoordinateSelector
 from ._subset_extensions import (
     _init_reference,
     _solve_ICGN,
@@ -42,6 +43,8 @@ from ._subset_extensions import (
     _grad_C_W
     )
 import matplotlib.pyplot as plt
+
+log = logging.getLogger(__name__)
 
 class Subset:
     """Subset class for geopyv.
@@ -113,7 +116,9 @@ class Subset:
             self.g_img = self._load_g_img()
         if type(self.f_coord) != np.ndarray:
             self.f_coord = np.empty(2)
-            self._select_f_coord()
+            # self._select_f_coord()
+            coordinate = CoordinateSelector()
+            self.f_coord = coordinate.select(self.f_img, self.template)
         elif np.shape(self.f_coord) != np.shape(np.empty(2)):
             raise TypeError("Coordinate is not an np.ndarray of length 2.")
         if type(self.template) != Circle:
@@ -243,6 +248,13 @@ class Subset:
             # Check for tolerance.
             if self.C_CC > self.tolerance:
                 self.solved = True
+                log.info("Subset solved.")
+                log.info("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self.x, y_i=self.y))
+                log.info("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self.u, v=self.v))
+                log.info("Correlation coefficient: CC = {C_CC} (-), SSD = {C_SSD} (-)".format(C_CC=self.C_CC, C_SSD=self.C_SSD))
+                log.info("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x+self.u, y_f=self.y+self.v))
+            else:
+                log.warn("Subset not yet solved. Use command subset.solve().")
         except:
             raise ValueError("Reporting value error...")
 
@@ -308,68 +320,13 @@ class Subset:
 
     def _load_f_img(self):
         """Private method to load the reference image."""
-        print("No reference image supplied. Please select the reference image.")
+        log.warn("No reference image supplied. Please select the reference image.")
         return self._load_img("Select reference image.")
 
     def _load_g_img(self):
         """Private method to load the target image."""
-        print("No target image supplied. Please select the target image.")
+        log.warn("No target image supplied. Please select the target image.")
         return self._load_img("Select target image.")
-
-    def _on_select_f_coord(self, event):
-        """Private method to print the selected coordinates."""
-        print("Coordinate selected: {}, {}".format(self.x, self.y))
-
-    def _on_click_f_coord(self, event):
-        """Private method to store and plot the currently selected coordinate in self.f_coord."""
-        if event.button==3:
-            if event.xdata != None and event.ydata != None:
-                if event.xdata > self.template.size and event.xdata < np.shape(self.f_img.image_gs)[0]-self.template.size:
-                    if event.ydata > self.template.size and event.ydata < np.shape(self.f_img.image_gs)[1]-self.template.size:
-                        self.x = np.round(event.xdata, 0)
-                        self.y = np.round(event.ydata, 0)
-                        self.f_coord = np.asarray([self.x, self.y])
-                        ax = event.inaxes
-                        f = ax.get_figure()
-                        num_lines = len(ax.lines)
-                        while num_lines > 0:
-                            ax.lines.pop()
-                            num_lines = len(ax.lines)
-                        ax.plot(self.x, self.y, marker="+", color="y", zorder=10)
-                        if type(self.template) == Circle:
-                            theta = np.linspace(0, 2*np.pi, 150)
-                            radius = self.template.size
-                            x = self.x+radius*np.cos(theta)
-                            y = self.y+radius*np.sin(theta)
-                            ax.plot(x, y, color='y')
-                        elif type(self.template) == Square:
-                            x = [
-                                self.x-self.template.size, 
-                                self.x-self.template.size,
-                                self.x+self.template.size,
-                                self.x+self.template.size,
-                                self.x-self.template.size,
-                            ]
-                            y = [
-                                self.y-self.template.size, 
-                                self.y+self.template.size,
-                                self.y+self.template.size,
-                                self.y-self.template.size,
-                                self.y-self.template.size,
-                            ]
-                            ax.plot(x, y, color='y')
-                        f.canvas.draw()
-                        f.canvas.flush_events()
-
-    def _select_f_coord(self):
-        """Private method to select f_coord if not supplied by the user."""
-        print("No coordinate supplied. Please select the target coordinate for the subset.")
-        f, ax = plt.subplots(num="Right click on the target coordinate for the subset and close to save")
-        f.canvas.mpl_connect('button_press_event', self._on_click_f_coord)
-        f.canvas.mpl_connect('close_event', self._on_select_f_coord)
-        ax.imshow(self.f_img.image_gs, cmap="gist_gray")
-        plt.tight_layout()
-        plt.show()   
 
     def _get_initial_guess_size(self):
         """Private method to estimate the size of square subset to use in the
@@ -606,15 +563,5 @@ class Subset:
         self.dA_s_dp = _dA_s_dp(self.W_f, self.D_f, self.p)
     def _get_grad_C_W(self):
         self.grad_C_W = _grad_C_W(self.f, self.g, self.f_m, self.g_m, self.Delta_f, self.Delta_g, self.p, self.W_f, self.W_g, self.D_f, self.D_g, self.T_p, self.dT_p_dp, self.dA_s_dp, self.A_s)
-
-    def results(self):
-        """Method to print the results"""
-        if self.solved: 
-            print("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self.x, y_i=self.y))
-            print("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self.u, v=self.v))
-            print("Correlation coefficient: CC = {C_CC} (-), SSD = {C_SSD} (-)".format(C_CC=self.C_CC, C_SSD=self.C_SSD))
-            print("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x+self.u, y_f=self.y+self.v))
-        else:
-            print("Subset not yet solved. Use command `subset.solve()`.")
     
     

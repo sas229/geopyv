@@ -1,5 +1,5 @@
 import logging
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
 from PySide6.QtGui import QPixmap
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,31 +7,34 @@ from geopyv.templates import Circle, Square
 
 log = logging.getLogger(__name__)
 
+class Selector(QMainWindow):
+    def __init__(self, img, template):
+        super().__init__()
+        self.img = img
+        self.template = template
+        self.setWindowTitle("Select coordinate for the subset")
+
+        self.view = QGraphicsView()
+        self.scene = QGraphicsScene(self)
+        self.view.setScene(self.scene)
+        self.image = QGraphicsPixmapItem()
+        self.image.setPixmap(QPixmap(self.img.filepath))
+        self.scene.addItem(self.image)    
+        self.setCentralWidget(self.view)    
+
+        self.coord = np.asarray([200., 200.])
+
 class CoordinateSelector:
 
-    def __init__(self):
-        self.app = QApplication.instance()
-        if self.app is None: 
-            self.app = QApplication()
-        self.window = QMainWindow()
-        self.window.setWindowTitle("Select coordinate.")
-        self.widget = QWidget()               
-        self.window.setCentralWidget(self.widget)    
-        self.layout = QVBoxLayout(self.widget)
-        self.label = QLabel(self.window)
-        self.layout.addWidget(self.label)
-        self.app.exec()
-
     def select(self, f_img, template):
-        print("Selecting coordinate.")
-        self.pixmap = QPixmap(f_img.filepath)
-        self.label.setPixmap(self.pixmap)
-        self.window.resize(self.pixmap.width(), self.pixmap.height())
-        print(f_img.filepath)
-        self.window.show()
-        f_coord = np.asarray([np.shape(f_img.image_gs)[0]/2, np.shape(f_img.image_gs)[1]/2])
-        return f_coord
-
+        log.warn("No coordinate supplied for subset. Please select coordinate for subset.")
+        app = QApplication.instance()
+        if app is None: 
+            app = QApplication()
+        selector = Selector(f_img, template)
+        selector.show()
+        app.exec()
+        return selector.coord
     
     # def select(self, f_img, template):
     #     """Method to select f_coord if not supplied by the user."""

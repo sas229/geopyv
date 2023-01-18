@@ -35,7 +35,6 @@ class Image:
         self.border = np.int_(border)
         self._get_image()
         self._get_image_gs()
-        self._get_C()
         self._get_QCQT()
 
     def _get_image(self):
@@ -98,9 +97,9 @@ class Image:
             C[:, j] = np.fft.ifft(np.fft.fft(C[:, j]) / kernel_y)
 
         # Discard the imaginary part.
-        self.C = np.real(C)
+        C = np.real(C)
 
-        return
+        return C
 
     def _get_QCQT(self):
         r"""Private method to precompute the :math:`\mathbf{Q} \cdot
@@ -125,5 +124,6 @@ class Image:
         QT = np.ascontiguousarray(np.transpose(Q), np.float64)
 
         # Call C++ extension to perform computations.
-        self.QCQT = _QCQT(Q, QT, self.C, self.image_gs.shape, self.border)
+        C = self._get_C()
+        self.QCQT = _QCQT(Q, QT, C, self.image_gs.shape, self.border)
         return

@@ -22,6 +22,7 @@ opencv-python = "*"
 plyer = "*"
 colorlog = "*"
 notebook = "*"
+memory-profiler = "*"
 geopyv = {path = "."}
 
 [dev-packages]

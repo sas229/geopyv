@@ -1732,11 +1732,11 @@
         },
         "sphinx-rtd-theme": {
             "hashes": [
-                "sha256:00777ec28ef15433ce0288704315a4447f8cf6f4d24436cfac096e979113bd73",
-                "sha256:6e7fc2343981061d7409fdd721d2fd36d6faaf93a0995112e54da4250d48771f"
+                "sha256:6680809ba5794f6b39c4abd2766c7988c306a21aa5990a56d17b2d4b2dcb27b2",
+                "sha256:6d5c9534a0bff4f343c9f1c521848b5d9b1b12b842e3663d06668dd36fa7356a"
             ],
             "index": "pypi",
-            "version": "==1.2.0rc2"
+            "version": "==1.2.0rc3"
         },
         "sphinxcontrib-applehelp": {
             "hashes": [

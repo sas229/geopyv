@@ -10,17 +10,17 @@ def initialise(level):
     operating_system = platform.system()
     home_dir = os.path.expanduser( '~' )
     if operating_system == "Windows":
-        log_dir = os.path.abspath(os.path.join(home_dir,"AppData/CamLab"))
+        log_dir = os.path.abspath(os.path.join(home_dir,"AppData/geopyv"))
         isdir = os.path.isdir(log_dir) 
         if isdir == False:
             os.mkdir(log_dir)
-        log_file = os.path.abspath(os.path.join(home_dir,"AppData/CamLab/CamLab.log"))
+        log_file = os.path.abspath(os.path.join(home_dir,"AppData/geopyv/geopyv.log"))
     elif operating_system == "Linux":
-        log_dir = os.path.abspath(os.path.join(home_dir,".camlab"))
+        log_dir = os.path.abspath(os.path.join(home_dir,".geopyv"))
         isdir = os.path.isdir(log_dir) 
         if isdir == False:
             os.mkdir(log_dir)
-        log_file = os.path.abspath(os.path.join(home_dir,".camlab/CamLab.log"))
+        log_file = os.path.abspath(os.path.join(home_dir,".geopyv/geopyv.log"))
 
     # Delete log file if already in existence.
     if os.path.exists(log_file):

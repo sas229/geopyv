@@ -12,8 +12,9 @@ class Selector(QMainWindow):
         super().__init__()
         self.img = img
         self.template = template
-        self.setWindowTitle("Select coordinate for the subset")
 
+        # Setup window.
+        self.setWindowTitle("Select coordinate for the subset")
         self.view = QGraphicsView()
         self.scene = QGraphicsScene(self)
         self.view.setScene(self.scene)

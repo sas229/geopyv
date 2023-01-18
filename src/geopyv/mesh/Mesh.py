@@ -269,10 +269,6 @@ class Mesh:
             self.subset_bgf_nodes = np.mean(self.nodes[self.elements], axis = 1)
             self.subset_bgf_values = np.mean(self.d2u, axis=(1,2))
 
-
-    
-
-
     def _element_area(self):
         """
         A private method to calculate the element areas.

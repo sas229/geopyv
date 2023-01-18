@@ -1,5 +1,5 @@
-import logging 
-from geopyv import log
+# import logging 
+# from geopyv import log
 
-level = logging.WARN
-log.initialise(level)
+# level = logging.WARN
+# log.initialise(level)

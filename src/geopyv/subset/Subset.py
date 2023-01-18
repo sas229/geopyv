@@ -1,8 +1,9 @@
 import cv2
+import os
 import numpy as np
-from plyer import filechooser
 from geopyv.image import Image
 from geopyv.templates import Circle, Square
+from geopyv.gui import ImageSelector
 from ._subset_extensions import (
     _init_reference,
     _solve_ICGN,
@@ -282,14 +283,14 @@ class Subset:
             ax1.plot([1, self.max_iterations], [self.max_norm, self.max_norm], "--r", label="Threshold")
             ax2.plot(self.history[0,:], self.history[2,:], marker="o", clip_on=False, label="Convergence")
             ax2.plot([1, self.max_iterations], [self.tolerance, self.tolerance], "--r", label="Threshold")
-            ax1.set_ylabel("Norm (-)")
-            ax1.set_ylim(0.00001, 1)
-            ax1.set_yticks([1, 0.1, 0.01, 0.001, 0.0001, 0.00001])
+            ax1.set_ylabel(r"$\Delta$ Norm (-)")
+            ax1.set_ylim(self.max_norm/1000, self.max_norm*1000)
+            ax1.set_yticks([self.max_norm*1000, self.max_norm*100, self.max_norm*10, self.max_norm, self.max_norm/10, self.max_norm/100, self.max_norm/1000])
             ax2.set_ylabel(r"$C_{CC}$ (-)")
             ax2.set_xlabel("Iteration number (-)")
             ax2.set_xlim(1, self.max_iterations)
-            ax2.set_ylim(0.5, 1)
-            ax2.set_yticks(np.linspace(0.5, 1.0, 6))
+            ax2.set_ylim(0.0, 1)
+            ax2.set_yticks(np.linspace(0.0, 1.0, 6))
             ax2.set_xticks(np.linspace(1, self.max_iterations, self.max_iterations))
             ax1.legend(frameon=False)
             plt.tight_layout()
@@ -299,8 +300,9 @@ class Subset:
 
     def _load_img(self, message):
         """Private method to open a file dialog and slect an image."""
-        imglist = filechooser.open_file(title=message, filters=['*.jpg','*.png','*.bmp'])
-        imgpath = imglist[0]
+        directory = os.getcwd()
+        dialog = ImageSelector()
+        imgpath = dialog.get_path(directory, message)
         img = Image(imgpath)
         return img
 
@@ -326,6 +328,7 @@ class Subset:
                     if event.ydata > self.template.size and event.ydata < np.shape(self.f_img.image_gs)[1]-self.template.size:
                         self.x = np.round(event.xdata, 0)
                         self.y = np.round(event.ydata, 0)
+                        self.f_coord = np.asarray([self.x, self.y])
                         ax = event.inaxes
                         f = ax.get_figure()
                         num_lines = len(ax.lines)

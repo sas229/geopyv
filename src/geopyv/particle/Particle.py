@@ -126,8 +126,7 @@ class Particle:
                             [0,4,4,0,-8,0]])
 
         # Displacements
-        self.p_inc[:2] = N@self.meshes[m].nodes[self.meshes[m].elements[tri_idx]]
-
+        self.p_inc[:2] = N@displacements
         # 1st Order Strains
         J_x_T = dN@element
         J_u_T = dN@displacements

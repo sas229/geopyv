@@ -25,6 +25,10 @@ class Selector(QMainWindow):
 
         self.coord = np.asarray([200., 200.])
 
+    def select(self):
+        # Select the coordinate.
+        print("Selecting the coordinate...")
+
 class CoordinateSelector:
 
     def select(self, f_img, template):
@@ -34,6 +38,7 @@ class CoordinateSelector:
             app = QApplication()
         selector = Selector(f_img, template)
         selector.show()
+        selector.select()
         app.exec()
         return selector.coord
     

@@ -1,10 +1,12 @@
 import logging 
 import cv2
 import os
+import pickle
 import numpy as np
 from geopyv.image import Image
 from geopyv.templates import Circle, Square
 from geopyv.gui import ImageSelector, CoordinateSelector
+from geopyv.plots import inspect_subset, convergence_subset
 from ._subset_extensions import (
     _init_reference,
     _solve_ICGN,
@@ -140,6 +142,10 @@ class Subset:
         self.initialised == True
         self.x = self.f_coord[0]
         self.y = self.f_coord[1]
+        self.quality = {
+            "SSSIG": self.SSSIG,
+            "sigma_intensity": self.sigma_intensity,
+        }
 
         # Check subset is entirely within the reference image.
         subset_list = np.array([
@@ -211,6 +217,17 @@ class Subset:
         self.max_norm = max_norm
         self.max_iterations = max_iterations
         self.tolerance = tolerance
+        self.settings = {
+            "method": self.method,
+            "max_norm": self.max_norm,
+            "max_iterations": self.max_iterations,
+            "tolerance": self.tolerance,
+            "template": {
+                "shape": self.template.shape,
+                "dimension": self.template.dimension,
+                "size": self.template.size,
+            }
+        }
 
         # Compute initial guess if u and v in deformation parameter vector initialised
         # with zeros, otherwise precondition.
@@ -244,6 +261,8 @@ class Subset:
             self.p = results[4]
             self.u = self.p[0][0]
             self.v = self.p[1][0]
+            self.x_f = self.x+self.u
+            self.y_f = self.y+self.v
 
             # Check for tolerance.
             if self.C_CC > self.tolerance:
@@ -252,61 +271,69 @@ class Subset:
                 log.info("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self.x, y_i=self.y))
                 log.info("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self.u, v=self.v))
                 log.info("Correlation coefficient: CC = {C_CC} (-), SSD = {C_SSD} (-)".format(C_CC=self.C_CC, C_SSD=self.C_SSD))
-                log.info("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x+self.u, y_f=self.y+self.v))
+                log.info("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x_f, y_f=self.y_f))
             else:
                 log.warn("Subset not yet solved. Use command subset.solve().")
+        
+            # Pack results.
+            self.results = {
+                "u": self.u,
+                "v": self.v,
+                "p": self.p,
+                "history": self.history,
+                "iterations": self.iterations,
+                "C_CC": self.C_CC,
+                "C_SSD": self.C_SSD,
+                "solved": self.solved,
+                "unsolvable": self.unsolvable,
+            }
+
+            # Data.
+            self.data = {
+            "images": {
+                "f_img": self.f_img.filepath,
+                "g_img": self.g_img.filepath,
+            },
+            "position": {
+                "x": self.x,
+                "y": self.y,
+            },
+            "quality": self.quality,
+            "settings": self.settings,
+            "results": self.results,
+        }
         except:
             raise ValueError("Reporting value error...")
 
+    def export(self):
+        """Method to export subset data."""
+        if self.solved == True:
+            return self.data
+        elif self.solved == False:
+            print("Subset not solved therefore no results.")
+        elif self.unsolvable == True:
+            print("Subset cannot be solved therefore no results.")
+
+    def save(self, filename):
+        """Method to save subset data."""
+        if self.solved == True:
+            ext = ".pyv"
+            filepath = filename + ext
+            with open(filepath, "wb") as outfile:
+                pickle.dump(self.data, outfile)
+        elif self.solved == False:
+            print("Subset not solved therefore no results.")
+        elif self.unsolvable == True:
+            print("Subset cannot be solved therefore no results.")
+
     def inspect(self):
         """Method to show the subset and associated quality metrics."""
-        f, ax = plt.subplots(num="Subset")
-        x = self.f_coord.item(0)
-        y = self.f_coord.item(1)
-        x_min = (np.round(x, 0) - self.template.size).astype(int)
-        x_max = (np.round(x, 0) + self.template.size).astype(int)
-        y_min = (np.round(y, 0) - self.template.size).astype(int)
-        y_max = (np.round(y, 0) + self.template.size).astype(int)
-        subset = self.f_img.image_gs.astype(np.float32)[y_min:y_max+1, x_min:x_max+1]
-
-        # If a circular subset, mask pixels outside radius.
-        if type(self.template) == Circle:
-            x, y = np.meshgrid(
-                np.arange(-self.template.size, self.template.size + 1, 1),
-                np.arange(-self.template.size, self.template.size + 1, 1),
-            )
-            dist = np.sqrt(x ** 2 + y ** 2)
-            mask = np.zeros(subset.shape)
-            mask[dist > self.template.size] = 255
-            subset = np.maximum(subset, mask)
-
-        ax.imshow(subset, cmap="gist_gray")
-        quality = r"Quality metrics: $\sigma_s$ = {:.2f}; SSSIG = {:.2E}".format(self.sigma_intensity, self.SSSIG)
-        ax.text(self.template.size, 2*self.template.size + 5, quality, horizontalalignment="center")
-        ax.set_axis_off()
-        plt.tight_layout()
-        plt.show()
+        inspect_subset(self.f_img.image_gs, self.x, self.y, self.template, self.sigma_intensity, self.SSSIG)
 
     def convergence(self):
         """Method to plot the rate of convergence for the subset."""
         if hasattr(self, "history"):
-            f, (ax1, ax2) = plt.subplots(2, 1, sharex=True, num="Convergence")
-            ax1.semilogy(self.history[0,:], self.history[1,:], marker="o", clip_on=False, label="Convergence")
-            ax1.plot([1, self.max_iterations], [self.max_norm, self.max_norm], "--r", label="Threshold")
-            ax2.plot(self.history[0,:], self.history[2,:], marker="o", clip_on=False, label="Convergence")
-            ax2.plot([1, self.max_iterations], [self.tolerance, self.tolerance], "--r", label="Threshold")
-            ax1.set_ylabel(r"$\Delta$ Norm (-)")
-            ax1.set_ylim(self.max_norm/1000, self.max_norm*1000)
-            ax1.set_yticks([self.max_norm*1000, self.max_norm*100, self.max_norm*10, self.max_norm, self.max_norm/10, self.max_norm/100, self.max_norm/1000])
-            ax2.set_ylabel(r"$C_{CC}$ (-)")
-            ax2.set_xlabel("Iteration number (-)")
-            ax2.set_xlim(1, self.max_iterations)
-            ax2.set_ylim(0.0, 1)
-            ax2.set_yticks(np.linspace(0.0, 1.0, 6))
-            ax2.set_xticks(np.linspace(1, self.max_iterations, self.max_iterations))
-            ax1.legend(frameon=False)
-            plt.tight_layout()
-            plt.show()
+            convergence_subset(self.history, self.max_iterations, self.max_norm, self.tolerance)
         else:
             raise Exception("Warning: Subset not yet solved. Run the solve() method.")
 

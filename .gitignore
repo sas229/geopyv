@@ -137,3 +137,4 @@ test_grad.py
 test_WFAGN.py
 test_triangle.py
 main.py
+*.pyv

@@ -26,6 +26,7 @@ memory-profiler = "*"
 geopyv = {path = "."}
 
 [dev-packages]
+ipykernel = "*"
 
 [requires]
 python_version = "3"

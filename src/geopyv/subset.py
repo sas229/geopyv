@@ -44,7 +44,6 @@ from ._subset_extensions import (
     _dA_s_dp,
     _grad_C_W
     )
-import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 

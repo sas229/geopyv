@@ -126,7 +126,7 @@ class Particle:
                             [0,4,4,0,-8,0]])
 
         # Displacements
-        self.p_inc[:2] = N@self.meshes[m].nodes[self.meshes[m].elements[tri_idx]]
+        self.p_inc[:2] = N@displacements
 
         # 1st Order Strains
         J_x_T = dN@element
@@ -150,7 +150,6 @@ class Particle:
 
     def _strain_path(self):
         """Method to calculate and store stress path data for the particle object."""
-        print("Strain path")
         for m in range(self.length):
             if self.update_register[m]: # Check whether to update the reference values.
                 self.ref_coords = self.coords[m]

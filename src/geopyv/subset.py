@@ -171,7 +171,7 @@ class Subset(SubsetBase):
             }
         }
 
-    def solve(self, max_norm=1e-3, max_iterations=15, p_0=np.zeros(6), tolerance=0.75, method="ICGN"):
+    def solve(self, max_norm=1e-3, max_iterations=15, p_0=np.zeros(6), tolerance=0.7, method="ICGN"):
         """Method to solve for the subset displacements using the various methods.
 
         Parameters
@@ -278,8 +278,6 @@ class Subset(SubsetBase):
                 log.info("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self.u, v=self.v))
                 log.info("Correlation coefficient: CC = {C_CC} (-), SSD = {C_SSD} (-)".format(C_CC=self.C_CC, C_SSD=self.C_SSD))
                 log.info("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x_f, y_f=self.y_f))
-            else:
-                log.warn("Subset not yet solved. Use command subset.solve().")
         
             # Pack results.
             self.results = {

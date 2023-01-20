@@ -14,20 +14,16 @@ flake8-black = "*"
 matplotlib = "*"
 gmsh = "*"
 scipy = "*"
-PyQt5 = "*"
 opencv-contrib-python = "*"
 pyside6 = "*"
 alive-progress = "*"
 opencv-python = "*"
-plyer = "*"
 colorlog = "*"
 notebook = "*"
-memory-profiler = "*"
-varname = "*"
-geopyv = {path = "."}
 
 [dev-packages]
 ipykernel = "*"
+geopyv = {editable = true, path = "."}
 
 [requires]
 python_version = "3"

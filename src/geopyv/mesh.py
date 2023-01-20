@@ -1,3 +1,4 @@
+import logging 
 import numpy as np
 import scipy as sp
 from geopyv.templates import Circle
@@ -14,6 +15,8 @@ from alive_progress import alive_bar
 import faulthandler
 import traceback
 faulthandler.enable()
+
+log = logging.getLogger(__name__)
 
 class MeshBase:
     """Mesh base class to be used as a mixin."""
@@ -134,8 +137,6 @@ class Mesh(MeshBase):
         self._find_seed_node()
         try:
             self._reliability_guided()
-            
-
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations+1):
                 self.message = "Adaptive iteration {}".format(iteration)
@@ -155,7 +156,6 @@ class Mesh(MeshBase):
             print("Error! Could not solve for all subsets.")
             self.update = True
         gmsh.finalize()
-        # del(self.subsets)
         
     def _update_mesh(self):
         """Private method to update the mesh variables."""
@@ -266,10 +266,12 @@ class Mesh(MeshBase):
         gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0) # Prevent boundary influence on mesh.
         gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0) # Prevent point influence on mesh.
         gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0) # Prevent curve influence on mesh.
+        gmsh.option.setNumber("Mesh.Algorithm", 5)
         gmsh.model.mesh.clear() # Tidy.
         gmsh.model.mesh.generate(2) # Generate mesh.
         gmsh.model.mesh.optimize()
         gmsh.model.mesh.setOrder(2)
+        
         nt, nc, npar = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
         nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
         error = (np.shape(nodes)[0] - target)**2

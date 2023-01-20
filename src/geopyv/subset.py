@@ -155,6 +155,7 @@ class Subset(SubsetBase):
 
         # Data.
         self.data = {
+            "type": "Subset",
             "images": {
                 "f_img": self.f_img.filepath,
                 "g_img": self.g_img.filepath,

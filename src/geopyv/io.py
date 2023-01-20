@@ -1,6 +1,6 @@
 import pickle
 from geopyv.subset import Subset, SubsetResults
-from geopyv.mesh import Mesh
+from geopyv.mesh import Mesh, MeshResults
 from geopyv.particle import Particle
 
 def load(filename=None):
@@ -10,7 +10,10 @@ def load(filename=None):
     try:
         with open(filepath, "rb") as infile:
             data =  pickle.load(infile)
-            return SubsetResults(data)
+            if data["type"] == "Subset":
+                return SubsetResults(data)
+            elif data["type"] == "Mesh":
+                return MeshResults(data)
     except:
         raise FileNotFoundError("File not found.")
 

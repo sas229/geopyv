@@ -1,4 +1,5 @@
 import logging 
+import pickle
 import numpy as np
 import scipy as sp
 from geopyv.templates import Circle
@@ -81,6 +82,22 @@ class Mesh(MeshBase):
         print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.elements)))
         gmsh.finalize()
 
+        # Data.
+        self.data = {
+            "type": "Mesh",
+            "images": {
+                "f_img": self.f_img.filepath,
+                "g_img": self.g_img.filepath,
+            },
+            "target_nodes": self.target_nodes,
+            "boundary": self.boundary,
+            "exclusions": self.exclusions,
+            "size_lower_bound": self.size_lower_bound,
+            "size_upper_bound": self.size_upper_bound,
+            "nodes": self.nodes,
+            "elements": self.elements,
+        }
+
     def set_target_nodes(self, target_nodes):
         """Method to create a mesh with a target number of nodes."""
         self.target_nodes = target_nodes
@@ -151,11 +168,41 @@ class Mesh(MeshBase):
                 print('Error! The minimum correlation coefficient is below tolerance {field:.3f} < {tolerance:.3f}'.format(field=np.min(self.C_CC), tolerance=self.tolerance))
             else:
                 print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))
+                self.data["nodes"] = self.nodes
+                self.data["elements"] = self.elements
+                self.settings = {
+                    "max_iterations": self.max_iterations,
+                    "max_norm": self.max_norm,
+                    "adaptive_iterations": self.adaptive_iterations,
+                    "method": self.method,
+                    "order": self.order,
+                    "tolerance": self.tolerance,
+                }
+                self.data.update({"settings": self.settings})
+                self.results = {
+                    "displacements": self.displacements,
+                    "du": self.du,
+                    "d2u": self.d2u,
+                    "C_CC": self.C_CC,
+                }
+                self.data.update({"results": self.results})
         except ValueError:
             print(traceback.format_exc())
             print("Error! Could not solve for all subsets.")
             self.update = True
         gmsh.finalize()
+
+    def save(self, filename):
+        """Method to save mesh data to .pyv file."""
+        if self.update == False:
+            ext = ".pyv"
+            filepath = filename + ext
+            with open(filepath, "wb") as outfile:
+                pickle.dump(self.data, outfile)
+        elif self.solved == False:
+            log.warn("Mesh not solved therefore no results.")
+        elif self.unsolvable == True:
+            log.warn("Mesh cannot be solved therefore no results.")
         
     def _update_mesh(self):
         """Private method to update the mesh variables."""

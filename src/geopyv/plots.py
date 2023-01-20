@@ -4,6 +4,8 @@ import numpy as np
 
 def inspect_subset(data):
     """Function to show the subset and associated quality metrics."""
+
+    # Load data.
     image = cv2.imread(data["images"]["f_img"], cv2.IMREAD_COLOR)
     image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     image_gs = cv2.GaussianBlur(image_gs, ksize=(5,5), sigmaX=1.1, sigmaY=1.1)
@@ -30,6 +32,7 @@ def inspect_subset(data):
         mask[dist > template_size] = 255
         image = np.maximum(image, mask)
 
+    # Create plot.
     ax.imshow(image, cmap="gist_gray")
     quality = r"Quality metrics: $\sigma_s$ = {:.2f}; SSSIG = {:.2E}".format(sigma_intensity, SSSIG)
     ax.text(template_size, 2*template_size + 5, quality, horizontalalignment="center")
@@ -39,10 +42,14 @@ def inspect_subset(data):
 
 def convergence_subset(data):
     """Function to plot subset convergence."""
+
+    # Load data.
     history = data["results"]["history"]
     max_iterations = data["settings"]["max_iterations"]
     max_norm = data["settings"]["max_norm"]
     tolerance = data["settings"]["tolerance"]
+
+    # Create plot.
     f, (ax1, ax2) = plt.subplots(2, 1, sharex=True, num="Convergence")
     ax1.semilogy(history[0,:], history[1,:], marker="o", clip_on=False, label="Convergence")
     ax1.plot([1, max_iterations], [max_norm, max_norm], "--r", label="Threshold")
@@ -60,3 +67,9 @@ def convergence_subset(data):
     ax1.legend(frameon=False)
     plt.tight_layout()
     plt.show()
+
+def contour_mesh(data):
+    """Function to plot contours of mesh data."""
+
+    # Load data.
+    

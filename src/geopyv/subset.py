@@ -323,7 +323,7 @@ class Subset:
             raise ValueError("Reporting value error...")
 
     def export(self):
-        """Method to export subset data."""
+        """Method to export subset data as a dict."""
         if self.solved == True:
             return self.data
         elif self.solved == False:
@@ -332,7 +332,7 @@ class Subset:
             print("Subset cannot be solved therefore no results.")
 
     def save(self, filename):
-        """Method to save subset data."""
+        """Method to save subset data to .pyv file."""
         if self.solved == True:
             ext = ".pyv"
             filepath = filename + ext
@@ -345,12 +345,12 @@ class Subset:
 
     def inspect(self):
         """Method to show the subset and associated quality metrics."""
-        inspect_subset(self.f_img.image_gs, self.x, self.y, self.template, self.sigma_intensity, self.SSSIG)
+        inspect_subset(self)
 
     def convergence(self):
         """Method to plot the rate of convergence for the subset."""
         if hasattr(self, "history"):
-            convergence_subset(self.history, self.max_iterations, self.max_norm, self.tolerance)
+            convergence_subset(self)
         else:
             raise Exception("Warning: Subset not yet solved. Run the solve() method.")
 

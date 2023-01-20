@@ -13,7 +13,7 @@ def load(filename=None):
     except:
         raise FileNotFoundError("File not found.")
 
-def save(object, filename):
+def save(object, name):
     """Function to save data from a geopyv object."""
     if type(object) == Subset or type(object) == Mesh or type(object == Particle):
-        object.save(filename) 
+        object.save(name) 

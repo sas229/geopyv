@@ -23,6 +23,7 @@ plyer = "*"
 colorlog = "*"
 notebook = "*"
 memory-profiler = "*"
+varname = "*"
 geopyv = {path = "."}
 
 [dev-packages]

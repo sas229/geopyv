@@ -294,9 +294,8 @@ class Subset(SubsetBase):
                 "unsolvable": self.unsolvable,
             }
             self.data.update({"results": self.results})            
-
         except:
-            raise ValueError("Reporting value error...")
+            raise RuntimeError("Runtime error in solve method.")
 
     def save(self, filename):
         """Method to save subset data to .pyv file."""
@@ -306,9 +305,9 @@ class Subset(SubsetBase):
             with open(filepath, "wb") as outfile:
                 pickle.dump(self.data, outfile)
         elif self.solved == False:
-            print("Subset not solved therefore no results.")
+            log.warn("Subset not solved therefore no results.")
         elif self.unsolvable == True:
-            print("Subset cannot be solved therefore no results.")
+            log.warn("Subset cannot be solved therefore no results.")
 
     def _load_img(self, message):
         """Private method to open a file dialog and slect an image."""

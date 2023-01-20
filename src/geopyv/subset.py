@@ -100,6 +100,24 @@ class Subset:
     C_CC : float
         Zero-normalised cross-correlation coefficient, computed by private method
         :meth:`~_get_correlation`.
+    x : float
+        Initial horizontal coordinate.
+    y : float 
+        Initial vertical coordinate.
+    u : float
+        Horizontal displacement.
+    v : float 
+        Vertical displacement.
+    x_f : float
+        Final horizontal coordinate.
+    y_f : float
+        Final vertical coordinate.
+    settings: dict
+        Dictionary of settings.
+    quality: dict 
+        Dictionary of image quality measures.
+    results: dict
+        Dictionary of results.
     """
 
     def __init__(self, f_coord=None, f_img=None, g_img=None, template=Circle(50)):

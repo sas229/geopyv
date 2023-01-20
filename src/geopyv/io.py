@@ -1,5 +1,5 @@
 import pickle
-from geopyv.subset import Subset
+from geopyv.subset import Subset, SubsetResults
 from geopyv.mesh import Mesh
 from geopyv.particle import Particle
 
@@ -9,7 +9,8 @@ def load(filename=None):
     filepath = filename + ext
     try:
         with open(filepath, "rb") as infile:
-            return pickle.load(infile)
+            data =  pickle.load(infile)
+            return SubsetResults(data)
     except:
         raise FileNotFoundError("File not found.")
 

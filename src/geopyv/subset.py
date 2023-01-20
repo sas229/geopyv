@@ -47,7 +47,19 @@ from ._subset_extensions import (
 
 log = logging.getLogger(__name__)
 
-class Subset:
+class SubsetBase:
+    def inspect(self):
+        """Method to show the subset and associated quality metrics."""
+        inspect_subset(self.data)
+
+    def convergence(self):
+        """Method to plot the rate of convergence for the subset."""
+        if "results" in self.data:
+            convergence_subset(self.data)
+        else:
+            raise Exception("Warning: Subset not yet solved. Run the solve() method.")
+
+class Subset(SubsetBase):
     """Subset class for geopyv.
 
     Parameters
@@ -60,7 +72,6 @@ class Subset:
         Target image of geopyv.Image class, instantiated by :mod:`~image.Image`.
     template : `geopyv.Template`
         Subset template object.
-
 
     Attributes
     ----------
@@ -144,6 +155,18 @@ class Subset:
             if type(template) != Square:
                 raise TypeError("Template is not a type defined in geopyv.templates.")
 
+        # Check subset is entirely within the reference image.
+        self.x = self.f_coord[0]
+        self.y = self.f_coord[1]
+        subset_list = np.array([
+            [self.x-self.template.size, self.y-self.template.size],
+            [self.x+self.template.size, self.y+self.template.size],
+            [self.x-self.template.size, self.y+self.template.size],
+            [self.x+self.template.size, self.y-self.template.size]
+            ])
+        if np.any(subset_list<0):
+            raise ValueError("Subset reference partially falls outside reference image.")
+
         # Initialise subset.
         self._get_initial_guess_size()
         output = _init_reference(self.f_coord, self.template.coords, self.f_img.QCQT)
@@ -157,22 +180,28 @@ class Subset:
         self.solved = False
         self.unsolvable = False
         self.initialised == True
-        self.x = self.f_coord[0]
-        self.y = self.f_coord[1]
         self.quality = {
             "SSSIG": self.SSSIG,
             "sigma_intensity": self.sigma_intensity,
         }
 
-        # Check subset is entirely within the reference image.
-        subset_list = np.array([
-            [self.x-self.template.size, self.y-self.template.size],
-            [self.x+self.template.size, self.y+self.template.size],
-            [self.x-self.template.size, self.y+self.template.size],
-            [self.x+self.template.size, self.y-self.template.size]
-            ])
-        if np.any(subset_list<0):
-            raise ValueError("Subset reference partially falls outside reference image.")
+        # Data.
+        self.data = {
+            "images": {
+                "f_img": self.f_img.filepath,
+                "g_img": self.g_img.filepath,
+            },
+            "position": {
+                "x": self.x,
+                "y": self.y,
+            },
+            "quality": self.quality,
+            "template": {
+                "shape": self.template.shape,
+                "dimension": self.template.dimension,
+                "size": self.template.size,
+            }
+        }
 
     def solve(self, max_norm=1e-3, max_iterations=15, p_0=np.zeros(6), tolerance=0.75, method="ICGN"):
         """Method to solve for the subset displacements using the various methods.
@@ -239,12 +268,8 @@ class Subset:
             "max_norm": self.max_norm,
             "max_iterations": self.max_iterations,
             "tolerance": self.tolerance,
-            "template": {
-                "shape": self.template.shape,
-                "dimension": self.template.dimension,
-                "size": self.template.size,
-            }
         }
+        self.data.update({"settings": self.settings})
 
         # Compute initial guess if u and v in deformation parameter vector initialised
         # with zeros, otherwise precondition.
@@ -304,32 +329,10 @@ class Subset:
                 "solved": self.solved,
                 "unsolvable": self.unsolvable,
             }
+            self.data.update({"results": self.results})            
 
-            # Data.
-            self.data = {
-            "images": {
-                "f_img": self.f_img.filepath,
-                "g_img": self.g_img.filepath,
-            },
-            "position": {
-                "x": self.x,
-                "y": self.y,
-            },
-            "quality": self.quality,
-            "settings": self.settings,
-            "results": self.results,
-        }
         except:
             raise ValueError("Reporting value error...")
-
-    def export(self):
-        """Method to export subset data as a dict."""
-        if self.solved == True:
-            return self.data
-        elif self.solved == False:
-            print("Subset not solved therefore no results.")
-        elif self.unsolvable == True:
-            print("Subset cannot be solved therefore no results.")
 
     def save(self, filename):
         """Method to save subset data to .pyv file."""
@@ -342,17 +345,6 @@ class Subset:
             print("Subset not solved therefore no results.")
         elif self.unsolvable == True:
             print("Subset cannot be solved therefore no results.")
-
-    def inspect(self):
-        """Method to show the subset and associated quality metrics."""
-        inspect_subset(self)
-
-    def convergence(self):
-        """Method to plot the rate of convergence for the subset."""
-        if hasattr(self, "history"):
-            convergence_subset(self)
-        else:
-            raise Exception("Warning: Subset not yet solved. Run the solve() method.")
 
     def _load_img(self, message):
         """Private method to open a file dialog and slect an image."""
@@ -608,4 +600,20 @@ class Subset:
     def _get_grad_C_W(self):
         self.grad_C_W = _grad_C_W(self.f, self.g, self.f_m, self.g_m, self.Delta_f, self.Delta_g, self.p, self.W_f, self.W_g, self.D_f, self.D_g, self.T_p, self.dT_p_dp, self.dA_s_dp, self.A_s)
     
-    
+class SubsetResults(SubsetBase):
+    """Subset class for geopyv.
+
+    Parameters
+    ----------
+    data : dict
+        geopyv data dict from Subset object.
+
+    Attributes
+    ----------
+    data : dict
+        geopyv data dict from Subset object.
+    """
+
+    def __init__(self, data):
+        """Initialisation of geopyv SubsetResults class."""
+        self.data = data

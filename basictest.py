@@ -49,36 +49,13 @@ subset.convergence()
 
 # tracemalloc.stop()
 
-# print(globals().items())
-output = {
-    "Subsets": [],
-    }
-for i in globals().copy().items():
-    if isinstance(i[1], Subset) == True:
-        name = i[0]
-        s = i[1]
-        data = {
-            "f_img": s.f_img.filepath,
-            "g_img": s.g_img.filepath,
-            "settings": s.settings,
-            "quality": s.quality,
-            "results": s.results,
-        }
-        d = {name: data}
-        output["Subsets"].append(d)
-
-
-subset_data = subset.export()
-print(subset_data["results"])
-
 subset.save("test")
-with open("test.pyv", "rb") as infile:
-    pickled_data = pickle.load(infile)
-print(pickled_data["quality"])
+print(subset.data)
 
-data = io.load("test")
-print(data["settings"])
+results = io.load("test")
+results.inspect()
+results.convergence()
+print(type(results))
+# data = io.load("test")
 
-data = io.load("test")
-
-io.save(subset, "test2")
+# io.save(subset, "test2")

@@ -16,6 +16,7 @@ from ._subset_extensions import (
 log = logging.getLogger(__name__)
 
 class SubsetBase:
+    """Subset base class to be used as a mixin."""
     def inspect(self):
         """Method to show the subset and associated quality metrics."""
         inspect_subset(self.data)
@@ -114,7 +115,6 @@ class Subset(SubsetBase):
             self.g_img = self._load_g_img()
         if type(self.f_coord) != np.ndarray:
             self.f_coord = np.empty(2)
-            # self._select_f_coord()
             coordinate = CoordinateSelector()
             self.f_coord = coordinate.select(self.f_img, self.template)
         elif np.shape(self.f_coord) != np.shape(np.empty(2)):
@@ -356,7 +356,7 @@ class Subset(SubsetBase):
         self.p_init[1] = (max_loc[1] + self.initial_guess_size / 2) - y
   
 class SubsetResults(SubsetBase):
-    """Subset class for geopyv.
+    """SubsetResults class for geopyv.
 
     Parameters
     ----------

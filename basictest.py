@@ -6,8 +6,6 @@ from geopyv.subset import Subset
 from geopyv.mesh import Mesh
 from geopyv import log
 from geopyv import io
-import tracemalloc
-import pickle
 
 def name_of_global_obj(xx):
     return [objname for objname, oid in globals().items() if id(oid)==id(xx)][0]
@@ -18,44 +16,28 @@ def list_global_objects():
 level = logging.WARN
 log.initialise(level)
 
-# tracemalloc.start()
-
 # Subset test.
 ref = Image("./tests/ref.jpg")
 tar = Image("./tests/tar.jpg")
-# coord = np.asarray([300.,300.])
+coord = np.asarray([300.,300.])
 subset = Subset(f_img=ref, g_img=tar, f_coord=np.asarray([300,300]), template=Circle(25))
 # subset = Subset(f_img=ref, g_img=tar)
 subset.inspect()
 subset.solve()
 subset.convergence()
-
-# subset_memory = tracemalloc.get_traced_memory()
-
-# # Mesh test.
-# template = Circle(25)
-# boundary = np.asarray([[200.0, 200.0],[200.,800.],[800.,800.],[800.,200.]])
-# mesh = Mesh(f_img=ref, g_img=tar, target_nodes=1000, boundary=boundary)
-# mesh.solve(seed_coord=coord, template=template, adaptive_iterations=0, method = "ICGN")
-
-# mesh_memory = tracemalloc.get_traced_memory()
-# difference = mesh_memory[1]-subset_memory[1]
-
-# print("\n")
-# print("geopyv memory usage:\n")
-# print("One subset: {:.2f} Mb".format(subset_memory[0]/1000000))
-# print("Mesh (1000 subsets): {:.2f} Mb".format(mesh_memory[0]/1000000))
-# print("\n")
-
-# tracemalloc.stop()
-
 subset.save("test")
-print(subset.data)
+print("subset type:", type(subset))
+del(subset)
 
-results = io.load("test")
-results.inspect()
-results.convergence()
-print(type(results))
-# data = io.load("test")
+# Load subset test.
+subset = io.load("test")
+subset.inspect()
+subset.convergence()
+print("subset type:", type(subset))
 
-# io.save(subset, "test2")
+# Mesh test.
+template = Circle(25)
+boundary = np.asarray([[200.0, 200.0],[200.,800.],[800.,800.],[800.,200.]])
+mesh = Mesh(f_img=ref, g_img=tar, target_nodes=1000, boundary=boundary)
+mesh.solve(seed_coord=coord, template=template, adaptive_iterations=0, method = "ICGN")
+

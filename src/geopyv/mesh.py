@@ -15,7 +15,25 @@ import faulthandler
 import traceback
 faulthandler.enable()
 
-class Mesh:
+class MeshBase:
+    """Mesh base class to be used as a mixin."""
+    def inspect(self):
+        """Method to show the mesh and associated quality metrics."""
+        print("Plot contours.")
+
+    def convergence(self):
+        """Method to plot the rate of convergence for the mesh."""
+        print("Plot contours.")
+    
+    def contour(self):
+        """Method to plot the contours of a given measure."""
+        print("Plot contours.")
+    
+    def quiver(self):
+        """Method to plot a quiver plot of the displacements."""
+        print("Plot quiver.")
+
+class Mesh(MeshBase):
 
     def __init__(self, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 1, size_upper_bound = 1000):
         """Initialisation of geopyv mesh object."""
@@ -482,3 +500,21 @@ class Mesh:
         self.p[idx] = self.subsets[idx].p.flatten()
         self.displacements[idx, 0] = self.subsets[idx].u
         self.displacements[idx, 1] = self.subsets[idx].v
+
+class MeshResults(MeshBase):
+    """MeshResults class for geopyv.
+
+    Parameters
+    ----------
+    data : dict
+        geopyv data dict from Mesh object.
+
+    Attributes
+    ----------
+    data : dict
+        geopyv data dict from Mesh object.
+    """
+
+    def __init__(self, data):
+        """Initialisation of geopyv MeshResults class."""
+        self.data = data

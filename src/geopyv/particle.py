@@ -127,6 +127,10 @@ class Particle:
 
         # Displacements
         self.p_inc[:2] = N@displacements
+<<<<<<< HEAD:src/geopyv/particle.py
+=======
+
+>>>>>>> 290f9c6a4c907d008fba71cbdac170d9a8d695b0:src/geopyv/particle/Particle.py
         # 1st Order Strains
         J_x_T = dN@element
         J_u_T = dN@displacements
@@ -149,7 +153,6 @@ class Particle:
 
     def _strain_path(self):
         """Method to calculate and store stress path data for the particle object."""
-        print("Strain path")
         for m in range(self.length):
             if self.update_register[m]: # Check whether to update the reference values.
                 self.ref_coords = self.coords[m]

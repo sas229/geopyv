@@ -19,9 +19,15 @@ opencv-contrib-python = "*"
 pyside6 = "*"
 alive-progress = "*"
 opencv-python = "*"
+plyer = "*"
+colorlog = "*"
+notebook = "*"
+memory-profiler = "*"
+varname = "*"
 geopyv = {path = "."}
 
 [dev-packages]
+ipykernel = "*"
 
 [requires]
 python_version = "3"

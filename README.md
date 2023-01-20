@@ -8,6 +8,9 @@ Python/C++ based PIV/DIC package.
 Use pipenv in root folder of project:
 - pip install pipenv
 - pipenv shell
+[- cd external
+- git submodule update --init
+- cd ..]
 - pipenv install .
 - pipenv uninstall geopyv
 

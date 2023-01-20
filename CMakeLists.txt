@@ -7,10 +7,10 @@ message(${CMAKE_CXX_FLAGS})
 
 add_subdirectory(external)
 
-pybind11_add_module(_image_extensions src/geopyv/image/_image.cpp)
+pybind11_add_module(_image_extensions src/geopyv/_image.cpp)
 target_link_libraries(_image_extensions PUBLIC Eigen3::Eigen)
-install(TARGETS _image_extensions DESTINATION ./image)
+install(TARGETS _image_extensions DESTINATION ./)
 
-pybind11_add_module(_subset_extensions src/geopyv/subset/_subset.cpp)
+pybind11_add_module(_subset_extensions src/geopyv/_subset.cpp)
 target_link_libraries(_subset_extensions PUBLIC Eigen3::Eigen)
-install(TARGETS _subset_extensions DESTINATION ./subset)
+install(TARGETS _subset_extensions DESTINATION ./)

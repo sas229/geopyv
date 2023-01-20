@@ -46,13 +46,34 @@ class Mesh:
         self.size_lower_bound = size_lower_bound
         self.size_upper_bound = size_upper_bound
 
-        # Initialise gmsh.
-        print("Generating mesh using gmsh with approximately {n} nodes.".format(n=self.target_nodes))
-        gmsh.initialize()
-        gmsh.option.setNumber("General.Verbosity", 2) # 0: silent except for fatal errors, 1: +errors, 2: +warnings, 3: +direct, 4: +information, 5: +status, 99: +debug
-        # Create mesh.
+        # Define region of interest.
         self._define_RoI()
+
+        # Initialize gmsh if not already initialized.
+        if gmsh.isInitialized() == 0:
+            gmsh.initialize()
+        gmsh.option.setNumber("General.Verbosity", 2) # 0: silent except for fatal errors, 1: +errors, 2: +warnings, 3: +direct, 4: +information, 5: +status, 99: +debug
+        
+        # Create initial mesh.
+        print("Generating mesh using gmsh with approximately {n} nodes.".format(n=self.target_nodes))
         self._initial_mesh()
+        print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.elements)))
+        gmsh.finalize()
+
+    def set_target_nodes(self, target_nodes):
+        """Method to create a mesh with a target number of nodes."""
+        self.target_nodes = target_nodes
+
+        # Initialize gmsh if not already initialized.
+        if gmsh.isInitialized() == 0:
+            gmsh.initialize()
+        gmsh.option.setNumber("General.Verbosity", 2) # 0: silent except for fatal errors, 1: +errors, 2: +warnings, 3: +direct, 4: +information, 5: +status, 99: +debug
+        
+        # Create mesh.
+        print("Generating mesh using gmsh with approximately {n} nodes.".format(n=self.target_nodes))
+        self._initial_mesh()
+        print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.elements)))
+        gmsh.finalize()        
 
     def solve(self, seed_coord=None, template=Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2):
 
@@ -81,6 +102,14 @@ class Mesh:
             self.p_0 = np.zeros(7)
         elif self.order == 2 and self.method != "WFAGN":
             self.p_0 = np.zeros(12)
+
+        # Initialize gmsh if not already initialized.
+        if gmsh.isInitialized() == 0:
+            gmsh.initialize()
+        gmsh.option.setNumber("General.Verbosity", 2) # 0: silent except for fatal errors, 1: +errors, 2: +warnings, 3: +direct, 4: +information, 5: +status, 99: +debug
+        
+        # Create initial mesh.
+        self._initial_mesh()
          
         # Solve initial mesh.
         self.message = "Solving initial mesh"
@@ -108,7 +137,7 @@ class Mesh:
             print("Error! Could not solve for all subsets.")
             self.update = True
         gmsh.finalize()
-        del(self.subsets)
+        # del(self.subsets)
         
     def _update_mesh(self):
         """Private method to update the mesh variables."""
@@ -159,7 +188,6 @@ class Mesh:
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
         self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
         self.elements = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
-        print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.elements)))
 
     def _adaptive_mesh(self):
         D = abs(self.du[:,0,1]+self.du[:,1,0])*self.areas # Elemental shear strain-area products.
@@ -241,10 +269,6 @@ class Mesh:
             self.subset_bgf_nodes = np.mean(self.nodes[self.elements], axis = 1)
             self.subset_bgf_values = np.mean(self.d2u, axis=(1,2))
 
-
-    
-
-
     def _element_area(self):
         """
         A private method to calculate the element areas.
@@ -299,7 +323,7 @@ class Mesh:
         self.d2u = d2u
 
     def _reliability_guided(self):
-        """N
+        """
         A private method to perform reliability-guided (RG) PIV analysis.
         """
 
@@ -337,7 +361,6 @@ class Mesh:
                 self.subsets[tag] = Subset(self.nodes[tag], self.f_img, self.g_img, template) # Create masked boundary subset. 
             else:
                 self.subsets[tag] = Subset(self.nodes[tag], self.f_img, self.g_img, self.template) # Create full subset. 
-
         # Solve subsets in mesh.
         number_nodes = np.shape(self.nodes)[0]
         with alive_bar(number_nodes, dual_line=True, bar='blocks', title=self.message) as self.bar:

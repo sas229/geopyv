@@ -7,12 +7,6 @@ from geopyv.mesh import Mesh
 from geopyv import log
 from geopyv import io
 
-def name_of_global_obj(xx):
-    return [objname for objname, oid in globals().items() if id(oid)==id(xx)][0]
-
-def list_global_objects():
-    print(len([objname for objname, oid in globals().items()]))
-
 level = logging.WARN
 log.initialise(level)
 

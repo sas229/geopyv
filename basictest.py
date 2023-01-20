@@ -78,3 +78,5 @@ print(pickled_data["quality"])
 
 data = io.load("test")
 print(data["settings"])
+
+data = io.load("none")

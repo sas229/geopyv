@@ -4,10 +4,14 @@ from geopyv.mesh import Mesh
 from geopyv.particle import Particle
 
 def load(filename=None):
+    """Function to load a geopyv data file."""
     ext = ".pyv"
     filepath = filename + ext
-    with open(filepath, "rb") as infile:
-        return pickle.load(infile)
+    try:
+        with open(filepath, "rb") as infile:
+            return pickle.load(infile)
+    except:
+        raise FileNotFoundError("File not found.")
 
 def save(object, filename):
     """Function to save data from a geopyv object."""

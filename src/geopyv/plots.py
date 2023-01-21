@@ -18,6 +18,9 @@ def inspect_subset(data, show, block, save):
     sigma_intensity = data["quality"]["sigma_intensity"]
     SSSIG = data["quality"]["SSSIG"]
     title = "Subset: {x},{y} (px)".format(x=x, y=y)
+    mask = data["template"]["mask"].astype(np.float32)
+
+    # Figure setup.
     fig, ax = plt.subplots(num=title)
     x_min = (np.round(x, 0) - template_size).astype(int)
     x_max = (np.round(x, 0) + template_size).astype(int)
@@ -25,16 +28,8 @@ def inspect_subset(data, show, block, save):
     y_max = (np.round(y, 0) + template_size).astype(int)
     image = image_gs.astype(np.float32)[y_min:y_max+1, x_min:x_max+1]
 
-    # If a circular subset, mask pixels outside radius.
-    if data["template"]["shape"] == "Circle":
-        x, y = np.meshgrid(
-            np.arange(-template_size, template_size + 1, 1),
-            np.arange(-template_size, template_size + 1, 1),
-        )
-        dist = np.sqrt(x ** 2 + y ** 2)
-        mask = np.zeros(image.shape)
-        mask[dist > template_size] = 255
-        image = np.maximum(image, mask)
+    # Apply subset mask.
+    image = np.maximum(image, mask)
 
     # Create plot.
     ax.imshow(image, cmap="gist_gray")
@@ -43,9 +38,11 @@ def inspect_subset(data, show, block, save):
     ax.set_axis_off()
     plt.tight_layout()
 
+    # Save
     if save != None:
         plt.savefig(save)
 
+    # Show or close.
     if show == True:
         plt.show(block=block)
     else:
@@ -86,6 +83,11 @@ def convergence_subset(data, show, block, save):
     ax[0].legend(frameon=False)
     plt.tight_layout()
 
+    # Save
+    if save != None:
+        plt.savefig(save)
+
+    # Show or close.
     if show == True:
         plt.show(block=block)
     else:
@@ -107,6 +109,7 @@ def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xl
         levels = np.linspace(tolerance, 1.0, 10)
         ticks = [tolerance, 1.0]
 
+    # Extract variables from data.
     x = []
     y = []
     value = []
@@ -133,8 +136,7 @@ def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xl
     solved = np.asarray(solved)
     C_CC = np.asarray(C_CC)
 
-    # unsolved = np.flatnonzero(np.where(solved > -1, solved, 0))
-    # poor = np.flatnonzero(np.where(C_CC < 0.7, solved,0))
+    # Plot setup.
     platform = sys.platform
     if platform == "linux" or platform == "linux2" or platform == "darwin":
         split = "/"
@@ -144,25 +146,31 @@ def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xl
     g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]):]
     title = "Contour: f_img = {f_img}; g_img = {g_img}; variable = {variable}".format(f_img=f_img, g_img=g_img, variable=quantity)
     fig, ax = plt.subplots(num=title)
+    
+    # Triangulation.
     mesh_triangulation, x_p, y_p = _plot_triangulation(elements, x, y)
+    
     # Plot mesh.
     if mesh == True:
         for i in range(np.shape(x_p)[0]):
             ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth = "0.5")
     triangulation = tri.Triangulation(nodes[:,0], nodes[:,1], mesh_triangulation)
 
+    # Set levels and extend.
+    extend = "neither"
+    if type(levels) != type(None):
+        if np.max(value) > np.max(levels):
+            extend = "max"
+        elif np.min(value) < np.min(levels):
+            extend = "min"
+        elif np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
+            extend = "both"
+            
     # Plot contours.
-    if np.max(value) > np.max(levels):
-        extend = "max"
-    elif np.min(value) < np.min(levels):
-        extend = "min"
-    elif np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
-        extend = "both"
-    else:
-        extend = "neither"
     contours = ax.tricontourf(triangulation, value, alpha=alpha, levels=levels, extend=extend)
     if colorbar == True:
-        fig.colorbar(contours, label = 'v [px]', ticks=ticks)
+        label = quantity
+        fig.colorbar(contours, label=label, ticks=ticks)
     
     # Show image in background.
     if imshow == True:
@@ -173,25 +181,21 @@ def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xl
     else:
         ax.set_aspect('equal', 'box')
 
-    # Axis.
+    # Axis control.
     if axis == "off":
         ax.set_axis_off()
     
+    # Limit control.
     if xlim != None:
         ax.set_xlim(xlim)
     if ylim != None:
         ax.set_ylim(ylim)
 
-    # for i in range(np.shape(unsolved)[0]):
-    #     ax.scatter(nodes[unsolved[i],0], nodes[unsolved[i],1], marker='o', color='red')
-    # for i in range(np.shape(poor)[0]):
-    #     ax.scatter(nodes[poor[i],0], nodes[poor[i],1], marker='o', color='orange')
-    # for i in range(np.shape(mesh.boundary_node_tags)[0]):
-    #     ax.scatter(nodes[mesh.boundary_node_tags[i],0], nodes[mesh.boundary_node_tags[i],1], marker='o', color='blue')
-
+    # Save.
     if save != None:
         plt.savefig(save)
 
+    # Show or close.
     if show == True:
         plt.show(block=block)
     else:

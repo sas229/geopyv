@@ -1,5 +1,5 @@
 import numpy as np
-import matplotlib.path as path
+import matplotlib.pyplot as plt
 
 class Template:
     """Class for geopyv template.
@@ -31,6 +31,7 @@ class Template:
         self.coords = []
         self.shape = "None"
         self.dimension = "None"
+        self.subset_mask = np.zeros(((2*self.size)+1, (2*self.size)+1)).astype(np.intc)
 
     def _check_size_and_type(self):
         """Private method to check if size is a positive integer, and if not convert to
@@ -61,11 +62,15 @@ class Template:
             if mask[y, x] == 1:
                 if count == 0:
                     masked_coords = self.coords[i,:]
-                    count += 1
                 else:
                     masked_coords = np.row_stack((masked_coords, self.coords[i,:]))
-                    count += 1
+                count += 1
+            else:
+                x_s = int(self.coords[i,0]+self.size)
+                y_s = int(self.coords[i,1]+self.size)
+                self.subset_mask[x_s, y_s] = 255
         self.coords = masked_coords
+        self.n_px = np.shape(self.coords)[0]
 
 
 class Circle(Template):
@@ -110,6 +115,14 @@ class Circle(Template):
         self.coords = np.empty((self.n_px, 2), order="F")
         self.coords[:, 0] = (x_s - self.size).astype(float)
         self.coords[:, 1] = (y_s - self.size).astype(float)
+
+        # Modify subset mask.
+        x, y = np.meshgrid(
+            np.arange(-self.size, self.size + 1, 1),
+            np.arange(-self.size, self.size + 1, 1),
+        )
+        dist = np.sqrt(x**2 + y**2)
+        self.subset_mask[dist > self.size] = 255
 
 
 class Square(Template):

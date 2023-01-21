@@ -170,6 +170,9 @@ class Subset(SubsetBase):
                 "shape": self.template.shape,
                 "dimension": self.template.dimension,
                 "size": self.template.size,
+                "coords": self.template.coords,
+                "mask" : self.template.subset_mask,
+                "n_px": self.template.n_px,
             }
         }
 
@@ -290,6 +293,7 @@ class Subset(SubsetBase):
                 "p": self.p,
                 "history": self.history,
                 "iterations": self.iterations,
+                "norm": self.norm,
                 "C_CC": self.C_CC,
                 "C_SSD": self.C_SSD,
             }

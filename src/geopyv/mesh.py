@@ -24,12 +24,18 @@ class MeshBase:
     def inspect(self, subset=None, show=True, block=True, save=None):
         """Method to show the mesh and associated quality metrics."""
         if subset != None:
-            inspect_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
+            if subset >= 0 and subset < len(self.data["results"]["subsets"]):
+                inspect_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
+            else:
+                raise ValueError("Subset index provided is out of the range of the mesh object contents.")
 
     def convergence(self, subset=None, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the mesh."""
         if subset != None:
-            convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
+            if subset >= 0 and subset < len(self.data["results"]["subsets"]):
+                convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
+            else:
+                raise ValueError("Subset index provided is out of the range of the mesh object contents.")
     
     def contour(self, quantity="C_CC", imshow=True, colorbar=True, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot the contours of a given measure."""

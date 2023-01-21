@@ -5,6 +5,7 @@ from geopyv.templates import Circle
 from geopyv.image import Image
 from geopyv.subset import Subset
 from geopyv.geometry.utilities import area_to_length
+from geopyv.plots import inspect_subset, convergence_subset
 import gmsh
 from copy import deepcopy
 from scipy.optimize import minimize_scalar
@@ -20,13 +21,15 @@ log = logging.getLogger(__name__)
 
 class MeshBase:
     """Mesh base class to be used as a mixin."""
-    def inspect(self):
+    def inspect(self, subset=None):
         """Method to show the mesh and associated quality metrics."""
-        print("Plot contours.")
+        if subset != None:
+            inspect_subset(self.data["results"]["subsets"][subset])
 
-    def convergence(self):
+    def convergence(self, subset=None):
         """Method to plot the rate of convergence for the mesh."""
-        print("Plot contours.")
+        if subset != None:
+            convergence_subset(self.data["results"]["subsets"][subset])
     
     def contour(self):
         """Method to plot the contours of a given measure."""
@@ -179,6 +182,8 @@ class Mesh(MeshBase):
                 self.data["elements"] = self.elements
                 self.data["solved"] = self.solved
                 self.data["unsolvable"] = self.unsolvable
+
+                # Pack settings.
                 self.settings = {
                     "max_iterations": self.max_iterations,
                     "max_norm": self.max_norm,
@@ -188,11 +193,18 @@ class Mesh(MeshBase):
                     "tolerance": self.tolerance,
                 }
                 self.data.update({"settings": self.settings})
+
+                # Extract data from subsets.
+                subset_data = []
+                for subset in self.subsets:
+                    subset_data.append(subset.data)
+
+                # Pack results.
                 self.results = {
+                    "subsets": subset_data,
                     "displacements": self.displacements,
                     "du": self.du,
                     "d2u": self.d2u,
-                    "C_CC": self.C_CC,
                 }
                 self.data.update({"results": self.results})
                 print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))

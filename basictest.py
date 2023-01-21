@@ -55,8 +55,9 @@ io.save(mesh, "mesh")
 del(mesh)
 
 mesh = io.load("mesh")
-print(type(mesh.data["results"]["displacements"]))
-
+print(type(mesh.data["results"]["subsets"]))
+mesh.inspect(subset=0)
+mesh.convergence(subset=0)
 # # Plot quantity and levels.
 # # quantity = node_strains[:,2]*100 # Percentage strains.
 # quantity = mesh.displacements[:,1]

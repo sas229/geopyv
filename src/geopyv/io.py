@@ -40,8 +40,14 @@ def save(object, filename):
 def _convert_list_to_ndarray(data):
     """Recursive function to convert lists to numpy ndarray."""
     for key, value in data.items():
-        if type(value) == list:
+        # If not a list of subsets, convert to numpy ndarray.
+        if type(value) == list and key != "subsets":
             data[key] = np.asarray(value)
+        # If a dict convert recursievely.
         elif type(value) == dict:
             _convert_list_to_ndarray(data[key])
+        # If a list of subsets, convert recursively.
+        elif key == "subsets":
+            for subset in value:
+                _convert_list_to_ndarray(subset)
     return data

@@ -95,7 +95,7 @@ def convergence_subset(data, show, block, save):
 
     return fig, ax
 
-def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xlim, ylim, show, block, save):
+def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, axis, xlim, ylim, show, block, save):
     """Function to plot contours of mesh data."""
 
     # Load data.
@@ -103,18 +103,10 @@ def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xl
     elements = data["elements"]
     subsets = data["results"]["subsets"]
 
-    ticks = None
-    if quantity == "C_CC":
-        tolerance = data["settings"]["tolerance"]
-        levels = np.linspace(tolerance, 1.0, 10)
-        ticks = [tolerance, 1.0]
-
     # Extract variables from data.
     x = []
     y = []
     value = []
-    solved = []
-    C_CC = []
     for s in subsets:
         x.append(s["position"]["x"])
         y.append(s["position"]["y"])
@@ -128,13 +120,9 @@ def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xl
             value.append(float((s["results"]["p"])[5]))
         else:
             value.append(s["results"][quantity])
-        solved.append(s["solved"])
-        C_CC.append(s["results"]["C_CC"])
     x = np.asarray(x)
     y = np.asarray(y)
     value = np.asarray(value)
-    solved = np.asarray(solved)
-    C_CC = np.asarray(C_CC)
 
     # Plot setup.
     platform = sys.platform
@@ -165,13 +153,7 @@ def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xl
             extend = "min"
         elif np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
             extend = "both"
-            
-    # Plot contours.
-    contours = ax.tricontourf(triangulation, value, alpha=alpha, levels=levels, extend=extend)
-    if colorbar == True:
-        label = quantity
-        fig.colorbar(contours, label=label, ticks=ticks)
-    
+
     # Show image in background.
     if imshow == True:
         image = cv2.imread(data["images"]["f_img"], cv2.IMREAD_COLOR)
@@ -180,7 +162,13 @@ def contour_mesh(data, quantity, imshow, colorbar, mesh, alpha, levels, axis, xl
         plt.imshow(image_gs, cmap='gray')
     else:
         ax.set_aspect('equal', 'box')
-
+            
+    # Plot contours.
+    contours = ax.tricontourf(triangulation, value, alpha=alpha, levels=levels, extend=extend)
+    if colorbar == True:
+        label = quantity
+        fig.colorbar(contours, label=label, ticks=ticks)
+    
     # Axis control.
     if axis == "off":
         ax.set_axis_off()

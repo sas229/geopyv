@@ -37,10 +37,10 @@ class MeshBase:
             else:
                 raise ValueError("Subset index provided is out of the range of the mesh object contents.")
     
-    def contour(self, quantity="C_CC", imshow=True, colorbar=True, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
+    def contour(self, quantity="C_CC", imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot the contours of a given measure."""
         if quantity != None:
-            fig, ax = contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
+            fig, ax = contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, ticks=ticks, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
             return fig, ax
     
     def quiver(self):

@@ -38,15 +38,15 @@ def save(object, filename):
         raise TypeError("Not a geopyv type.")
 
 def _convert_list_to_ndarray(data):
-    """Recursive function to convert lists to numpy ndarray."""
+    """Recursive function to convert lists back to numpy ndarray."""
     for key, value in data.items():
         # If not a list of subsets, convert to numpy ndarray.
         if type(value) == list and key != "subsets":
             data[key] = np.asarray(value)
-        # If a dict convert recursievely.
+        # If a dict convert recursively.
         elif type(value) == dict:
             _convert_list_to_ndarray(data[key])
-        # If a list of subsets, convert recursively.
+        # If a list of subsets convert recursively.
         elif key == "subsets":
             for subset in value:
                 _convert_list_to_ndarray(subset)

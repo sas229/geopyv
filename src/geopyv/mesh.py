@@ -5,7 +5,7 @@ from geopyv.templates import Circle
 from geopyv.image import Image
 from geopyv.subset import Subset
 from geopyv.geometry.utilities import area_to_length
-from geopyv.plots import inspect_subset, convergence_subset
+from geopyv.plots import inspect_subset, convergence_subset, contour_mesh
 import gmsh
 from copy import deepcopy
 from scipy.optimize import minimize_scalar
@@ -21,19 +21,21 @@ log = logging.getLogger(__name__)
 
 class MeshBase:
     """Mesh base class to be used as a mixin."""
-    def inspect(self, subset=None):
+    def inspect(self, subset=None, show=True, block=True, save=None):
         """Method to show the mesh and associated quality metrics."""
         if subset != None:
-            inspect_subset(self.data["results"]["subsets"][subset])
+            inspect_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
 
-    def convergence(self, subset=None):
+    def convergence(self, subset=None, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the mesh."""
         if subset != None:
-            convergence_subset(self.data["results"]["subsets"][subset])
+            convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
     
-    def contour(self):
+    def contour(self, quantity="C_CC", imshow=True, colorbar=True, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot the contours of a given measure."""
-        print("Plot contours.")
+        if quantity != None:
+            fig, ax = contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
+            return fig, ax
     
     def quiver(self):
         """Method to plot a quiver plot of the displacements."""
@@ -205,6 +207,7 @@ class Mesh(MeshBase):
                     "displacements": self.displacements,
                     "du": self.du,
                     "d2u": self.d2u,
+                    "C_CC": self.C_CC,
                 }
                 self.data.update({"results": self.results})
                 print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))

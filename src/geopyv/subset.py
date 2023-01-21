@@ -16,14 +16,14 @@ log = logging.getLogger(__name__)
 
 class SubsetBase:
     """Subset base class to be used as a mixin."""
-    def inspect(self):
+    def inspect(self, show=True, block=True, save=None):
         """Method to show the subset and associated quality metrics."""
-        inspect_subset(self.data)
+        inspect_subset(self.data, show=show, block=block, save=save)
 
-    def convergence(self):
+    def convergence(self, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the subset."""
         if "results" in self.data:
-            convergence_subset(self.data)
+            convergence_subset(self.data, show=show, block=block, save=save)
         else:
             raise Exception("Warning: Subset not yet solved. Run the solve() method.")
 
@@ -88,7 +88,7 @@ class Subset(SubsetBase):
     v : float 
         Vertical displacement.
     x_f : float
-        Final horizontal coordinate.
+        Final horizontal coordinate.self.initialised
     y_f : float
         Final vertical coordinate.
     settings: dict

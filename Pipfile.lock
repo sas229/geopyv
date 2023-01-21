@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "3ccb96e99f3a003fda39be06837ec05ac6f2e741c17fad18b6796977195e6d8e"
+            "sha256": "e7b0319a9cf18f9d09e1be6fe8b5e2bf7052322694bc2454e76be8cc533896d0"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -21,7 +21,7 @@
                 "sha256:6a538862d33ce67d997429d14998310e1dbfda6cb7d9bbfbf799c4709847fece",
                 "sha256:8bbf4c75fe13cbd3d72f49a03b02c5c7dca32169b6d49117c257e7eb3eaee341"
             ],
-            "markers": "python_version >= '3.7' and python_version < '4.0'",
+            "markers": "python_version >= '3.7' and python_version < '4'",
             "version": "==4.2.1"
         },
         "aiofiles": {
@@ -29,7 +29,7 @@
                 "sha256:1142fa8e80dbae46bb6339573ad4c8c0841358f79c6eb50a493dceca14621bad",
                 "sha256:9107f1ca0b2a5553987a94a3c9959fe5b491fdf731389aa5b7b1bd0733e32de6"
             ],
-            "markers": "python_version >= '3.7' and python_version < '4.0'",
+            "markers": "python_version >= '3.7' and python_version < '4'",
             "version": "==22.1.0"
         },
         "aiosqlite": {
@@ -638,6 +638,14 @@
             "markers": "python_version >= '3.7'",
             "version": "==3.1.2"
         },
+        "json-numpy": {
+            "hashes": [
+                "sha256:f0b6dbd95ed03cf0b1897185baff996560f62b4bf736d5779c391780255d4485",
+                "sha256:fede9a57ecbf1b834be72071204f3993b32e9cbdd181cfb64e55af2b0a5f3fa6"
+            ],
+            "index": "pypi",
+            "version": "==1.0.1"
+        },
         "json5": {
             "hashes": [
                 "sha256:1aa54b80b5e507dfe31d12b7743a642e2ffa6f70bf73b8e3d7d1d5fba83d99bd",
@@ -1044,6 +1052,14 @@
             ],
             "markers": "python_version >= '3.8'",
             "version": "==1.24.1"
+        },
+        "numpyencoder": {
+            "hashes": [
+                "sha256:79da1c662bcdc6260a3944426e1dc38c248a236b9b73faf26a9084f73932f870",
+                "sha256:e3f7cec9b40fc026ec4ea9fc2d0ef69d4f5f171edec8f51b4cf1c5144545495b"
+            ],
+            "index": "pypi",
+            "version": "==0.3.0"
         },
         "opencv-contrib-python": {
             "hashes": [
@@ -1541,7 +1557,7 @@
                 "sha256:64299f4909223da747622c030b781c0d7811e359c37124b4bd368fb8c6518baa",
                 "sha256:98b1b2782e3c6c4904938b84c0eb932721069dfdb9134313beff7c83c2df24bf"
             ],
-            "markers": "python_version >= '3.7' and python_version < '4.0'",
+            "markers": "python_version >= '3.7' and python_version < '4'",
             "version": "==2.28.2"
         },
         "rfc3339-validator": {

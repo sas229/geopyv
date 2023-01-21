@@ -1,5 +1,4 @@
-import logging 
-import pickle
+import logging
 import numpy as np
 import scipy as sp
 from geopyv.templates import Circle
@@ -67,6 +66,8 @@ class Mesh(MeshBase):
         self.exclusions = exclusions
         self.size_lower_bound = size_lower_bound
         self.size_upper_bound = size_upper_bound
+        self.solved = False
+        self.unsolvable = False
 
         # Define region of interest.
         self._define_RoI()
@@ -85,6 +86,8 @@ class Mesh(MeshBase):
         # Data.
         self.data = {
             "type": "Mesh",
+            "solved": self.solved,
+            "unsolvable": self.unsolvable,
             "images": {
                 "f_img": self.f_img.filepath,
                 "g_img": self.g_img.filepath,
@@ -134,6 +137,7 @@ class Mesh(MeshBase):
         self.beta = beta
         self.subset_bgf_nodes = None
         self.subset_bgf_values = None
+        self.update = False
         if self.order == 1 and self.method != "WFAGN":
             self.p_0 = np.zeros(6)
         elif self.order == 1 and self.method == "WFAGN":
@@ -165,11 +169,16 @@ class Mesh(MeshBase):
 
             # Finalise.
             if self.update == True:
+                self.solved = False
+                self.unsolvable = True
                 print('Error! The minimum correlation coefficient is below tolerance {field:.3f} < {tolerance:.3f}'.format(field=np.min(self.C_CC), tolerance=self.tolerance))
             else:
-                print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))
+                # Pack data.
+                self.solved = True
                 self.data["nodes"] = self.nodes
                 self.data["elements"] = self.elements
+                self.data["solved"] = self.solved
+                self.data["unsolvable"] = self.unsolvable
                 self.settings = {
                     "max_iterations": self.max_iterations,
                     "max_norm": self.max_norm,
@@ -186,23 +195,12 @@ class Mesh(MeshBase):
                     "C_CC": self.C_CC,
                 }
                 self.data.update({"results": self.results})
+                print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))
         except ValueError:
             print(traceback.format_exc())
             print("Error! Could not solve for all subsets.")
             self.update = True
         gmsh.finalize()
-
-    def save(self, filename):
-        """Method to save mesh data to .pyv file."""
-        if self.update == False:
-            ext = ".pyv"
-            filepath = filename + ext
-            with open(filepath, "wb") as outfile:
-                pickle.dump(self.data, outfile)
-        elif self.solved == False:
-            log.warn("Mesh not solved therefore no results.")
-        elif self.unsolvable == True:
-            log.warn("Mesh cannot be solved therefore no results.")
         
     def _update_mesh(self):
         """Private method to update the mesh variables."""
@@ -395,10 +393,9 @@ class Mesh(MeshBase):
         """
 
         # Set up.
-        self.update = False
         m = np.shape(self.nodes)[0]
         n = np.shape(self.p_0)[0]
-        self.solved = np.zeros(m, dtype = int) # Solved/unsolved reference array (1 if unsolved, -1 if solved).
+        self.subset_solved = np.zeros(m, dtype = int) # Solved/unsolved reference array (1 if unsolved, -1 if solved).
         self.C_CC = np.zeros(m, dtype=np.float64) # Correlation coefficient array. 
         self.subsets = np.empty(m, dtype = object) # Initiate subset array.
         self.p = np.zeros((m, n), dtype=np.float64) # Warp function array.
@@ -445,11 +442,11 @@ class Mesh(MeshBase):
                 # Solve through sorted queue.
                 self.bar.text = "-> Solving remaining subsets using reliability guided approach..."
                 count = 0
-                while np.max(self.solved)>-1:
+                while np.max(self.subset_solved)>-1:
                     # Identify next subset.
-                    cur_idx = np.argmax(self.solved*self.C_CC) # Subset with highest correlation coefficient selected.
+                    cur_idx = np.argmax(self.subset_solved*self.C_CC) # Subset with highest correlation coefficient selected.
                     p_0 = self.subsets[cur_idx].p # Precondition based on selected subset.
-                    self.solved[cur_idx] = -1 # Set as solved. 
+                    self.subset_solved[cur_idx] = -1 # Set as solved. 
                     self._neighbours(cur_idx, p_0) # Calculate for neighbouring subsets.
                     if count == number_nodes:
                         break
@@ -457,7 +454,7 @@ class Mesh(MeshBase):
                     self.bar()
                 
                 # Update
-                if not any(self.solved != -1): # If all solved...
+                if not any(self.subset_solved != -1): # If all solved...
                     if np.amin(self.C_CC) < self.tolerance: # ...but minimum correlation coefficient is less than tolerance...
                         self.update = True # ... raise update flag.
                 else: # If any remain unsolved...
@@ -514,7 +511,7 @@ class Mesh(MeshBase):
         
         neighbours = self._connectivity(cur_idx)
         for idx in neighbours:
-            if self.solved[idx] == 0: # If not previously solved.
+            if self.subset_solved[idx] == 0: # If not previously solved.
             # Use nearest-neighbout pre-conditioning.
                 self.subsets[idx].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
                 if self.subsets[idx].solved: # Check against tolerance.
@@ -544,7 +541,7 @@ class Mesh(MeshBase):
             flag = -1
         else:
             flag = 1
-        self.solved[idx] = flag
+        self.subset_solved[idx] = flag
         self.C_CC[idx] = np.max((self.subsets[idx].C_CC, 0)) # Clip correlation coefficient to positive values.
         self.p[idx] = self.subsets[idx].p.flatten()
         self.displacements[idx, 0] = self.subsets[idx].u

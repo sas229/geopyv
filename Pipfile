@@ -20,6 +20,8 @@ alive-progress = "*"
 opencv-python = "*"
 colorlog = "*"
 notebook = "*"
+json-numpy = "*"
+numpyencoder = "*"
 
 [dev-packages]
 ipykernel = "*"

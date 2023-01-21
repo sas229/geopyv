@@ -48,6 +48,7 @@ def convergence_subset(data):
     max_iterations = data["settings"]["max_iterations"]
     max_norm = data["settings"]["max_norm"]
     tolerance = data["settings"]["tolerance"]
+    print(type(history))
 
     # Create plot.
     f, (ax1, ax2) = plt.subplots(2, 1, sharex=True, num="Convergence")

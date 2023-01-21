@@ -19,17 +19,20 @@ ref = Image("./images/T-Bar/IMG_1062.jpg")
 tar = Image("./images/T-Bar/IMG_1064.jpg")
 subset = Subset(f_img=ref, g_img=tar, f_coord=np.asarray([400,400]), template=Circle(50))
 # subset = Subset(f_img=ref, g_img=tar)
-# subset.inspect()
+subset.inspect()
 subset.solve()
-# subset.convergence()
-subset.save("test")
-print("subset type:", type(subset))
+subset.convergence()
+# subset.save("test")
+# print("subset type:", type(subset))
+# del(subset)
+
+io.save(subset, "test")
 del(subset)
 
 # Load subset test.
 subset = io.load("test")
-# subset.inspect()
-# subset.convergence()
+subset.inspect()
+subset.convergence()
 print("subset type:", type(subset))
 
 # Mesh test.
@@ -44,14 +47,15 @@ exclusions = []
 exclusions.append(circular_exclusion(np.asarray([1925, 1470]), radius=430, size=100))
 seed = np.asarray([400, 400.0])
 mesh = Mesh(f_img=ref, g_img=tar, target_nodes=2000, boundary=boundary, exclusions=exclusions)
+io.save(mesh, "mesh")
 beta = 5.0
 alpha = 1/beta
 mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method = "ICGN", alpha=alpha, beta=beta)
-mesh.save("mesh")
+io.save(mesh, "mesh")
 del(mesh)
 
 mesh = io.load("mesh")
-print(mesh)
+print(type(mesh.data["results"]["displacements"]))
 
 # # Plot quantity and levels.
 # # quantity = node_strains[:,2]*100 # Percentage strains.

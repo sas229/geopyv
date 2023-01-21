@@ -1,7 +1,6 @@
 import logging 
 import cv2
 import os
-import pickle
 import numpy as np
 from geopyv.image import Image
 from geopyv.templates import Circle, Square
@@ -156,6 +155,8 @@ class Subset(SubsetBase):
         # Data.
         self.data = {
             "type": "Subset",
+            "solved": self.solved,
+            "unsolvable": self.unsolvable,
             "images": {
                 "f_img": self.f_img.filepath,
                 "g_img": self.g_img.filepath,
@@ -281,6 +282,8 @@ class Subset(SubsetBase):
                 log.info("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x_f, y_f=self.y_f))
         
             # Pack results.
+            self.data["solved"] = self.solved
+            self.data["unsolvable"] = self.unsolvable
             self.results = {
                 "u": self.u,
                 "v": self.v,
@@ -289,24 +292,10 @@ class Subset(SubsetBase):
                 "iterations": self.iterations,
                 "C_CC": self.C_CC,
                 "C_SSD": self.C_SSD,
-                "solved": self.solved,
-                "unsolvable": self.unsolvable,
             }
             self.data.update({"results": self.results})            
         except:
             raise RuntimeError("Runtime error in solve method.")
-
-    def save(self, filename):
-        """Method to save subset data to .pyv file."""
-        if self.solved == True:
-            ext = ".pyv"
-            filepath = filename + ext
-            with open(filepath, "wb") as outfile:
-                pickle.dump(self.data, outfile)
-        elif self.solved == False:
-            log.warn("Subset not solved therefore no results.")
-        elif self.unsolvable == True:
-            log.warn("Subset cannot be solved therefore no results.")
 
     def _load_img(self, message):
         """Private method to open a file dialog and slect an image."""

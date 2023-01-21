@@ -50,6 +50,7 @@ mesh = geopyv.io.load("mesh")
 mesh.contour(quantity="u", colorbar=False, alpha=0.75, levels=np.arange(-5, 6, 1), axis="off", xlim=((900,2900)), ylim=((500,2500)))
 mesh.contour(quantity="C_CC")
 mesh.contour(quantity="iterations")
+mesh.contour(quantity="R")
 
 # You can also return the fig and ax objects and add customised items to the plot.
 fig, ax = mesh.contour("v", alpha=1.0, levels=np.arange(-5, 6, 1))

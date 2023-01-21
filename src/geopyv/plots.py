@@ -118,6 +118,8 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
             value.append(float((s["results"]["p"])[4]))
         elif quantity == "v_y":
             value.append(float((s["results"]["p"])[5]))
+        elif quantity == "R":
+            value.append(np.sqrt(s["results"]["u"]**2 + s["results"]["v"]**2))
         else:
             value.append(s["results"][quantity])
     x = np.asarray(x)

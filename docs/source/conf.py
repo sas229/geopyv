@@ -62,4 +62,7 @@ add_module_names = True
 autodoc_member_order = 'bysource'
 math_number_all = False
 autoclass_content = 'both'
-# autodoc_mock_imports = ["geopyv"]
+autodoc_mock_imports = [
+    "geopyv._image_extensions",
+    "geopyv._subset_extensions"
+]

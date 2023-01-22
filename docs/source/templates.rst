@@ -3,14 +3,14 @@ geopyv.templates
 
 API for geopyv templates module.
 
-.. autoclass:: geopyv.templates.Template
+.. autoclass:: templates.Template
     :special-members: __init__
     :members:
 
-.. autoclass:: geopyv.templates.Circle
+.. autoclass:: templates.Circle
     :special-members: __init__
     :members:
 
-.. autoclass:: geopyv.templates.Square
+.. autoclass:: templates.Square
     :special-members: __init__
     :members:

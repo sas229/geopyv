@@ -6,11 +6,10 @@ A DIC/PIV code for Python (with C++ extensions) using the Inverse-Compositional 
 .. toctree::
    about
    installation
-   tutorials
    theory
+   tutorials
    validation
    support
-   api
    license
    
 Indices and tables

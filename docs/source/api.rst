@@ -2,5 +2,4 @@ API
 ===
 
 .. toctree::
-   templates
-
+    autoapi/geopyv/index

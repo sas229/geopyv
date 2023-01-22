@@ -29,7 +29,7 @@ release = '0.0.1'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon', 'sphinx.ext.mathjax']
+extensions = ['autoapi.extension', 'sphinx.ext.coverage', 'sphinx.ext.napoleon', 'sphinx.ext.mathjax']
 
 # Napoleon settings.
 napoleon_include_private_with_doc = True
@@ -41,7 +41,6 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
-
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -55,10 +54,12 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 html_theme_options = {'body_max_width': '100%'}
 add_module_names = True
-autodoc_member_order = 'bysource'
+# autodoc_member_order = 'bysource'
 math_number_all = False
 autoclass_content = 'both'
 # autodoc_mock_imports = [
 #     "geopyv._image_extensions",
 #     "geopyv._subset_extensions"
 # ]
+autoapi_dirs = ['../../src/geopyv']
+# autoapi_options = ['show-inheritance-diagram']

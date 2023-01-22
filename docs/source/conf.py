@@ -52,14 +52,11 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-html_theme_options = {'body_max_width': '100%'}
+html_theme_options = {'body_max_width': '100%', 'includehidden': True}
 add_module_names = True
-# autodoc_member_order = 'bysource'
 math_number_all = False
 autoclass_content = 'both'
-# autodoc_mock_imports = [
-#     "geopyv._image_extensions",
-#     "geopyv._subset_extensions"
-# ]
 autoapi_dirs = ['../../src/geopyv']
 # autoapi_options = ['show-inheritance-diagram']
+autoapi_keep_files = True
+suppress_warnings = ['autoapi']

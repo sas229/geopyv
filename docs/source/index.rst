@@ -21,7 +21,7 @@ A DIC/PIV code for Python (with C++ extensions) using the Inverse-Compositional 
    :maxdepth: 2
    :hidden:
 
-   /tutorials/gettingstarted
+   /tutorials/basic
    /tutorials/advanced
 
 .. toctree::

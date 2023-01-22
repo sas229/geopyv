@@ -1,4 +1,4 @@
-.. _Advanced Tutorials:
+.. _Advanced:
 
 Advanced
 --------

@@ -60,3 +60,4 @@ add_module_names = True
 autodoc_member_order = 'bysource'
 math_number_all = False
 autoclass_content = 'both'
+autodoc_mock_imports = ["geopyv"]

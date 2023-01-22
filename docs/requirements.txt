@@ -1,2 +1,2 @@
 sphinx-rtd-theme
-opencv-pyhon
+opencv-python

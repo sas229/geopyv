@@ -12,7 +12,7 @@
 #
 import os
 import sys
-sys.path.append(os.path.abspath('../../geopyv'))
+sys.path.append(os.path.abspath('../../src/geopyv'))
 
 
 # -- Project information -----------------------------------------------------
@@ -56,6 +56,6 @@ html_theme = 'sphinx_rtd_theme'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 html_theme_options = {'body_max_width': '100%'}
-add_module_names = False
+add_module_names = True
 autodoc_member_order = 'bysource'
 math_number_all = False

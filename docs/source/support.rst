@@ -14,23 +14,23 @@ FAQ
 
     - Get some inspiration here: :ref:`examples`
 
-2. Is the source code available?
+3. Is the source code available?
 
     - Yes, all of it, via `GitHub <https://github.com/sas229/geopyv>`_.
 
-3. Can I use it in my closed source commerical package?
+4. Can I use it in my closed source commerical package?
 
-    - Not if you sell the software without releasing the source code. See the following link: :ref:`license`
+    - Not if you sell the software without releasing the source code. See here: :ref:`license`
 
-3. Does it work on Linux?
+5. Does it work on Linux?
 
     - Yes, via the `manylinux <https://github.com/pypa/manylinux>`_ package.
 
-4. Does it work on Windows?
+6. Does it work on Windows?
 
     - Not yet, but it ought to soon. Watch this space.
 
-5. Does it work on Mac OS?
+7. Does it work on Mac OS?
 
     - Not yet, but it ought to soon. Watch this space.
 

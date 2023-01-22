@@ -65,6 +65,7 @@ html_theme_options = {
     'includehidden': True,
     'collapse_navigation': True,
 }
+html_show_sourcelink = False
 
 add_module_names = True
 
@@ -74,6 +75,7 @@ autoapi_dirs = ['../../src/geopyv']
 # autoapi_options = ['show-inheritance-diagram']
 autoapi_keep_files = True
 suppress_warnings = ['autoapi']
+autoapi_add_toctree_entry = False
 
 bibtex_bibfiles = ['refs.bib']
 bibtex_default_style = 'plain'

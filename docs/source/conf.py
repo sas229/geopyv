@@ -12,10 +12,7 @@
 #
 import os
 import sys
-sys.path.append(os.path.abspath('../../src/geopyv/templates.py'))
-sys.path.append(os.path.abspath('../../src/geopyv/subset.py'))
-sys.path.append(os.path.abspath('../../src/geopyv/mesh.py'))
-sys.path.append(os.path.abspath('../../src/geopyv/image.py'))
+sys.path.append(os.path.abspath('../../src/geopyv/'))
 
 
 # -- Project information -----------------------------------------------------

@@ -643,14 +643,14 @@ Exit criteria
 For a first order subset warp function the norm is:
             
 .. math::
-    :label: norm_1
+    .. :label: norm_1
     
     \|\Delta p\| = \left[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x}  s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y} s \right)^2 \right]^{1/2}
     
 For a second order subset warp function the norm is:
     
 .. math::
-    :label: norm_2
+    .. :label: norm_2
 
     \begin{multline*}
     \|\Delta p\| = \Bigl[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x} s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y}  s \right)^2 \\

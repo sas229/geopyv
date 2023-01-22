@@ -3,6 +3,6 @@ geopyv.subset
 
 API for geopyv subset module.
 
-.. autoclass:: geopyv.subset.Subset
+.. autoclass:: Subset
     :special-members: __init__
     :members:

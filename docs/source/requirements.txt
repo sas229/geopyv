@@ -8,4 +8,3 @@ opencv_python==4.7.0.68
 Pillow==9.4.0
 PySide6==6.4.2
 scipy==1.10.0
-geopyv==0.0.1

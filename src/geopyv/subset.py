@@ -190,7 +190,7 @@ class Subset(SubsetBase):
         p_0 : ndarray, optional
             1D array of warp function parameters with `float` type.
         method : str
-            Solution method. Options are FAGN, WFAGN and ICGN. Default is ICGN since it
+            Solution method. Options are FAGN and ICGN. Default is ICGN since it
             is faster.
 
 
@@ -302,7 +302,7 @@ class Subset(SubsetBase):
             raise RuntimeError("Runtime error in solve method.")
 
     def _load_img(self, message):
-        """Private method to open a file dialog and slect an image."""
+        """Private method to open a file dialog and select an image."""
         directory = os.getcwd()
         dialog = ImageSelector()
         imgpath = dialog.get_path(directory, message)

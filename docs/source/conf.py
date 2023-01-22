@@ -29,7 +29,15 @@ release = '0.0.1'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['autoapi.extension', 'sphinx.ext.coverage', 'sphinx.ext.napoleon', 'sphinx.ext.mathjax']
+extensions = [
+    'autoapi.extension',
+    'sphinx.ext.coverage',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.mathjax',
+    'sphinx_copybutton',
+    'sphinxcontrib.bibtex',
+    'sphinx.ext.todo',
+]
 
 # Napoleon settings.
 napoleon_include_private_with_doc = True
@@ -52,11 +60,22 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-html_theme_options = {'body_max_width': '100%', 'includehidden': True}
+html_theme_options = {
+    'body_max_width': '100%',
+    'includehidden': True,
+    'collapse_navigation': True,
+}
+
 add_module_names = True
+
 math_number_all = False
-autoclass_content = 'both'
+
 autoapi_dirs = ['../../src/geopyv']
 # autoapi_options = ['show-inheritance-diagram']
 autoapi_keep_files = True
 suppress_warnings = ['autoapi']
+
+bibtex_bibfiles = ['refs.bib']
+bibtex_default_style = 'plain'
+
+todo_include_todos = True

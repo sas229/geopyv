@@ -19,13 +19,12 @@ pyside6 = "*"
 alive-progress = "*"
 opencv-python = "*"
 colorlog = "*"
-notebook = "*"
-json-numpy = "*"
 numpyencoder = "*"
 
 [dev-packages]
 ipykernel = "*"
 geopyv = {editable = true, path = "."}
+sphinxcontrib-bibtex = "*"
 
 [requires]
 python_version = "3"

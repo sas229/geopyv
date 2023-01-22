@@ -223,7 +223,7 @@ Attributes
       :type max_iterations: int, optional
       :param p_0: 1D array of warp function parameters with `float` type.
       :type p_0: ndarray, optional
-      :param method: Solution method. Options are FAGN, WFAGN and ICGN. Default is ICGN since it
+      :param method: Solution method. Options are FAGN and ICGN. Default is ICGN since it
                      is faster.
       :type method: str
 
@@ -244,7 +244,7 @@ Attributes
 
    .. py:method:: _load_img(message)
 
-      Private method to open a file dialog and slect an image.
+      Private method to open a file dialog and select an image.
 
 
    .. py:method:: _load_f_img()

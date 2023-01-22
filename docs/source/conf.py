@@ -12,7 +12,7 @@
 #
 import os
 import sys
-sys.path.append(os.path.abspath('../../src/geopyv'))
+sys.path.append(os.path.abspath('../..'))
 
 
 # -- Project information -----------------------------------------------------
@@ -59,3 +59,4 @@ html_theme_options = {'body_max_width': '100%'}
 add_module_names = True
 autodoc_member_order = 'bysource'
 math_number_all = False
+autoclass_content = 'both'

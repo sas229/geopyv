@@ -43,7 +43,7 @@ after which the inverse FFT is taken for each column to yield the final matrix o
     
     \mathbf{C}_{\left( :, j \right)} = F^{-1}\left[ \frac{ F\left[ \mathbf{C}_{\left( :, j \right)} \right] }{ F\left[ \mathbf{b}_{y} \right] } \right]
 
-This array of coefficients is computed by :py:meth:`geopyv.Image._get_C`. The same technique is used to calculate the B-spline coefficients for the target image :math:`g`. 
+This array of coefficients is computed by :py:meth:`geopyv.image.Image._get_C`. The same technique is used to calculate the B-spline coefficients for the target image :math:`g`. 
 
 .. warning::
     
@@ -67,7 +67,7 @@ The bi-quintic B-spline kernel :math:`\mathbf{Q}` is:
                     
 and :math:`\mathbf{Q}^T` is its transpose. 
 
-The :math:`\mathbf{C}_\left(i-2:i+3, j-2:j+3\right)` matrix is a subset of the B-spline coefficient matrix :math:`\mathbf{C}` computed by :py:meth:`geopyv.Image._get_C`, where :math:`i` and :math:`j` are the image coordinates:
+The :math:`\mathbf{C}_\left(i-2:i+3, j-2:j+3\right)` matrix is a subset of the B-spline coefficient matrix :math:`\mathbf{C}` computed by :py:meth:`geopyv.image.Image._get_C`, where :math:`i` and :math:`j` are the image coordinates:
     
 .. math::
     
@@ -80,7 +80,7 @@ The :math:`\mathbf{C}_\left(i-2:i+3, j-2:j+3\right)` matrix is a subset of the B
                     \mathbf{C}_\left(i-2,j+3 \right) &  \mathbf{C}_\left(i-1,j+3 \right) & \mathbf{C}_\left(i,j+3 \right) & \mathbf{C}_\left(i+1,j+3 \right) & \mathbf{C}_\left(i+2,j+3 \right) & \mathbf{C}_\left(i+3,j+3 \right) 
                 \end{bmatrix} 
 
-The following matrix is pre-computed from these quantities for all pixels in the image by :py:meth:`geopyv.Image._get_QCQT`:
+The following matrix is pre-computed from these quantities for all pixels in the image by :py:meth:`geopyv.image.Image._get_QCQT`:
 
 .. math::
 
@@ -117,7 +117,7 @@ where :math:`\lfloor x\rfloor` and :math:`\lfloor y\rfloor` are the floor of the
     \delta x^{5}
     \end{array}\right]
 
-where :math:`\mathbf{Q} \cdot \mathbf{C}_{f} \cdot \mathbf{Q}^T` is precomputed for the entirety of image :math:`f` by :py:meth:`geopyv.Image._get_QCQT`. The same method is used to interpolate pixel intensitites for both the reference image :math:`f` and the target image :math:`g` by :py:meth:`geopyv.Subset._get_intensity`.
+where :math:`\mathbf{Q} \cdot \mathbf{C}_{f} \cdot \mathbf{Q}^T` is precomputed for the entirety of image :math:`f` by :py:meth:`geopyv.image.Image._get_QCQT`. The same method is used to interpolate pixel intensitites for both the reference image :math:`f` and the target image :math:`g`.
 
 Subsets
 -------
@@ -490,152 +490,152 @@ Finally, the warp parameter vector is updated as follows:
 
     \mathbf{p} \leftarrow \mathbf{p} + \Delta \mathbf{p}
 
-Weighted Forward Additive Gauss-Newton (WFAGN) Method
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. Weighted Forward Additive Gauss-Newton (WFAGN) Method
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Weighted Forward Additive Gauss-Newton approach uses a Gaussian window function in order to adaptively vary the effective subset size across an analysis domain. This allow larger subsets to be used without risk of under-matching (where the warp function is a lower order than the deformation). The penalty is that this method is much more computationally intensive because the tricks employed in the ICGN method cannot be used. This is because the Jacobian and Hessian are both a function of a the Gaussian window size, which is a variable in the least squares optimsiation in this approach. For this reason a more expansive derivation will be given for this method using slightly more verbose nomenclature. For the WFAGN method the correlation coefficient is defined as:
+.. The Weighted Forward Additive Gauss-Newton approach uses a Gaussian window function in order to adaptively vary the effective subset size across an analysis domain. This allow larger subsets to be used without risk of under-matching (where the warp function is a lower order than the deformation). The penalty is that this method is much more computationally intensive because the tricks employed in the ICGN method cannot be used. This is because the Jacobian and Hessian are both a function of a the Gaussian window size, which is a variable in the least squares optimsiation in this approach. For this reason a more expansive derivation will be given for this method using slightly more verbose nomenclature. For the WFAGN method the correlation coefficient is defined as:
 
-.. math::
+.. .. math::
 
-    C_{W}(\Delta \mathbf{p}) = \sum_{(x, y) \in n} \frac{T(\mathbf{p})^2}{A_{s}}
+..     C_{W}(\Delta \mathbf{p}) = \sum_{(x, y) \in n} \frac{T(\mathbf{p})^2}{A_{s}}
 
-where:
+.. where:
 
-.. math::
+.. .. math::
 
-    T(\mathbf{p}) = g_{n}W_{g} - f_{n}W_{f}
+..     T(\mathbf{p}) = g_{n}W_{g} - f_{n}W_{f}
 
-and the scalar :math:`A_{s}` is computed as:
+.. and the scalar :math:`A_{s}` is computed as:
 
-.. math::
+.. .. math::
 
-    A_{s} = \sum_{(x, y) \in n} W_{f}^2
+..     A_{s} = \sum_{(x, y) \in n} W_{f}^2
 
-The :math:`g_{n}` and :math:`f_{n}` terms are the normalised intensities, given by: 
+.. The :math:`g_{n}` and :math:`f_{n}` terms are the normalised intensities, given by: 
 
-.. math::
+.. .. math::
 
-    g_{n} = \frac{g{(\mathbf{W}(x, y; \mathbf{p}))}-\bar{g}}{\Delta g} \quad \text{and} \quad
-    f_{n} = \frac{f{(\mathbf{W}(x, y; \mathbf{0}))}-\bar{f}}{\Delta f}
+..     g_{n} = \frac{g{(\mathbf{W}(x, y; \mathbf{p}))}-\bar{g}}{\Delta g} \quad \text{and} \quad
+..     f_{n} = \frac{f{(\mathbf{W}(x, y; \mathbf{0}))}-\bar{f}}{\Delta f}
 
-This is very similar to that for the FAGN method, except that the normalised intensities in the target and reference subsets are multiplied by :math:`W_{g}` and :math:`W_{f}`, respectively, and their difference (also known as the error image) is divided by the sum of the square the of the reference weighting coefficients. The weighting coefficients are computed using a form of Gaussian function for the reference and target subsets respectively:
+.. This is very similar to that for the FAGN method, except that the normalised intensities in the target and reference subsets are multiplied by :math:`W_{g}` and :math:`W_{f}`, respectively, and their difference (also known as the error image) is divided by the sum of the square the of the reference weighting coefficients. The weighting coefficients are computed using a form of Gaussian function for the reference and target subsets respectively:
 
-.. math::
+.. .. math::
 
-    W_{g} = \exp \left( {-\frac{D_{g}^{2}}{2D_{0}^2}} \right) \quad \text{and} \quad W_{f} = \exp \left( {-\frac{D_{f}^2}{2D_{0}^2}} \right)
+..     W_{g} = \exp \left( {-\frac{D_{g}^{2}}{2D_{0}^2}} \right) \quad \text{and} \quad W_{f} = \exp \left( {-\frac{D_{f}^2}{2D_{0}^2}} \right)
 
-where :math:`D_{0}` is an additional variable to be optimised, and :math:`D_{g}` and :math:`D_{f}` are the distances from the centre coordinate of the subset to the current point in the target and reference subsets, respectively:
+.. where :math:`D_{0}` is an additional variable to be optimised, and :math:`D_{g}` and :math:`D_{f}` are the distances from the centre coordinate of the subset to the current point in the target and reference subsets, respectively:
 
-.. math::
+.. .. math::
     
-    D_{g} = \sqrt{\Delta x^{\prime 2} + \Delta y^{\prime 2}} \quad \text{and} \quad D_{f} = \sqrt{\Delta x^2 + \Delta y^2}
+..     D_{g} = \sqrt{\Delta x^{\prime 2} + \Delta y^{\prime 2}} \quad \text{and} \quad D_{f} = \sqrt{\Delta x^2 + \Delta y^2}
 
-where :math:`\Delta x^{\prime}` and :math:`\Delta y^{\prime}` and :math:`\Delta x` and :math:`\Delta y` are the local coordinates of the points of interest in the target and reference images, respectively:
+.. where :math:`\Delta x^{\prime}` and :math:`\Delta y^{\prime}` and :math:`\Delta x` and :math:`\Delta y` are the local coordinates of the points of interest in the target and reference images, respectively:
 
-.. math::
+.. .. math::
         
-    \Delta x^{\prime} = (x^{\prime} - x_{c}^{\prime}); \quad \Delta y^{\prime} = (y^{\prime} - y_{c}^{\prime}) \quad \text{and} \quad \Delta x = (x - x_{c}); \quad \Delta y = (y - y_{c})
+..     \Delta x^{\prime} = (x^{\prime} - x_{c}^{\prime}); \quad \Delta y^{\prime} = (y^{\prime} - y_{c}^{\prime}) \quad \text{and} \quad \Delta x = (x - x_{c}); \quad \Delta y = (y - y_{c})
 
-given :math:`(x_{c}, y_{c})` and :math:`(x_{c}^{\prime}, y_{c}^{\prime})` are the centre coordinates for the subset in the reference and target image, respectively. The parameter :math:`D_{0}` is appended to the warp parameter vector :math:`\mathbf{p}`, such that an appopriate value is determined via optimisation for each subset. For a first-order warp function the warp parameter vector becomes:
+.. given :math:`(x_{c}, y_{c})` and :math:`(x_{c}^{\prime}, y_{c}^{\prime})` are the centre coordinates for the subset in the reference and target image, respectively. The parameter :math:`D_{0}` is appended to the warp parameter vector :math:`\mathbf{p}`, such that an appopriate value is determined via optimisation for each subset. For a first-order warp function the warp parameter vector becomes:
 
-.. math::
+.. .. math::
 
-    \mathbf{p}_{1W} = \left(u, v, u_{x}, v_{x}, u_{y}, v_{y}, D_{0}\right)^{T}
+..     \mathbf{p}_{1W} = \left(u, v, u_{x}, v_{x}, u_{y}, v_{y}, D_{0}\right)^{T}
 
-and for a second-order warp function:
+.. and for a second-order warp function:
 
-.. math::
+.. .. math::
 
-    \mathbf{p}_{2W} = \left(u, v, u_{x}, v_{x}, u_{y}, v_{y}, u_{x x}, v_{x x}, u_{x y}, v_{x y}, u_{y y}, v_{y y}, D_{0}\right)^{T}
+..     \mathbf{p}_{2W} = \left(u, v, u_{x}, v_{x}, u_{y}, v_{y}, u_{x x}, v_{x x}, u_{x y}, v_{x y}, u_{y y}, v_{y y}, D_{0}\right)^{T}
 
-where the subscript :math:`W` represents the addition of the Gaussian window parameter :math:`D_{0}`. For clarity, the warp parameter vector :math:`\mathbf{p}`  herein refers to the weighted versions given above. 
+.. where the subscript :math:`W` represents the addition of the Gaussian window parameter :math:`D_{0}`. For clarity, the warp parameter vector :math:`\mathbf{p}`  herein refers to the weighted versions given above. 
 
-The increment in the warp parameter vector :math:`\mathbf{p}` is approximated as:
+.. The increment in the warp parameter vector :math:`\mathbf{p}` is approximated as:
 
-.. math:: 
+.. .. math:: 
 
-    \Delta \mathbf{p} = -\mathbf{H}^{-1} \nabla C_{W}
+..     \Delta \mathbf{p} = -\mathbf{H}^{-1} \nabla C_{W}
 
-where the gradient of :math:`C_{W}` with respect to :math:`\mathbf{p}` is:
+.. where the gradient of :math:`C_{W}` with respect to :math:`\mathbf{p}` is:
 
-.. math::
+.. .. math::
 
-    \nabla C_{W}(\mathbf{p}) = \frac{1}{A_{s}^2} \sum_{(x, y) \in n} \left[2A_{s} T(\mathbf{p}) \frac{\partial T(\mathbf{p})}{\partial \mathbf{p}} - T(\mathbf{p})^2 \frac{\partial A_{s}}{\partial \mathbf{p}} \right]
+..     \nabla C_{W}(\mathbf{p}) = \frac{1}{A_{s}^2} \sum_{(x, y) \in n} \left[2A_{s} T(\mathbf{p}) \frac{\partial T(\mathbf{p})}{\partial \mathbf{p}} - T(\mathbf{p})^2 \frac{\partial A_{s}}{\partial \mathbf{p}} \right]
 
-For the all but the last term in the expanded warp parameter vector :math:`\mathbf{p}`, the derivatives :math:`\left. \frac{\partial A_{s}}{\partial \mathbf{p}} \right|_{i=1,2, \ldots k-1}` are zero because this quantity is not a function of :math:`\mathbf{p}`, hence:
+.. For the all but the last term in the expanded warp parameter vector :math:`\mathbf{p}`, the derivatives :math:`\left. \frac{\partial A_{s}}{\partial \mathbf{p}} \right|_{i=1,2, \ldots k-1}` are zero because this quantity is not a function of :math:`\mathbf{p}`, hence:
 
-.. math::
+.. .. math::
 
-     \left. \frac{\partial C_{W}(\mathbf{p})}{\partial p_{i}} \right|_{i=1,2, \ldots k-1} = \frac{2}{A_s} \sum_{(x, y) \in n} \left. \left[ T(\mathbf{p}) \frac{\partial T(\mathbf{p})}{\partial \mathbf{p}} \right] \right|_{i=1,2, \ldots k-1}
+..      \left. \frac{\partial C_{W}(\mathbf{p})}{\partial p_{i}} \right|_{i=1,2, \ldots k-1} = \frac{2}{A_s} \sum_{(x, y) \in n} \left. \left[ T(\mathbf{p}) \frac{\partial T(\mathbf{p})}{\partial \mathbf{p}} \right] \right|_{i=1,2, \ldots k-1}
 
-where for all but the last term in the warp parameter vector (referred to here as the :math:`k`'th term for generality, where :math:`k=7` for a first-order warp function and :math:`k=13` for a second-order warp function):
+.. where for all but the last term in the warp parameter vector (referred to here as the :math:`k`'th term for generality, where :math:`k=7` for a first-order warp function and :math:`k=13` for a second-order warp function):
 
-.. math::
+.. .. math::
 
-    \left.\frac{\partial T(\mathbf{p})}{\partial p_{i}}\right|_{i=1,2, \ldots k-1} = \left.\left[W_{g} \frac{\partial g_{n}}{\partial p_{i}} + g_{n} \frac{\partial W_{g}}{\partial p_{i}}\right]\right|_{i=1,2, \ldots k-1}
+..     \left.\frac{\partial T(\mathbf{p})}{\partial p_{i}}\right|_{i=1,2, \ldots k-1} = \left.\left[W_{g} \frac{\partial g_{n}}{\partial p_{i}} + g_{n} \frac{\partial W_{g}}{\partial p_{i}}\right]\right|_{i=1,2, \ldots k-1}
 
-given:
+.. given:
 
-.. math:: 
+.. .. math:: 
 
-    \left.\frac{\partial g_{n}}{\partial p_{i}}\right|_{i=1,2, \ldots k-1} = \left.\frac{1}{\Delta g^2} \left[ \Delta g \left(\frac{\partial g}{\partial p_{i}} - \frac{\partial \bar{g}}{\partial p_{i}}\right) - \left(g{(\mathbf{W}(x, y; \mathbf{p}))} - g_{m}\right) \frac{\partial \Delta g}{\partial p_{i}} \right]\right|_{i=1,2, \ldots k-1} \\
+..     \left.\frac{\partial g_{n}}{\partial p_{i}}\right|_{i=1,2, \ldots k-1} = \left.\frac{1}{\Delta g^2} \left[ \Delta g \left(\frac{\partial g}{\partial p_{i}} - \frac{\partial \bar{g}}{\partial p_{i}}\right) - \left(g{(\mathbf{W}(x, y; \mathbf{p}))} - g_{m}\right) \frac{\partial \Delta g}{\partial p_{i}} \right]\right|_{i=1,2, \ldots k-1} \\
 
-and:
+.. and:
 
-.. math::
+.. .. math::
 
-    \left.\frac{\partial \bar{g}}{\partial p_{i}}\right|_{i=1,2, \ldots k-1} = \frac{1}{n} \left.\left[\sum_{(x, y) \in n} \frac{\partial g}{\partial p_{i}}\right]\right|_{i=1,2, \ldots k-1} \\
+..     \left.\frac{\partial \bar{g}}{\partial p_{i}}\right|_{i=1,2, \ldots k-1} = \frac{1}{n} \left.\left[\sum_{(x, y) \in n} \frac{\partial g}{\partial p_{i}}\right]\right|_{i=1,2, \ldots k-1} \\
 
-The derivatives :math:`\left.\frac{\partial g}{\partial p_{i}}\right|_{i=1,2, \ldots k-1}` are the 'steepest descent images', which are a function of the target image gradients :math:`\nabla g` and the Jacobian matrix :math:`\frac{\partial \mathbf{W}}{\partial \mathbf{p}}`:
+.. The derivatives :math:`\left.\frac{\partial g}{\partial p_{i}}\right|_{i=1,2, \ldots k-1}` are the 'steepest descent images', which are a function of the target image gradients :math:`\nabla g` and the Jacobian matrix :math:`\frac{\partial \mathbf{W}}{\partial \mathbf{p}}`:
 
-.. math::
+.. .. math::
 
-    \left.\frac{\partial g}{\partial p_{i}}\right|_{i=1,2, \ldots k-1} = \nabla g \frac{\partial \mathbf{W}}{\partial \mathbf{p}}
+..     \left.\frac{\partial g}{\partial p_{i}}\right|_{i=1,2, \ldots k-1} = \nabla g \frac{\partial \mathbf{W}}{\partial \mathbf{p}}
 
-where the gradient and Jacobian matrices are as defined previously. The derivatives :math:`\left.\frac{\partial W_{g}}{\partial p_{i}}\right|_{i=1,2, \ldots k-1}` are computed from the warp functions as follows:
+.. where the gradient and Jacobian matrices are as defined previously. The derivatives :math:`\left.\frac{\partial W_{g}}{\partial p_{i}}\right|_{i=1,2, \ldots k-1}` are computed from the warp functions as follows:
 
-.. math::
+.. .. math::
 
-    \begin{align}
-        \frac{\partial W_{g}}{\partial p_{1}} = \frac{\partial W_{g}}{\partial u} &= 0 \\
-        \frac{\partial W_{g}}{\partial p_{2}} = \frac{\partial W_{g}}{\partial v} &= 0 \\
-        \frac{\partial W_{g}}{\partial p_{3}} = \frac{\partial W_{g}}{\partial u_{x}} &= -\frac{W_{g}}{2D_{0}^2} \left[\left(1 + u_{x}\right) \Delta x + u_{y} \Delta y \right] \Delta x \\
-        \frac{\partial W_{g}}{\partial p_{4}} = \frac{\partial W_{g}}{\partial v_{v}} &= -\frac{W_{g}}{2D_{0}^2} \left[v_{x} \Delta x + \left(1 + v_{y}\right) \Delta y \right] \Delta x \\
-        \frac{\partial W_{g}}{\partial p_{5}} = \frac{\partial W_{g}}{\partial u_{y}} &= -\frac{W_{g}}{2D_{0}^2} \left[\left(1 + u_{x}\right) \Delta x + u_{y} \Delta y \right] \Delta y \\
-        \frac{\partial W_{g}}{\partial p_{6}} = \frac{\partial W_{g}}{\partial v_{y}} &= -\frac{W_{g}}{2D_{0}^2} \left[v_{x} \Delta x + \left(1 + v_{y}\right) \Delta y \right] \Delta y \\
-    \end{align}
+..     \begin{align}
+..         \frac{\partial W_{g}}{\partial p_{1}} = \frac{\partial W_{g}}{\partial u} &= 0 \\
+..         \frac{\partial W_{g}}{\partial p_{2}} = \frac{\partial W_{g}}{\partial v} &= 0 \\
+..         \frac{\partial W_{g}}{\partial p_{3}} = \frac{\partial W_{g}}{\partial u_{x}} &= -\frac{W_{g}}{2D_{0}^2} \left[\left(1 + u_{x}\right) \Delta x + u_{y} \Delta y \right] \Delta x \\
+..         \frac{\partial W_{g}}{\partial p_{4}} = \frac{\partial W_{g}}{\partial v_{v}} &= -\frac{W_{g}}{2D_{0}^2} \left[v_{x} \Delta x + \left(1 + v_{y}\right) \Delta y \right] \Delta x \\
+..         \frac{\partial W_{g}}{\partial p_{5}} = \frac{\partial W_{g}}{\partial u_{y}} &= -\frac{W_{g}}{2D_{0}^2} \left[\left(1 + u_{x}\right) \Delta x + u_{y} \Delta y \right] \Delta y \\
+..         \frac{\partial W_{g}}{\partial p_{6}} = \frac{\partial W_{g}}{\partial v_{y}} &= -\frac{W_{g}}{2D_{0}^2} \left[v_{x} \Delta x + \left(1 + v_{y}\right) \Delta y \right] \Delta y \\
+..     \end{align}
 
-DERIVE HIGHER ORDER TERMS NEXT...
+.. DERIVE HIGHER ORDER TERMS NEXT...
 
-For the last component of :math:`\mathbf{p}` the gradient term :math:`\frac{\partial C(\mathbf{p})}{\partial p_{k}}` is:
+.. For the last component of :math:`\mathbf{p}` the gradient term :math:`\frac{\partial C(\mathbf{p})}{\partial p_{k}}` is:
 
-.. math::
+.. .. math::
 
-     \frac{\partial C_{W}(\mathbf{p})}{\partial p_{k}} = \frac{1}{A_s^2} \sum_{(x, y) \in n} \left[ T(\mathbf{p}) \left( \frac{g_{n} W_{g} D^{\prime 2}}{D_{0}^3} - \frac{g_{f} W_{f} D^{2}}{D_{0}^3} \right) - \frac{T(\mathbf{p})^2}{A_{s}} \frac{\partial A_{s}}{\partial p_{k}} \right]
+..      \frac{\partial C_{W}(\mathbf{p})}{\partial p_{k}} = \frac{1}{A_s^2} \sum_{(x, y) \in n} \left[ T(\mathbf{p}) \left( \frac{g_{n} W_{g} D^{\prime 2}}{D_{0}^3} - \frac{g_{f} W_{f} D^{2}}{D_{0}^3} \right) - \frac{T(\mathbf{p})^2}{A_{s}} \frac{\partial A_{s}}{\partial p_{k}} \right]
 
-Both of the weighting coefficients :math:`W_{g}` and :math:`W_{f}` are functions of the parameter :math:`D_{0}`, thus we must calculate both:
+.. Both of the weighting coefficients :math:`W_{g}` and :math:`W_{f}` are functions of the parameter :math:`D_{0}`, thus we must calculate both:
 
-.. math::
+.. .. math::
 
-    \frac{\partial T(\mathbf{p})}{\partial p_{k}} = \frac{g_{n}W_{g} D_{g}^2}{D_{0}^3} - \frac{f_{n}W_{f} D_{f}^2}{D_{0}^3} \quad \text{and} \quad  \frac{\partial A_{s}}{\partial p_{k}} = 2 \sum_{(x, y) \in n} \frac{W_{f}^2 D_{f}^2}{D_{0}^3}
+..     \frac{\partial T(\mathbf{p})}{\partial p_{k}} = \frac{g_{n}W_{g} D_{g}^2}{D_{0}^3} - \frac{f_{n}W_{f} D_{f}^2}{D_{0}^3} \quad \text{and} \quad  \frac{\partial A_{s}}{\partial p_{k}} = 2 \sum_{(x, y) \in n} \frac{W_{f}^2 D_{f}^2}{D_{0}^3}
 
-Therefore:
+.. Therefore:
 
-.. math::
+.. .. math::
 
-    \frac{\partial C_{W}(\mathbf{p})}{\partial p_{k}} = \frac{2}{D_{0}^3 A_{s}} \sum_{(x, y) \in n} \left[ T(\mathbf{p})\left( g_{n} W_{g} D_{g}^2 - f_{n} W_{f} D_{f}^2 \right) - \frac{\left[T(\mathbf{p})\right]^2}{A_{s}} \sum_{(x, y) \in n} W_{f}^2 D_{f}^2 \right]
+..     \frac{\partial C_{W}(\mathbf{p})}{\partial p_{k}} = \frac{2}{D_{0}^3 A_{s}} \sum_{(x, y) \in n} \left[ T(\mathbf{p})\left( g_{n} W_{g} D_{g}^2 - f_{n} W_{f} D_{f}^2 \right) - \frac{\left[T(\mathbf{p})\right]^2}{A_{s}} \sum_{(x, y) \in n} W_{f}^2 D_{f}^2 \right]
 
-The (Gauss-Newton approximation to the) Hessian matrix for this method is:
+.. The (Gauss-Newton approximation to the) Hessian matrix for this method is:
 
-.. math::
+.. .. math::
 
-    \mathbf{H} = \frac{2}{A_{s}} \sum_{(x, y) \in n} \left[\frac{\partial T(\mathbf{p})}{\partial \mathbf{p}}^T \frac{\partial T(\mathbf{p})}{\partial \mathbf{p}} \right]
+..     \mathbf{H} = \frac{2}{A_{s}} \sum_{(x, y) \in n} \left[\frac{\partial T(\mathbf{p})}{\partial \mathbf{p}}^T \frac{\partial T(\mathbf{p})}{\partial \mathbf{p}} \right]
 
-Finally, the warp parameter vector is updated as follows:
+.. Finally, the warp parameter vector is updated as follows:
 
-.. math::
+.. .. math::
 
-    \mathbf{p} \leftarrow \mathbf{p} + \Delta \mathbf{p}
+..     \mathbf{p} \leftarrow \mathbf{p} + \Delta \mathbf{p}
 
 Exit criteria
 ~~~~~~~~~~~~~
@@ -643,36 +643,42 @@ Exit criteria
 For a first order subset warp function the norm is:
             
 .. math::
+    :label: norm_1
     
     \|\Delta p\| = \left[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x}  s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y} s \right)^2 \right]^{1/2}
     
 For a second order subset warp function the norm is:
     
 .. math::
-    
-    \|\Delta p\| = \left[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x} s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y}  s \right)^2 \\
-    + \left(0.5 \Delta u_{xx} s^2 \right)^2 + \left(0.5 \Delta u_{xy} s^2 \right)^2 + \left(0.5 \Delta u_{yy} s^2 \right)^2 \\
-    + \left(0.5 \Delta v_{xx} s^2 \right)^2 + \left(0.5 \Delta v_{xy} s^2 \right)^2 + \left(0.5 \Delta v_{yy} s^2 \right)^2 \right]^{1/2}
+    :label: norm_2
+
+    \begin{multline*}
+    \|\Delta p\| = \Bigl[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x} s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y}  s \right)^2 \\
+    + \left(0.5 \Delta u_{xx} s^2 \right)^2 + \left(0.5 \Delta u_{xy} s^2 \right)^2 + \left(0.5 \Delta u_{yy} s^2 \right)^2 + \left(0.5 \Delta v_{xx} s^2 \right)^2 + \left(0.5 \Delta v_{xy} s^2 \right)^2 + \left(0.5 \Delta v_{yy} s^2 \right)^2 \Bigr]^{1/2}
+    \end{multline*}
 
 where :math:`s` is the size of the subset (approximated generally as the square root of the number of pixels in the template). The iterative solution process is classed as convergent when the norm is less than a user-defined limit, otherwise the iterative solver is stopped if the number of iterations exceeds a user-defined limit. 
 
-For a first-order Gaussian weighted subset the norm becomes:
+.. For a first-order Gaussian weighted subset the norm becomes:
 
-.. math::
+.. .. math::
+    .. :label: norm_W1
     
-    \|\Delta p\| = \left[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x}  s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y} s \right)^2 + \Delta D_{0}^2 \right]^{1/2}
+..     \|\Delta p\| = \left[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x}  s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y} s \right)^2 + \Delta D_{0}^2 \right]^{1/2}
 
-Similarly, for a second order Gaussian weighted subset warp function the norm is:
+.. Similarly, for a second order Gaussian weighted subset warp function the norm is:
     
-.. math::
+.. .. math::
+    .. :label: norm_W2
     
-    \|\Delta p\| = \left[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x} s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y}  s \right)^2 \\
-    + \left(0.5 \Delta u_{xx} s^2 \right)^2 + \left(0.5 \Delta u_{xy} s^2 \right)^2 + \left(0.5 \Delta u_{yy} s^2 \right)^2 \\
-    + \left(0.5 \Delta v_{xx} s^2 \right)^2 + \left(0.5 \Delta v_{xy} s^2 \right)^2 + \left(0.5 \Delta v_{yy} s^2 \right)^2 + \Delta D_{0}^2 \right]^{1/2}
+..     \|\Delta p\| = \left[ \Delta u^2 + \Delta v^2 \\\\
+..     + \left( \Delta u_{x} s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y}  s \right)^2 \\\\
+..     + \left(0.5 \Delta u_{xx} s^2 \right)^2 + \left(0.5 \Delta u_{xy} s^2 \right)^2 + \left(0.5 \Delta u_{yy} s^2 \right)^2 \\\\
+..     + \left(0.5 \Delta v_{xx} s^2 \right)^2 + \left(0.5 \Delta v_{xy} s^2 \right)^2 + \left(0.5 \Delta v_{yy} s^2 \right)^2 + \Delta D_{0}^2 \right]^{1/2}
 
 .. note::
     
-    A typical exit criteria for the norm used in the iterative computations is :math:`\|\Delta p\|_{max} = 1 \cdot 10^{-3}` and the  maximum number of iterations is :math:`15`.
+    A typical exit criteria for the norm used in the iterative computations is :math:`\|\Delta p\|_{max} = 1 \cdot 10^{-3}` and the  maximum number of iterations is :math:`15` and are the default arguments for all solve methods.
 
 
 Mesh
@@ -680,10 +686,15 @@ Mesh
 The analysis mesh is the mesh of elements that is used to discretise the region of interest.
 
 
-Sequences
----------
+Sequence
+--------
 
 A sequence is a series of images that will be analysed using PIV/DIC computational techniques. 
+
+Particle
+--------
+
+A particle is an object representing an initial volume of material that is tracked throughout a sequence of images. 
 
 
 

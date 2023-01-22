@@ -53,9 +53,6 @@ def inspect_subset(data, show, block, save):
 def convergence_subset(data, show, block, save):
     """Function to plot subset convergence."""
 
-    # if show == False:
-    #     matplotlib.use('Agg')
-
     # Load data.
     history = data["results"]["history"]
     max_iterations = data["settings"]["max_iterations"]
@@ -194,6 +191,7 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
     return fig, ax
 
 def _plot_triangulation(elements, x, y):
+    """Method to compute a first order triangulation from a second order element."""
     plot_elements = []
     x_p = []
     y_p = []

@@ -983,7 +983,7 @@ std::vector<MatrixXd> _solve_ICGN(
     int n = f_coords.rows();
     int m = p_0.size();
     int iteration = 1;
-    double norm = 1, C_LS, C_CC, size = pow(double(n),0.5);
+    double norm = 1, C_LS, C_ZNCC, size = pow(double(n),0.5);
     MatrixXd sdi(n,m), hessian(m,m);
     VectorXd g_coord(2), p(m), g(n), Delta_p(m), p_new(m), constants(2);
     MatrixXd g_coords(n,2);
@@ -1007,10 +1007,10 @@ std::vector<MatrixXd> _solve_ICGN(
             p_new = _p_new_ICGN(p, Delta_p);
             norm = _norm(Delta_p, size);
             C_LS = _ZNSSD(f, g, f_m, g_m, Delta_f, Delta_g);
-            C_CC = 1-(C_LS/2);
+            C_ZNCC = 1-(C_LS/2);
             convergence(0,iteration-1) = iteration;
             convergence(1,iteration-1) = norm;
-            convergence(2,iteration-1) = C_CC;
+            convergence(2,iteration-1) = C_ZNCC;
             convergence(3,iteration-1) = C_LS;
             iteration += 1;
             p = p_new;
@@ -1053,7 +1053,7 @@ std::vector<MatrixXd> _solve_FAGN(
     int n = f_coords.rows();
     int m = p_0.size();
     int iteration = 1;
-    double norm = 1, C_LS, C_CC, size = pow(double(n),0.5);
+    double norm = 1, C_LS, C_ZNCC, size = pow(double(n),0.5);
     MatrixXd sdi(n,m), hessian(m,m);
     VectorXd g_coord(2), p(m), g(n), Delta_p(m), p_new(m), constants(2);
     MatrixXd g_coords(n,2), grad_g(n,2);
@@ -1076,10 +1076,10 @@ std::vector<MatrixXd> _solve_FAGN(
             p_new = p + Delta_p;
             norm = _norm(Delta_p, size);
             C_LS = _ZNSSD(f, g, f_m, g_m, Delta_f, Delta_g);
-            C_CC = 1-(C_LS/2);
+            C_ZNCC = 1-(C_LS/2);
             convergence(0,iteration-1) = iteration;
             convergence(1,iteration-1) = norm;
-            convergence(2,iteration-1) = C_CC;
+            convergence(2,iteration-1) = C_ZNCC;
             convergence(3,iteration-1) = C_LS;
             iteration += 1;
             p = p_new;
@@ -1123,7 +1123,7 @@ std::vector<MatrixXd> _solve_WFAGN(
     int n = f_coords.rows();
     int m = p_0.size();
     int iteration = 1;
-    double norm = 1, C_LS, C_CC, size = pow(double(n),0.5);
+    double norm = 1, C_LS, C_ZNCC, size = pow(double(n),0.5);
     double A_s, D_0 = p_0(m-1);
     MatrixXd sdi(n,m), hessian(m,m);
     VectorXd g_coord(2), p(m), g(n), Delta_p(m), p_new(m), constants(2);
@@ -1164,10 +1164,10 @@ std::vector<MatrixXd> _solve_WFAGN(
             p_new = p - Delta_p;      
             norm = _norm(Delta_p, size);
             C_LS = _WZNSSD(f, g, f_m, g_m, Delta_f, Delta_g, W_f, W_g, A_s);
-            C_CC = 1-(C_LS/2);
+            C_ZNCC = 1-(C_LS/2);
             convergence(0,iteration-1) = iteration;
             convergence(1,iteration-1) = norm;
-            convergence(2,iteration-1) = C_CC;
+            convergence(2,iteration-1) = C_ZNCC;
             convergence(3,iteration-1) = C_LS;
             iteration += 1;
             p = p_new;

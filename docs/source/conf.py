@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath('../../geopyv'))
 # -- Project information -----------------------------------------------------
 
 project = 'geopyv'
-copyright = '2021, Sam Stanier'
+copyright = '2023, Sam Stanier'
 author = 'Sam Stanier'
 
 # The full version, including alpha/beta/rc tags
@@ -55,9 +55,7 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-
 html_theme_options = {'body_max_width': '100%'}
-
 add_module_names = False
-
 autodoc_member_order = 'bysource'
+math_number_all = False

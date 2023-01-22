@@ -73,10 +73,10 @@ class Subset(SubsetBase):
     norm : float
         Custom norm of the increment in the warp function parameters after
         Gao et al. (2015), computed by private method :meth:`~_get_norm`.
-    C_SSD : float
+    C_ZNSSD : float
         Zero-normalised sum of squared differences coefficient, computed by private
         method :meth:`~_get_correlation`.
-    C_CC : float
+    C_ZNCC : float
         Zero-normalised cross-correlation coefficient, computed by private method
         :meth:`~_get_correlation`.
     x : float
@@ -267,8 +267,8 @@ class Subset(SubsetBase):
             self.iterations = np.max(results[3][0,:]).astype(int)
             self.history = results[3][:,:self.iterations]
             self.norm = self.history[1][-1]
-            self.C_CC = self.history[2][-1]
-            self.C_SSD = self.history[3][-1]
+            self.C_ZNCC = self.history[2][-1]
+            self.C_ZNSSD = self.history[3][-1]
             self.p = results[4]
             self.u = self.p[0][0]
             self.v = self.p[1][0]
@@ -276,12 +276,12 @@ class Subset(SubsetBase):
             self.y_f = self.y+self.v
 
             # Check for tolerance.
-            if self.C_CC > self.tolerance:
+            if self.C_ZNCC > self.tolerance:
                 self.solved = True
                 log.info("Subset solved.")
                 log.info("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self.x, y_i=self.y))
                 log.info("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self.u, v=self.v))
-                log.info("Correlation coefficient: CC = {C_CC} (-), SSD = {C_SSD} (-)".format(C_CC=self.C_CC, C_SSD=self.C_SSD))
+                log.info("Correlation coefficient: CC = {C_ZNCC} (-), SSD = {C_ZNSSD} (-)".format(C_ZNCC=self.C_ZNCC, C_ZNSSD=self.C_ZNSSD))
                 log.info("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x_f, y_f=self.y_f))
         
             # Pack results.
@@ -294,8 +294,8 @@ class Subset(SubsetBase):
                 "history": self.history,
                 "iterations": self.iterations,
                 "norm": self.norm,
-                "C_CC": self.C_CC,
-                "C_SSD": self.C_SSD,
+                "C_ZNCC": self.C_ZNCC,
+                "C_ZNSSD": self.C_ZNSSD,
             }
             self.data.update({"results": self.results})            
         except:

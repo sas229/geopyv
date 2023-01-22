@@ -1,7 +1,0 @@
-Definitions
-===========
-Image
-------
-Subset
-------
-Mesh

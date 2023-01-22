@@ -37,7 +37,7 @@ class MeshBase:
             else:
                 raise ValueError("Subset index provided is out of the range of the mesh object contents.")
     
-    def contour(self, quantity="C_CC", imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
+    def contour(self, quantity="C_ZNCC", imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot the contours of a given measure."""
         if quantity != None:
             fig, ax = contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, ticks=ticks, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
@@ -182,7 +182,7 @@ class Mesh(MeshBase):
             if self.update == True:
                 self.solved = False
                 self.unsolvable = True
-                print('Error! The minimum correlation coefficient is below tolerance {field:.3f} < {tolerance:.3f}'.format(field=np.min(self.C_CC), tolerance=self.tolerance))
+                print('Error! The minimum correlation coefficient is below tolerance {field:.3f} < {tolerance:.3f}'.format(field=np.min(self.C_ZNCC), tolerance=self.tolerance))
             else:
                 # Pack data.
                 self.solved = True
@@ -213,10 +213,10 @@ class Mesh(MeshBase):
                     "displacements": self.displacements,
                     "du": self.du,
                     "d2u": self.d2u,
-                    "C_CC": self.C_CC,
+                    "C_ZNCC": self.C_ZNCC,
                 }
                 self.data.update({"results": self.results})
-                print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_CC), max_C=np.amax(self.C_CC)))
+                print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_ZNCC), max_C=np.amax(self.C_ZNCC)))
         except ValueError:
             print(traceback.format_exc())
             print("Error! Could not solve for all subsets.")
@@ -417,7 +417,7 @@ class Mesh(MeshBase):
         m = np.shape(self.nodes)[0]
         n = np.shape(self.p_0)[0]
         self.subset_solved = np.zeros(m, dtype = int) # Solved/unsolved reference array (1 if unsolved, -1 if solved).
-        self.C_CC = np.zeros(m, dtype=np.float64) # Correlation coefficient array. 
+        self.C_ZNCC = np.zeros(m, dtype=np.float64) # Correlation coefficient array. 
         self.subsets = np.empty(m, dtype = object) # Initiate subset array.
         self.p = np.zeros((m, n), dtype=np.float64) # Warp function array.
         self.displacements = np.zeros((m, 2), dtype=np.float64) # Displacement output array.
@@ -465,7 +465,7 @@ class Mesh(MeshBase):
                 count = 0
                 while np.max(self.subset_solved)>-1:
                     # Identify next subset.
-                    cur_idx = np.argmax(self.subset_solved*self.C_CC) # Subset with highest correlation coefficient selected.
+                    cur_idx = np.argmax(self.subset_solved*self.C_ZNCC) # Subset with highest correlation coefficient selected.
                     p_0 = self.subsets[cur_idx].p # Precondition based on selected subset.
                     self.subset_solved[cur_idx] = -1 # Set as solved. 
                     self._neighbours(cur_idx, p_0) # Calculate for neighbouring subsets.
@@ -476,14 +476,14 @@ class Mesh(MeshBase):
                 
                 # Update
                 if not any(self.subset_solved != -1): # If all solved...
-                    if np.amin(self.C_CC) < self.tolerance: # ...but minimum correlation coefficient is less than tolerance...
+                    if np.amin(self.C_ZNCC) < self.tolerance: # ...but minimum correlation coefficient is less than tolerance...
                         self.update = True # ... raise update flag.
                 else: # If any remain unsolved...
                     self.update = True #... raise update flag.
             else:
                 # Set update attribute flag if seed correlation threshold not exceeded.
                 self.update = True 
-                print('Error! The seed subset correlation is below tolerance {seed:.3f} < {tolerance:.3f}'.format(seed=self.subsets[self.seed_node].C_CC, tolerance=self.subsets[self.seed_node].tolerance))
+                print('Error! The seed subset correlation is below tolerance {seed:.3f} < {tolerance:.3f}'.format(seed=self.subsets[self.seed_node].C_ZNCC, tolerance=self.subsets[self.seed_node].tolerance))
             
             # Compute element areas and strains.
             self._element_area()
@@ -526,6 +526,7 @@ class Mesh(MeshBase):
         Method to calculate the correlation coefficients and warp functions of the neighbouring nodes.
 
         Parameters
+        __________
         p_0 : numpy.ndarray (N)
             Preconditioning warp function.
         """
@@ -563,7 +564,7 @@ class Mesh(MeshBase):
         else:
             flag = 1
         self.subset_solved[idx] = flag
-        self.C_CC[idx] = np.max((self.subsets[idx].C_CC, 0)) # Clip correlation coefficient to positive values.
+        self.C_ZNCC[idx] = np.max((self.subsets[idx].C_ZNCC, 0)) # Clip correlation coefficient to positive values.
         self.p[idx] = self.subsets[idx].p.flatten()
         self.displacements[idx, 0] = self.subsets[idx].u
         self.displacements[idx, 1] = self.subsets[idx].v

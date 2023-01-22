@@ -157,7 +157,7 @@ print(particle.stress_path)
 #
 ## Analyse and plot data (to be moved into Mesh as methods...).
 #unsolved = np.flatnonzero(np.where(mesh.solved > -1, mesh.solved,0))
-#poor = np.flatnonzero(np.where(mesh.C_CC < 0.7, mesh.solved,0))
+#poor = np.flatnonzero(np.where(mesh.C_ZNCC < 0.7, mesh.solved,0))
 #
 ## Get average nodal strains (should be a better way to do this...).
 #node_strains = np.zeros((np.shape(mesh.nodes)[0], 3))

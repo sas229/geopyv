@@ -2,8 +2,8 @@ API
 ===
 
 .. toctree::
-   image
-   subset
-   mesh
+   .. image
+   .. subset
+   .. mesh
    templates
 

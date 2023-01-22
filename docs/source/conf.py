@@ -12,9 +12,10 @@
 #
 import os
 import sys
-# sys.path.append(os.path.abspath('../../src/'))
-for p in os.walk('../../src'):
-  sys.path.insert(0, p[0])
+sys.path.append(os.path.abspath('../../src/'))
+# for p in os.walk('../../src'):
+#   sys.path.insert(0, p[0])
+#   print(p[0])
 
 
 # -- Project information -----------------------------------------------------
@@ -62,7 +63,7 @@ add_module_names = True
 autodoc_member_order = 'bysource'
 math_number_all = False
 autoclass_content = 'both'
-autodoc_mock_imports = [
-    "geopyv._image_extensions",
-    "geopyv._subset_extensions"
-]
+# autodoc_mock_imports = [
+#     "geopyv._image_extensions",
+#     "geopyv._subset_extensions"
+# ]

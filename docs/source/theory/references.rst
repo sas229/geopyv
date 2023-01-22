@@ -1,4 +1,4 @@
-.. _references:
+.. _References:
 
 References
 ==========

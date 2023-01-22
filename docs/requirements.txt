@@ -1,5 +1,5 @@
 alive_progress==3.0.1
-colorlog==6.7.0
+colorlog>6.0.0
 geopyv.egg==info
 gmsh==4.11.1
 matplotlib==3.6.3

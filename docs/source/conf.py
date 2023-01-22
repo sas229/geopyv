@@ -12,7 +12,9 @@
 #
 import os
 import sys
-sys.path.append(os.path.abspath('../../src/'))
+# sys.path.append(os.path.abspath('../../src/'))
+for p in os.walk('../../src'):
+  sys.path.insert(0, p[0])
 
 
 # -- Project information -----------------------------------------------------

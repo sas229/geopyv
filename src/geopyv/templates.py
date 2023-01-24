@@ -68,7 +68,7 @@ class Template:
             else:
                 x_s = int(self.coords[i,0]+self.size)
                 y_s = int(self.coords[i,1]+self.size)
-                self.subset_mask[x_s, y_s] = 255
+                self.subset_mask[x_s, y_s] = 1
         self.coords = masked_coords
         self.n_px = np.shape(self.coords)[0]
 

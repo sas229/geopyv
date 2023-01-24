@@ -171,8 +171,8 @@ This will generate :numref:`convergence_subset` showing the iterative progressio
 
     A slow rate of convergence, or saturation of the number of iterations (i.e. iterations performed equal to the maximum specific iterations) indicates problems with the analysis.
 
-Inspecting the results
-----------------------
+Accessing the data
+------------------
 
 The subset data is stored in the `data` attribute as a dictionary with the following structure and types:
 

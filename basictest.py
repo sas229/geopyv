@@ -6,15 +6,15 @@ import matplotlib.pyplot as plt
 level = logging.WARN
 geopyv.log.initialise(level)
 
-# # Subset test.
-# ref = geopyv.image.Image("./images/T-Bar/IMG_1062.jpg")
-# tar = geopyv.image.Image("./images/T-Bar/IMG_1064.jpg")
-# template = geopyv.templates.Circle(50)
-# subset = geopyv.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([400,400]), template=template)
-# # subset = Subset(f_img=ref, g_img=tar)
-# subset.inspect()
-# subset.solve()
-# subset.convergence()
+# Subset test.
+ref = geopyv.image.Image("./images/T-Bar/IMG_1062.jpg")
+tar = geopyv.image.Image("./images/T-Bar/IMG_1064.jpg")
+template = geopyv.templates.Circle(50)
+subset = geopyv.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000,1000]), template=template)
+# subset = Subset(f_img=ref, g_img=tar)
+subset.inspect()
+subset.solve()
+subset.convergence()
 
 # geopyv.io.save(subset, "test")
 # del(subset)

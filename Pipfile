@@ -23,8 +23,8 @@ numpyencoder = "*"
 
 [dev-packages]
 ipykernel = "*"
-geopyv = {editable = true, path = "."}
 sphinxcontrib-bibtex = "*"
+geopyv = {editable = true, path = "."}
 
 [requires]
 python_version = "3"

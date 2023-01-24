@@ -81,3 +81,4 @@ bibtex_bibfiles = ['refs.bib']
 bibtex_default_style = 'plain'
 
 todo_include_todos = True
+numfig = True

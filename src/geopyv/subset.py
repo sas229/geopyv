@@ -176,7 +176,7 @@ class Subset(SubsetBase):
             }
         }
 
-    def solve(self, max_norm=1e-3, max_iterations=15, p_0=np.zeros(6), tolerance=0.7, method="ICGN"):
+    def solve(self, max_norm=1e-3, max_iterations=15, order=1, p_0=None, tolerance=0.7, method="ICGN"):
         """Method to solve for the subset displacements using the various methods.
 
         Parameters
@@ -187,6 +187,8 @@ class Subset(SubsetBase):
         max_iterations : int, optional
             Exit criterion for number of Gauss-Newton iterations. Defaults to value
             of 50.
+        order : int
+            Warp function order. Options are 1 and 2.
         p_0 : ndarray, optional
             1D array of warp function parameters with `float` type.
         method : str
@@ -223,21 +225,25 @@ class Subset(SubsetBase):
         elif tolerance > 1:
             raise ValueError("Tolerance must be less than one. Suggested default is 0.75.")
 
-        # Check method and length of p_0.
-        if method == "ICGN" or method == "FAGN":
-            if np.shape(p_0)[0] != 6 and np.shape(p_0)[0] != 12:
-                raise ValueError("Invalid length of initial p_0 preconditioning vector for chosen solve method.")
-        elif method == "WFAGN":
-            if np.shape(p_0)[0] != 7:
-                raise ValueError("Invalid length of initial p_0 preconditioning vector for chosen solve method.")
+        # Check warp function order.
+        if order == 1:
+            if p_0 == None:
+                p_0 = np.zeros(6)
+        elif order == 2:
+            if p_0 == None:
+                p_0 = np.zeros(12)
+        else:
+            raise ValueError("Invalid warp function order.")
 
         # Store settings.
         self.method = method
+        self.order = order
         self.max_norm = max_norm
         self.max_iterations = max_iterations
         self.tolerance = tolerance
         self.settings = {
             "method": self.method,
+            "order": self.order,
             "max_norm": self.max_norm,
             "max_iterations": self.max_iterations,
             "tolerance": self.tolerance,
@@ -297,7 +303,11 @@ class Subset(SubsetBase):
                 "C_ZNCC": self.C_ZNCC,
                 "C_ZNSSD": self.C_ZNSSD,
             }
-            self.data.update({"results": self.results})            
+            self.data.update({"results": self.results})   
+            
+            # Return solved boolean.
+            return self.solved
+
         except:
             raise RuntimeError("Runtime error in solve method.")
 

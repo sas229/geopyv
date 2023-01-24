@@ -211,7 +211,7 @@ Attributes
 
       :type: dict
 
-   .. py:method:: solve(max_norm=0.001, max_iterations=15, p_0=np.zeros(6), tolerance=0.7, method='ICGN')
+   .. py:method:: solve(max_norm=0.001, max_iterations=15, order=1, p_0=None, tolerance=0.7, method='ICGN')
 
       Method to solve for the subset displacements using the various methods.
 
@@ -221,6 +221,8 @@ Attributes
       :param max_iterations: Exit criterion for number of Gauss-Newton iterations. Defaults to value
                              of 50.
       :type max_iterations: int, optional
+      :param order: Warp function order. Options are 1 and 2.
+      :type order: int
       :param p_0: 1D array of warp function parameters with `float` type.
       :type p_0: ndarray, optional
       :param method: Solution method. Options are FAGN and ICGN. Default is ICGN since it

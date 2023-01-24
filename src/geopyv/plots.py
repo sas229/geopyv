@@ -32,9 +32,9 @@ def inspect_subset(data, show, block, save):
     image = np.maximum(image, mask)
 
     # Create plot.
-    ax.imshow(image, cmap="gist_gray")
-    quality = r"Quality metrics: $\sigma_s$ = {:.2f}; SSSIG = {:.2E}".format(sigma_intensity, SSSIG)
-    ax.text(template_size, 2*template_size + 5, quality, horizontalalignment="center")
+    ax.imshow(image, cmap="gist_gray", interpolation='nearest', aspect='equal', extent=(-0.5,6.5,-0.5,5.5))
+    quality = r"Subset size: {} (px); Quality metrics: $\sigma_s$ = {:.2f} (px); SSSIG = {:.2E} (-)".format(template_size, sigma_intensity, SSSIG)
+    ax.text(3.0, -1.0, quality, horizontalalignment="center")
     ax.set_axis_off()
     plt.tight_layout()
 

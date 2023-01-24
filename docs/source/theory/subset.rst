@@ -8,16 +8,11 @@ A subset is a small region within an image defined via a coordinate and a templa
 Templates
 ^^^^^^^^^
 
-Templates are defined by size and shape. In `geopyv` templates can be square or circular. Here are some examples:
+Templates are defined by size and shape. In `geopyv` templates can be square or circular. Below are some examples:
 
 .. image:: ../images/subset_examples.png
   :width: 600
   :align: center
-
-.. todo::
-    
-    - Add real world examples of subsets.
-
 
 Shape Functions
 ^^^^^^^^^^^^^^^

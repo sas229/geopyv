@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import numpy as np
 import re
+import geopyv as gp
 
 def inspect_subset(data, show, block, save):
     """Function to show the subset and associated quality metrics."""
@@ -17,7 +18,7 @@ def inspect_subset(data, show, block, save):
     template_size = data["template"]["size"]
     sigma_intensity = data["quality"]["sigma_intensity"]
     SSSIG = data["quality"]["SSSIG"]
-    title = "Subset: {x},{y} (px)".format(x=x, y=y)
+    title = "Inspect subset: f_coord = ({x},{y}) (px)".format(x=x, y=y)
     mask = data["template"]["mask"].astype(np.float32)
 
     # Figure setup.
@@ -33,7 +34,7 @@ def inspect_subset(data, show, block, save):
 
     # Create plot.
     ax.imshow(image, cmap="gist_gray", interpolation='nearest', aspect='equal', extent=(-0.5,6.5,-0.5,5.5))
-    quality = r"Subset size: {} (px); Quality metrics: $\sigma_s$ = {:.2f} (px); SSSIG = {:.2E} (-)".format(template_size, sigma_intensity, SSSIG)
+    quality = r"Size: {} (px); Quality metrics: $\sigma_s$ = {:.2f} (px); SSSIG = {:.2E} (-)".format(template_size, sigma_intensity, SSSIG)
     ax.text(3.0, -1.0, quality, horizontalalignment="center")
     ax.set_axis_off()
     plt.tight_layout()
@@ -62,7 +63,7 @@ def convergence_subset(data, show, block, save):
     y = data["position"]["y"]
 
     # Create plot.
-    title = "Convergence: {x},{y} (px)".format(x=x, y=y)
+    title = "Subset convergence: f_coord = ({x},{y}) (px)".format(x=x, y=y)
     fig, ax = plt.subplots(2, 1, sharex=True, num=title)
     ax[0].semilogy(history[0,:], history[1,:], marker="o", clip_on=False, label="Convergence")
     ax[0].plot([1, max_iterations], [max_norm, max_norm], "--r", label="Threshold")
@@ -135,7 +136,7 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
     fig, ax = plt.subplots(num=title)
     
     # Triangulation.
-    mesh_triangulation, x_p, y_p = _plot_triangulation(elements, x, y)
+    mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
     
     # Plot mesh.
     if mesh == True:
@@ -189,20 +190,3 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
         plt.close(fig)
 
     return fig, ax
-
-def _plot_triangulation(elements, x, y):
-    """Method to compute a first order triangulation from a second order element."""
-    plot_elements = []
-    x_p = []
-    y_p = []
-    for element in elements:
-        plot_elements.append([element[0], element[3], element[5]])
-        plot_elements.append([element[1], element[3], element[4]])
-        plot_elements.append([element[2], element[4], element[5]])
-        plot_elements.append([element[3], element[4], element[5]])
-        x_p.append([x[element[0]], x[element[3]], x[element[1]], x[element[4]], x[element[2]], x[element[5]], x[element[0]]])
-        y_p.append([y[element[0]], y[element[3]], y[element[1]], y[element[4]], y[element[2]], y[element[5]], y[element[0]]])
-    mesh_triangulation = np.asarray(plot_elements)
-    x_p = np.asarray(x_p)
-    y_p = np.asarray(y_p)
-    return mesh_triangulation, x_p, y_p

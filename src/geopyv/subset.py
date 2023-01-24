@@ -102,7 +102,7 @@ class Subset(SubsetBase):
     def __init__(self, f_coord=None, f_img=None, g_img=None, template=Circle(50)):
         """Initialisation of geopyv subset object."""
         self.initialised = False
-        self.f_coord = f_coord
+        self.f_coord = f_coord.astype(float)
         self.f_img = f_img
         self.g_img = g_img
         self.template = template

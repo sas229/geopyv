@@ -5,8 +5,8 @@ import os
 
 
 # Images.
-ref = geopyv.image.Image("../../images/T-Bar/IMG_1062.jpg")
-tar = geopyv.image.Image("../../images/T-Bar/IMG_1064.jpg")
+ref = geopyv.image.Image("./images/T-Bar/IMG_1062.jpg")
+tar = geopyv.image.Image("./images/T-Bar/IMG_1064.jpg")
 
 # Coordinate.
 f_coord = np.asarray([1000,1000])
@@ -18,12 +18,13 @@ for i in np.arange(10, 110, 10):
     template = geopyv.templates.Square(int(i))
     subset = geopyv.subset.Subset(f_img=ref, g_img=tar, f_coord=f_coord, template=template)
     name = "Square_{}_px".format(i)
-    subset.inspect(save=name, show=False, block=False)
-    img_list.append(name+".png")
+    save = "./docs/scripts/"+name+".png"
+    subset.inspect(save=save, show=False, block=False)
+    img_list.append(save)
     square_metrics.append([subset.data["template"]["size"], subset.data["quality"]["sigma_intensity"], subset.data["quality"]["SSSIG"]])
 
 # Make gif of subset.
-os.system('convert -loop 0 -delay 100 %s ../source/images/square_subset_size.gif' % ' '.join(img_list))
+os.system('convert -loop 0 -delay 100 %s ./docs/source/images/square_subset_size.gif' % ' '.join(img_list))
 
 # Loop.
 img_list = []
@@ -32,17 +33,19 @@ for i in np.arange(10, 110, 10):
     template = geopyv.templates.Circle(int(i))
     subset = geopyv.subset.Subset(f_img=ref, g_img=tar, f_coord=f_coord, template=template)
     name = "Circle_{}_px".format(i)
-    subset.inspect(save=name, show=False, block=False)
-    img_list.append(name+".png")
+    save = "./docs/scripts/"+name+".png"
+    subset.inspect(save=save, show=False, block=False)
+    img_list.append(save)
     circle_metrics.append([subset.data["template"]["size"], subset.data["quality"]["sigma_intensity"], subset.data["quality"]["SSSIG"]])
 
 # Make gif.
-os.system('convert -loop 0 -delay 100 %s ../source/images/circle_subset_size.gif' % ' '.join(img_list))
+os.system('convert -loop 0 -delay 100 %s ./docs/source/images/circle_subset_size.gif' % ' '.join(img_list))
 
 # Clean up images.
-for fname in os.listdir('.'):
+dir = "./docs/scripts/"
+for fname in os.listdir(dir):
     if fname.endswith(".png"):
-        os.remove(fname)
+        os.remove(dir+fname)
 
 # Make plot of metrics.
 img_list = []
@@ -67,5 +70,5 @@ ax2.plot(square_metrics[:,0], square_metrics[:,2], color ="r")
 ax1.scatter(square_metrics[:,0], square_metrics[:,1], color ="r", marker="s")
 ax2.semilogy(square_metrics[:,0], square_metrics[:,2], color ="r", marker="s")
 ax1.legend(frameon=False, loc="lower right")
-name = "../source/images/subset_quality.png"
+name = "./docs/source/images/subset_quality.png"
 plt.savefig(name)

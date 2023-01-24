@@ -14,5 +14,5 @@ Solving the mesh
 Adaptivity
 ^^^^^^^^^^
 
-Inspecting the results
-----------------------
+Accessing the data
+------------------

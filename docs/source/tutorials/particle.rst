@@ -11,5 +11,5 @@ Creating a particle
 Solving the particle
 --------------------
 
-Inspecting the results
-----------------------
+Accessing the data
+------------------

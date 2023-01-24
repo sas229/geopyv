@@ -11,5 +11,5 @@ Creating a sequence
 Solving the sequence
 --------------------
 
-Inspecting the results
-----------------------
+Accessing the data
+------------------

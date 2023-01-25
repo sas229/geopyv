@@ -5,6 +5,7 @@ from numpyencoder import NumpyEncoder
 from geopyv.subset import Subset, SubsetResults
 from geopyv.mesh import Mesh, MeshResults
 from geopyv.particle import Particle
+from alive_progress import alive_bar
 
 log = logging.getLogger(__name__)
 
@@ -14,8 +15,14 @@ def load(filename=None):
     filepath = filename + ext
     try:
         with open(filepath, "r") as infile:
-            data =  json.load(infile)
-            data = _convert_list_to_ndarray(data)
+            message = "Load geopyv object"
+            with alive_bar(dual_line=True, bar='blocks', title=message) as bar:
+                bar.text = "-> Loading object from {filepath}...".format(filepath=filepath)
+                data =  json.load(infile)
+                data = _convert_list_to_ndarray(data)
+                bar()
+            object_type = data["type"]
+            log.info("Loaded {object_type} object from {filepath}.".format(object_type=object_type, filepath=filepath))
             if data["type"] == "Subset":
                 return SubsetResults(data)
             elif data["type"] == "Mesh":
@@ -31,9 +38,15 @@ def save(object, filename):
             ext = ".pyv"
             filepath = filename + ext
             with open(filepath, "w") as outfile:
-                json.dump(object.data, outfile, cls=NumpyEncoder)
+                message = "Save geopyv object"
+                with alive_bar(dual_line=True, bar='blocks', title=message) as bar:
+                    bar.text = "-> Saving object to {filepath}...".format(filepath=filepath)
+                    json.dump(object.data, outfile, cls=NumpyEncoder)
+                    bar()
+                object_type = object.data["type"]
+                log.info("Saved {object_type} object to {filepath}.".format(object_type=object_type, filepath=filepath))
         else:
-            log.warn("geopyv object not solved therefore no data to save.")
+            log.warn("Object not solved therefore no data to save.")
     else:
         raise TypeError("Not a geopyv type.")
 

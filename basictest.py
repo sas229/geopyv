@@ -3,12 +3,12 @@ import numpy as np
 import geopyv
 import matplotlib.pyplot as plt
 
-level = logging.WARN
+level = logging.INFO
 geopyv.log.initialise(level)
 
 # Subset test.
 ref = geopyv.image.Image("./images/T-Bar/IMG_1062.jpg")
-tar = geopyv.image.Image("./images/T-Bar/IMG_1064.jpg")
+tar = geopyv.image.Image("./images/T-Bar/IMG_1066.jpg")
 template = geopyv.templates.Circle(50)
 subset = geopyv.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000,1000]), template=template)
 # subset = Subset(f_img=ref, g_img=tar)
@@ -40,7 +40,7 @@ mesh = geopyv.mesh.Mesh(f_img=ref, g_img=tar, target_nodes=2000, boundary=bounda
 geopyv.io.save(mesh, "mesh")
 beta = 5.0
 alpha = 1/beta
-mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta)
+mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta, tolerance=0.95)
 geopyv.io.save(mesh, "mesh")
 del(mesh)
 

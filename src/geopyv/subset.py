@@ -284,11 +284,11 @@ class Subset(SubsetBase):
             # Check for tolerance.
             if self.C_ZNCC > self.tolerance:
                 self.solved = True
-                log.info("Subset solved.")
-                log.info("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self.x, y_i=self.y))
-                log.info("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self.u, v=self.v))
-                log.info("Correlation coefficient: CC = {C_ZNCC} (-), SSD = {C_ZNSSD} (-)".format(C_ZNCC=self.C_ZNCC, C_ZNSSD=self.C_ZNSSD))
-                log.info("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x_f, y_f=self.y_f))
+                log.debug("Subset solved.")
+                log.debug("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self.x, y_i=self.y))
+                log.debug("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self.u, v=self.v))
+                log.debug("Correlation coefficient: CC = {C_ZNCC} (-), SSD = {C_ZNSSD} (-)".format(C_ZNCC=self.C_ZNCC, C_ZNSSD=self.C_ZNSSD))
+                log.debug("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x_f, y_f=self.y_f))
         
             # Pack results.
             self.data["solved"] = self.solved

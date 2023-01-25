@@ -199,8 +199,6 @@ The subset data is stored in the `data` attribute as a dictionary with the follo
             "shape": str,
             "dimension": str,
             "size": int,
-            "coords": np.ndarray,
-            "mask" : np.ndarray,
             "n_px": int,
         },
         "settings": {

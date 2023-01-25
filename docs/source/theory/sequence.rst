@@ -1,4 +1,4 @@
-.. _sequence:
+.. _Sequence:
 
 Sequence
 --------

@@ -18,7 +18,7 @@ class SubsetBase:
     """Subset base class to be used as a mixin."""
     def inspect(self, show=True, block=True, save=None):
         """Method to show the subset and associated quality metrics."""
-        inspect_subset(self.data, show=show, block=block, save=save)
+        inspect_subset(self.data, mask=None, show=show, block=block, save=save)
 
     def convergence(self, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the subset."""
@@ -170,8 +170,6 @@ class Subset(SubsetBase):
                 "shape": self.template.shape,
                 "dimension": self.template.dimension,
                 "size": self.template.size,
-                "coords": self.template.coords,
-                "mask" : self.template.subset_mask,
                 "n_px": self.template.n_px,
             }
         }
@@ -225,15 +223,17 @@ class Subset(SubsetBase):
         elif tolerance > 1:
             raise ValueError("Tolerance must be less than one. Suggested default is 0.75.")
 
-        # Check warp function order.
-        if order == 1:
-            if p_0 == None:
+        # Check warp function order and type.
+        if type(p_0) == type(None):
+            if order == 1:
                 p_0 = np.zeros(6)
-        elif order == 2:
-            if p_0 == None:
+            elif order == 2:
                 p_0 = np.zeros(12)
+            else:
+                raise ValueError("Invalid warp function order.")
         else:
-            raise ValueError("Invalid warp function order.")
+            if type(p_0) != np.ndarray:
+                raise TypeError("Warp function of incorrect type.")
 
         # Store settings.
         self.method = method
@@ -303,7 +303,7 @@ class Subset(SubsetBase):
                 "C_ZNCC": self.C_ZNCC,
                 "C_ZNSSD": self.C_ZNSSD,
             }
-            self.data.update({"results": self.results})   
+            self.data.update({"results": self.results})
             
             # Return solved boolean.
             return self.solved

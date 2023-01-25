@@ -6,7 +6,7 @@ import numpy as np
 import re
 import geopyv as gp
 
-def inspect_subset(data, show, block, save):
+def inspect_subset(data, mask, show, block, save):
     """Function to show the subset and associated quality metrics."""
 
     # Load data.
@@ -19,20 +19,33 @@ def inspect_subset(data, show, block, save):
     sigma_intensity = data["quality"]["sigma_intensity"]
     SSSIG = data["quality"]["SSSIG"]
     title = "Inspect subset: f_coord = ({x},{y}) (px)".format(x=x, y=y)
-    mask = data["template"]["mask"].astype(np.float32)
-
-    # Figure setup.
-    fig, ax = plt.subplots(num=title)
+    
+    # Crop image and mask.
     x_min = (np.round(x, 0) - template_size).astype(int)
     x_max = (np.round(x, 0) + template_size).astype(int)
     y_min = (np.round(y, 0) - template_size).astype(int)
     y_max = (np.round(y, 0) + template_size).astype(int)
     image = image_gs.astype(np.float32)[y_min:y_max+1, x_min:x_max+1]
+    if type(mask) != type(None):
+        if type(mask) == np.ndarray:
+            if np.shape(mask) == np.shape(image_gs):
+                mask = mask.astype(np.float32)[y_min:y_max+1, x_min:x_max+1]
+                invert_mask = np.abs(mask-1)*255
+                image = np.maximum(image, invert_mask)
 
-    # Apply subset mask.
-    image = np.maximum(image, mask)
+    # If a circular subset, mask pixels outside radius.
+    if data["template"]["shape"] == "circle":
+        x, y = np.meshgrid(
+            np.arange(-template_size, template_size + 1, 1),
+            np.arange(-template_size, template_size + 1, 1),
+        )
+        dist = np.sqrt(x ** 2 + y ** 2)
+        mask = np.zeros(image.shape)
+        mask[dist > template_size] = 255
+        image = np.maximum(image, mask) 
 
-    # Create plot.
+    # Plot figure.
+    fig, ax = plt.subplots(num=title)
     ax.imshow(image, cmap="gist_gray", interpolation='nearest', aspect='equal', extent=(-0.5,6.5,-0.5,5.5))
     quality = r"Size: {} (px); Quality metrics: $\sigma_s$ = {:.2f} (px); SSSIG = {:.2E} (-)".format(template_size, sigma_intensity, SSSIG)
     ax.text(3.0, -1.0, quality, horizontalalignment="center")

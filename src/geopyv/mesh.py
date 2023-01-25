@@ -25,7 +25,10 @@ class MeshBase:
         """Method to show the mesh and associated quality metrics."""
         if subset != None:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
-                inspect_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
+                subset_data = self.data["results"]["subsets"][subset]
+                if self.data["type"] == "Mesh":
+                    mask = self.data["mask"]
+                inspect_subset(data=subset_data, mask=mask, show=show, block=block, save=save)
             else:
                 raise ValueError("Subset index provided is out of the range of the mesh object contents.")
 
@@ -110,6 +113,7 @@ class Mesh(MeshBase):
             "size_upper_bound": self.size_upper_bound,
             "nodes": self.nodes,
             "elements": self.elements,
+            "mask": self.mask
         }
 
     def set_target_nodes(self, target_nodes):

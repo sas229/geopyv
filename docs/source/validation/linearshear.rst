@@ -2,3 +2,5 @@
 
 Linear Shear
 ------------
+
+Validation proof to go here...

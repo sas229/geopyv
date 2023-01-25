@@ -288,10 +288,10 @@ def quiver_mesh(data, imshow, mesh, axis, xlim, ylim, show, block, save):
     U = u/L 
     V = v/L 
     m = np.max(L)
-    alpha = 0.05 
-    S = alpha /(1+np.log(m/L)) 
-    U1=S*U 
-    V1=S*V
+    scale = 0.5 
+    S = scale/(1+np.log(m/L)) 
+    U1=S*U*1/2.54 
+    V1=S*V*1/2.54
     
     # Plot setup.
     platform = sys.platform
@@ -322,7 +322,7 @@ def quiver_mesh(data, imshow, mesh, axis, xlim, ylim, show, block, save):
         ax.set_aspect('equal', 'box')
             
     # Plot contours.
-    ax.quiver(x, y, U1, -V1, color="b", scale=1.0, units="width")
+    ax.quiver(x, y, U1, -V1, color="b", scale=1.0, units="inches")
     
     # Axis control.
     if axis == "off":

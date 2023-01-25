@@ -16,33 +16,33 @@ subset.inspect()
 subset.solve()
 subset.convergence()
 
-# geopyv.io.save(subset, "test")
-# del(subset)
+geopyv.io.save(subset, "test")
+del(subset)
 
-# # Load subset test.
-# subset = geopyv.io.load("test")
-# subset.inspect(show=False)
-# subset.convergence(show=False)
-# print("subset type:", type(subset))
+# Load subset test.
+subset = geopyv.io.load("test")
+subset.inspect(show=False)
+subset.convergence(show=False)
+print("subset type:", type(subset))
 
-# # Mesh test.
-# template = geopyv.templates.Circle(25)
-# boundary = np.asarray(
-#     [[200.0, 200.0],
-#     [200.0, 2700.0],
-#     [3900.0, 2700.0],
-#     [3900.0, 200.0]]
-# )
-# exclusions = []
-# exclusions.append(geopyv.geometry.exclusions.circular_exclusion(np.asarray([1925, 1470]), radius=430, size=100))
-# seed = np.asarray([400, 400.0])
-# mesh = geopyv.mesh.Mesh(f_img=ref, g_img=tar, target_nodes=2000, boundary=boundary, exclusions=exclusions)
-# geopyv.io.save(mesh, "mesh")
-# beta = 5.0
-# alpha = 1/beta
-# mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta)
-# geopyv.io.save(mesh, "mesh")
-# del(mesh)
+# Mesh test.
+template = geopyv.templates.Circle(25)
+boundary = np.asarray(
+    [[200.0, 200.0],
+    [200.0, 2700.0],
+    [3900.0, 2700.0],
+    [3900.0, 200.0]]
+)
+exclusions = []
+exclusions.append(geopyv.geometry.exclusions.circular_exclusion(np.asarray([1925, 1470]), radius=430, size=100))
+seed = np.asarray([400, 400.0])
+mesh = geopyv.mesh.Mesh(f_img=ref, g_img=tar, target_nodes=2000, boundary=boundary, exclusions=exclusions)
+geopyv.io.save(mesh, "mesh")
+beta = 5.0
+alpha = 1/beta
+mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta)
+geopyv.io.save(mesh, "mesh")
+del(mesh)
 
 mesh = geopyv.io.load("mesh")
 

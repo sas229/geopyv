@@ -15,8 +15,8 @@ def load(filename=None):
     filepath = filename + ext
     try:
         with open(filepath, "r") as infile:
-            message = "Load geopyv object"
-            with alive_bar(dual_line=True, bar='blocks', title=message) as bar:
+            message = "Loading geopyv object"
+            with alive_bar(dual_line=True, bar=None, title=message) as bar:
                 bar.text = "-> Loading object from {filepath}...".format(filepath=filepath)
                 data =  json.load(infile)
                 data = _convert_list_to_ndarray(data)
@@ -38,8 +38,8 @@ def save(object, filename):
             ext = ".pyv"
             filepath = filename + ext
             with open(filepath, "w") as outfile:
-                message = "Save geopyv object"
-                with alive_bar(dual_line=True, bar='blocks', title=message) as bar:
+                message = "Saving geopyv object"
+                with alive_bar(dual_line=True, bar=None, title=message) as bar:
                     bar.text = "-> Saving object to {filepath}...".format(filepath=filepath)
                     json.dump(object.data, outfile, cls=NumpyEncoder)
                     bar()

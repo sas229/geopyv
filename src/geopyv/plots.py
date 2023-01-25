@@ -47,7 +47,7 @@ def inspect_subset(data, mask, show, block, save):
     # Plot figure.
     fig, ax = plt.subplots(num=title)
     ax.imshow(image, cmap="gist_gray", interpolation='nearest', aspect='equal', extent=(-0.5,6.5,-0.5,5.5))
-    quality = r"Size: {} (px); Quality metrics: $\sigma_s$ = {:.2f} (px); SSSIG = {:.2E} (-)".format(template_size, sigma_intensity, SSSIG)
+    quality = r"Size: {size} (px); Quality metrics: $\sigma_s$ = {sigma_intensity:.2f} (-); SSSIG = {SSSIG:.2E} (-)".format(size=template_size, sigma_intensity=sigma_intensity, SSSIG=SSSIG)
     ax.text(3.0, -1.0, quality, horizontalalignment="center")
     ax.set_axis_off()
     plt.tight_layout()
@@ -92,6 +92,65 @@ def convergence_subset(data, show, block, save):
     ax[1].set_yticks(np.linspace(0.0, 1.0, 6))
     ax[1].set_xticks(np.linspace(1, max_iterations, max_iterations))
     ax[0].legend(frameon=False)
+    plt.tight_layout()
+
+    # Save
+    if save != None:
+        plt.savefig(save)
+
+    # Show or close.
+    if show == True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+def convergence_mesh(data, quantity, show, block, save):
+    """Function to plot subset convergence."""
+
+    # Get image names.
+    platform = sys.platform
+    if platform == "linux" or platform == "linux2" or platform == "darwin":
+        split = "/"
+    elif platform == "win32":
+        split = "\\"
+    f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]):]
+    g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]):]
+    title = "Convergence: f_img = {f_img}; g_img = {g_img}".format(f_img=f_img, g_img=g_img)
+
+    # Extract variables from data.
+    subsets = data["results"]["subsets"]
+    max_norm = data["settings"]["max_norm"]
+    tolerance = data["settings"]["tolerance"]
+    max_iterations = data["settings"]["max_iterations"]
+    iterations = []
+    norm = []
+    C_ZNCC = []
+    for s in subsets:
+        iterations.append(s["results"]["history"][0,-1])
+        norm.append(s["results"]["history"][1,-1])
+        C_ZNCC.append(s["results"]["history"][2,-1])
+    iterations = np.asarray(iterations)
+    norm = np.asarray(norm)
+    C_ZNCC = np.asarray(C_ZNCC)
+
+    # Create plot.
+    title = "Subset convergence: f_img = {f_img} (px)".format(f_img=f_img)
+    fig, ax = plt.subplots(num=title)
+    if quantity == "norm":
+        ax.hist(norm, bins=50)
+        ax.set_xlabel(r"$\Delta Norm$ (-)")
+        ax.set_xlim([0, max_norm])
+    elif quantity == "iterations":
+        ax.hist(iterations)
+        ax.set_xlabel(r"Iterations (-)")
+        ax.set_xlim([0, max_iterations])
+    else:
+        ax.hist(C_ZNCC, bins=50)
+        ax.set_xlabel(r"$C_{ZNCC}$ (-)")
+        ax.set_xlim([tolerance, 1.0])
+    ax.set_ylabel("Count (-)")    
     plt.tight_layout()
 
     # Save
@@ -154,7 +213,7 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
     # Plot mesh.
     if mesh == True:
         for i in range(np.shape(x_p)[0]):
-            ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth = "0.5")
+            ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth=0.5)
     triangulation = tri.Triangulation(nodes[:,0], nodes[:,1], mesh_triangulation)
 
     # Set levels and extend.
@@ -203,3 +262,146 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
         plt.close(fig)
 
     return fig, ax
+
+def quiver_mesh(data, imshow, mesh, axis, xlim, ylim, show, block, save):
+    """Function to plot contours of mesh data."""
+
+    # Load data.
+    elements = data["elements"]
+    subsets = data["results"]["subsets"]
+
+    # Extract variables from data.
+    x = []
+    y = []
+    u = []
+    v = []
+    for s in subsets:
+        x.append(s["position"]["x"])
+        y.append(s["position"]["y"])
+        u.append(s["results"]["u"])
+        v.append(s["results"]["v"])
+    x = np.asarray(x)
+    y = np.asarray(y)
+    u = np.asarray(u)
+    v = np.asarray(v)
+    L = np.sqrt(u**2 + v**2)
+    U = u/L 
+    V = v/L 
+    m = np.max(L)
+    alpha = 0.05 
+    S = alpha /(1+np.log(m/L)) 
+    U1=S*U 
+    V1=S*V
+    
+    # Plot setup.
+    platform = sys.platform
+    if platform == "linux" or platform == "linux2" or platform == "darwin":
+        split = "/"
+    elif platform == "win32":
+        split = "\\"
+    f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]):]
+    g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]):]
+    title = "Quiver: f_img = {f_img}; g_img = {g_img}".format(f_img=f_img, g_img=g_img)
+    fig, ax = plt.subplots(num=title)
+    
+    # Triangulation.
+    _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
+    
+    # Plot mesh.
+    if mesh == True:
+        for i in range(np.shape(x_p)[0]):
+            ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth=0.5)
+
+    # Show image in background.
+    if imshow == True:
+        image = cv2.imread(data["images"]["f_img"], cv2.IMREAD_COLOR)
+        image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image_gs = cv2.GaussianBlur(image_gs, ksize=(5,5), sigmaX=1.1, sigmaY=1.1)
+        plt.imshow(image_gs, cmap='gray')
+    else:
+        ax.set_aspect('equal', 'box')
+            
+    # Plot contours.
+    ax.quiver(x, y, U1, -V1, color="b", scale=1.0, units="width")
+    
+    # Axis control.
+    if axis == "off":
+        ax.set_axis_off()
+    
+    # Limit control.
+    if xlim != None:
+        ax.set_xlim(xlim)
+    if ylim != None:
+        ax.set_ylim(ylim)
+
+    # Save.
+    if save != None:
+        plt.savefig(save)
+
+    # Show or close.
+    if show == True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+def inspect_mesh(data, show, block, save):
+    """Function to inspect the mesh."""
+
+    # Load image.
+    image_path = data["images"]["f_img"]
+    image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image_gs = cv2.GaussianBlur(image_gs, ksize=(5,5), sigmaX=1.1, sigmaY=1.1)
+
+    # Load data.
+    nodes = data["nodes"]
+    elements = data["elements"]
+
+    # Extract variables from data.
+    x = []
+    y = []
+    value = []
+    for n in nodes:
+        x.append(n[0])
+        y.append(n[1])
+    x = np.asarray(x)
+    y = np.asarray(y)
+    value = np.asarray(value)
+
+    # Plot setup.
+    platform = sys.platform
+    if platform == "linux" or platform == "linux2" or platform == "darwin":
+        split = "/"
+    elif platform == "win32":
+        split = "\\"
+    f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]):]
+    title = "Inspect mesh: f_img = {f_img}".format(f_img=f_img)
+    
+    # Triangulation.
+    _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
+
+    # Plot figure.
+    fig, ax = plt.subplots(num=title)
+    for i in range(np.shape(x_p)[0]):
+        ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
+    ax.imshow(image, cmap="gist_gray", interpolation='nearest', aspect='equal')
+    details = r"{nodes} nodes; {elements} elements".format(nodes=np.shape(nodes)[0], elements=np.shape(elements)[0])
+    image_size = np.shape(image)
+    ax.text(image_size[1]/2, image_size[0]*1.05, details, horizontalalignment="center")
+    ax.set_axis_off()
+    plt.tight_layout()
+
+    # Save
+    if save != None:
+        plt.savefig(save)
+
+    # Show or close.
+    if show == True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+    

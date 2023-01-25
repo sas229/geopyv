@@ -5,7 +5,7 @@ from geopyv.templates import Circle
 from geopyv.image import Image
 from geopyv.subset import Subset
 from geopyv.geometry.utilities import area_to_length
-from geopyv.plots import inspect_subset, convergence_subset, contour_mesh
+from geopyv.plots import inspect_subset, convergence_subset, contour_mesh, inspect_mesh, convergence_mesh, quiver_mesh
 import gmsh
 from copy import deepcopy
 from scipy.optimize import minimize_scalar
@@ -22,7 +22,8 @@ log = logging.getLogger(__name__)
 class MeshBase:
     """Mesh base class to be used as a mixin."""
     def inspect(self, subset=None, show=True, block=True, save=None):
-        """Method to show the mesh and associated quality metrics."""
+        """Method to show the mesh and associated subset quality metrics."""
+        # If a subset index is given, inspect the subset.
         if subset != None:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
                 subset_data = self.data["results"]["subsets"][subset]
@@ -31,14 +32,21 @@ class MeshBase:
                 inspect_subset(data=subset_data, mask=mask, show=show, block=block, save=save)
             else:
                 raise ValueError("Subset index provided is out of the range of the mesh object contents.")
+        # Otherwise inspect the mesh.
+        else:
+            inspect_mesh(data=self.data, show=show, block=block, save=save)
 
-    def convergence(self, subset=None, show=True, block=True, save=None):
+    def convergence(self, subset=None, quantity=None, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the mesh."""
+        # If a subset index is given, inspect the subset.
         if subset != None:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
                 convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
             else:
                 raise ValueError("Subset index provided is out of the range of the mesh object contents.")
+        # Otherwise inspect the mesh.
+        else:
+            convergence_mesh(data=self.data, quantity=quantity, show=show, block=block, save=save)
     
     def contour(self, quantity="C_ZNCC", imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot the contours of a given measure."""
@@ -46,9 +54,9 @@ class MeshBase:
             fig, ax = contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, ticks=ticks, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
             return fig, ax
     
-    def quiver(self):
+    def quiver(self, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot a quiver plot of the displacements."""
-        print("Plot quiver.")
+        quiver_mesh(data=self.data, imshow=imshow, mesh=mesh, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
 
 class Mesh(MeshBase):
 
@@ -173,6 +181,8 @@ class Mesh(MeshBase):
         self._find_seed_node()
         try:
             self._reliability_guided()
+            if self.unsolvable:
+                return self.solved
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations+1):
                 self.message = "Adaptive iteration {}".format(iteration)
@@ -181,51 +191,47 @@ class Mesh(MeshBase):
                 self._adaptive_subset()
                 self._find_seed_node()
                 self._reliability_guided()
+                if self.unsolvable:
+                    return self.solved
 
-            # Finalise.
-            if self.update == True:
-                self.solved = False
-                self.unsolvable = True
-                print('Error! The minimum correlation coefficient is below tolerance {field:.3f} < {tolerance:.3f}'.format(field=np.min(self.C_ZNCC), tolerance=self.tolerance))
-            else:
-                # Pack data.
-                self.solved = True
-                self.data["nodes"] = self.nodes
-                self.data["elements"] = self.elements
-                self.data["solved"] = self.solved
-                self.data["unsolvable"] = self.unsolvable
+            # Pack data.
+            self.solved = True
+            self.data["nodes"] = self.nodes
+            self.data["elements"] = self.elements
+            self.data["solved"] = self.solved
+            self.data["unsolvable"] = self.unsolvable
 
-                # Pack settings.
-                self.settings = {
-                    "max_iterations": self.max_iterations,
-                    "max_norm": self.max_norm,
-                    "adaptive_iterations": self.adaptive_iterations,
-                    "method": self.method,
-                    "order": self.order,
-                    "tolerance": self.tolerance,
-                }
-                self.data.update({"settings": self.settings})
+            # Pack settings.
+            self.settings = {
+                "max_iterations": self.max_iterations,
+                "max_norm": self.max_norm,
+                "adaptive_iterations": self.adaptive_iterations,
+                "method": self.method,
+                "order": self.order,
+                "tolerance": self.tolerance,
+            }
+            self.data.update({"settings": self.settings})
 
-                # Extract data from subsets.
-                subset_data = []
-                for subset in self.subsets:
-                    subset_data.append(subset.data)
+            # Extract data from subsets.
+            subset_data = []
+            for subset in self.subsets:
+                subset_data.append(subset.data)
 
-                # Pack results.
-                self.results = {
-                    "subsets": subset_data,
-                    "displacements": self.displacements,
-                    "du": self.du,
-                    "d2u": self.d2u,
-                    "C_ZNCC": self.C_ZNCC,
-                }
-                self.data.update({"results": self.results})
-                print("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_ZNCC), max_C=np.amax(self.C_ZNCC)))
+            # Pack results.
+            self.results = {
+                "subsets": subset_data,
+                "displacements": self.displacements,
+                "du": self.du,
+                "d2u": self.d2u,
+                "C_ZNCC": self.C_ZNCC,
+            }
+            self.data.update({"results": self.results})
         except ValueError:
             print(traceback.format_exc())
             print("Error! Could not solve for all subsets.")
             self.update = True
         gmsh.finalize()
+        return self.solved
         
     def _update_mesh(self):
         """Private method to update the mesh variables."""
@@ -278,11 +284,14 @@ class Mesh(MeshBase):
         self.elements = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
 
     def _adaptive_mesh(self):
-        D = abs(self.du[:,0,1]+self.du[:,1,0])*self.areas # Elemental shear strain-area products.
-        D_b = np.mean(D) # Mean elemental shear strain-area product.
-        self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
-        f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.elements, self.areas)
-        minimize_scalar(f)
+        message = "Adaptively remeshing..."
+        with alive_bar(dual_line=True, bar=None, title=message) as bar:
+            D = abs(self.du[:,0,1]+self.du[:,1,0])*self.areas # Elemental shear strain-area products.
+            D_b = np.mean(D) # Mean elemental shear strain-area product.
+            self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
+            f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.elements, self.areas)
+            minimize_scalar(f)
+            bar()
 
     @staticmethod
     def _uniform_remesh(size, boundary, segments, curves, target_nodes, size_lower_bound):
@@ -457,7 +466,12 @@ class Mesh(MeshBase):
             self.bar.text = "-> Solving seed subset..."
             self.subsets[self.seed_node].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=self.p_0, method=self.method, tolerance=0.9) # Solve for seed subset.
             self.bar()
-            if self.subsets[self.seed_node].solved:
+
+            # If seed not solved, log error, otherwise store variables and solve neighbours.
+            if not self.subsets[self.seed_node].solved:
+                self.update = True 
+                log.error('Error! The seed subset correlation is below tolerance {seed:.3f} < {tolerance:.3f}'.format(seed=self.subsets[self.seed_node].C_ZNCC, tolerance=self.subsets[self.seed_node].tolerance))
+            else:
                 self._store_variables(self.seed_node, seed=True)
                 
                 # Solve for neighbours of the seed subset.
@@ -472,24 +486,26 @@ class Mesh(MeshBase):
                     cur_idx = np.argmax(self.subset_solved*self.C_ZNCC) # Subset with highest correlation coefficient selected.
                     p_0 = self.subsets[cur_idx].p # Precondition based on selected subset.
                     self.subset_solved[cur_idx] = -1 # Set as solved. 
-                    self._neighbours(cur_idx, p_0) # Calculate for neighbouring subsets.
+                    solved = self._neighbours(cur_idx, p_0) # Calculate for neighbouring subsets.
+                    if solved == False:
+                        break
                     if count == number_nodes:
                         break
                     count += 1
                     self.bar()
                 
-                # Update
-                if not any(self.subset_solved != -1): # If all solved...
-                    if np.amin(self.C_ZNCC) < self.tolerance: # ...but minimum correlation coefficient is less than tolerance...
-                        self.update = True # ... raise update flag.
-                else: # If any remain unsolved...
-                    self.update = True #... raise update flag.
-            else:
-                # Set update attribute flag if seed correlation threshold not exceeded.
-                self.update = True 
-                print('Error! The seed subset correlation is below tolerance {seed:.3f} < {tolerance:.3f}'.format(seed=self.subsets[self.seed_node].C_ZNCC, tolerance=self.subsets[self.seed_node].tolerance))
-            
+        # Update
+        if any(self.subset_solved != -1):
+            log.error("Specified correlation coefficient tolerance not met. Minimum correlation coefficient: {min_C:.3f}; tolerance: {tolerance:.3f}.".format(min_C=np.amin(self.C_ZNCC[np.where(self.C_ZNCC > 0.0)]), tolerance=self.tolerance))
+            self.update = True
+            self.solved = False
+            self.unsolvable = True
+        else:
             # Compute element areas and strains.
+            log.info("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self.C_ZNCC), max_C=np.amax(self.C_ZNCC)))
+            self.solved = True
+            self.update = False
+            self.unsolvable = False
             self._element_area()
             self._element_strains()
             self._update_subset_bgf()
@@ -559,7 +575,10 @@ class Mesh(MeshBase):
                         # Finally, try the NCC initial guess.
                         self.subsets[idx].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0 = np.zeros(np.shape(p_0)), method=self.method, tolerance=self.tolerance)
                         if self.subsets[idx].solved:
-                                self._store_variables(idx)
+                            self._store_variables(idx)
+                            return True
+                        else:
+                            return False
 
     def _store_variables(self, idx, seed=False):
         """Store variables."""

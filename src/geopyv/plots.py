@@ -238,7 +238,14 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
     # Plot contours.
     contours = ax.tricontourf(triangulation, value, alpha=alpha, levels=levels, extend=extend)
     if colorbar == True:
-        label = quantity
+        if quantity == "iterations":
+            label = "Iterations (-)"
+        elif quantity == "C_ZNCC":
+            label = r"$C_{ZNCC}$ (-)"
+        elif quantity == "norm":
+            label = r"$\Delta$ Norm (-)"
+        else:
+            label = quantity
         fig.colorbar(contours, label=label, ticks=ticks)
     
     # Axis control.
@@ -263,7 +270,7 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
 
     return fig, ax
 
-def quiver_mesh(data, imshow, mesh, axis, xlim, ylim, show, block, save):
+def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
     """Function to plot contours of mesh data."""
 
     # Load data.
@@ -288,7 +295,6 @@ def quiver_mesh(data, imshow, mesh, axis, xlim, ylim, show, block, save):
     U = u/L 
     V = v/L 
     m = np.max(L)
-    scale = 0.5 
     S = scale/(1+np.log(m/L)) 
     U1=S*U*1/2.54 
     V1=S*V*1/2.54

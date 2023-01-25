@@ -54,9 +54,9 @@ class MeshBase:
             fig, ax = contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, ticks=ticks, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
             return fig, ax
     
-    def quiver(self, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
+    def quiver(self, scale=1, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot a quiver plot of the displacements."""
-        quiver_mesh(data=self.data, imshow=imshow, mesh=mesh, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
+        quiver_mesh(data=self.data, scale=scale, imshow=imshow, mesh=mesh, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
 
 class Mesh(MeshBase):
 

@@ -52,7 +52,7 @@ mesh.convergence(quantity="norm")
 mesh.convergence(quantity="iterations")
 mesh.quiver()
 mesh.contour(quantity="u", colorbar=False, alpha=0.75, levels=np.arange(-5, 6, 1), axis="off", xlim=((900,2900)), ylim=((500,2500)))
-mesh.contour(quantity="C_ZNCC")
+mesh.contour(quantity="C_ZNCC", mesh=True)
 mesh.contour(quantity="iterations")
 mesh.contour(quantity="R")
 

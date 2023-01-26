@@ -72,7 +72,15 @@ add_module_names = True
 math_number_all = False
 
 autoapi_dirs = ['../../src/geopyv']
-# autoapi_options = ['show-inheritance-diagram']
+autoapi_options = [
+    'members',
+    'undoc-members',
+    'private-members',
+    'show-inheritance',
+    'show-module-summary',
+    'special-members',
+    'imported-members'
+]
 autoapi_keep_files = True
 suppress_warnings = ['autoapi']
 autoapi_add_toctree_entry = False

@@ -2,15 +2,7 @@ import logging
 import cv2
 import os
 import numpy as np
-from geopyv.image import Image
-from geopyv.templates import Circle, Square
-from geopyv.gui import ImageSelector, CoordinateSelector
-from geopyv.plots import inspect_subset, convergence_subset
-from ._subset_extensions import (
-    _init_reference,
-    _solve_ICGN,
-    _solve_FAGN,
-)
+import geopyv as gp
 
 log = logging.getLogger(__name__)
 
@@ -18,14 +10,16 @@ class SubsetBase:
     """Subset base class to be used as a mixin."""
     def inspect(self, show=True, block=True, save=None):
         """Method to show the subset and associated quality metrics."""
-        inspect_subset(self.data, mask=None, show=show, block=block, save=save)
+        fig, ax = gp.plots.inspect_subset(data=self.data, mask=None, show=show, block=block, save=save)
+        return fig, ax
 
     def convergence(self, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the subset."""
         if "results" in self.data:
-            convergence_subset(self.data, show=show, block=block, save=save)
+            fig, ax = gp.plots.convergence_subset(data=self.data, show=show, block=block, save=save)
+            return fig, ax
         else:
-            raise Exception("Warning: Subset not yet solved. Run the solve() method.")
+            log.error("Subset not yet solved. Run the solve() method.")
 
 class Subset(SubsetBase):
     """Subset class for geopyv.
@@ -34,154 +28,157 @@ class Subset(SubsetBase):
     ----------
     coord : `numpy.ndarray` (x, y)
         Subset coordinates.
-    f_img : geopyv.Image
-        Reference image of geopyv.Image class, instantiated by :mod:`~image.Image`.
-    g_img : geopyv.Image
-        Target image of geopyv.Image class, instantiated by :mod:`~image.Image`.
-    template : `geopyv.Template`
+    f_img : geopyv.image.Image
+        Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
+    g_img : geopyv.image.Image
+        Target image of geopyv.imageImage class, instantiated by :mod:`~image.Image`.
+    template : `geopyv.templates.Template`
         Subset template object.
 
     Attributes
     ----------
-    f_img : `geopyv.Image`
+    data : dict
+        Data object containing all settings and results.
+    _f_img : `geopyv.image.Image`
         Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
-    g_img : `geopyv.Image`
+    _g_img : `geopyv.image.Image`
         Target image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
-    template: `geopyv.Template`
+    _template: `geopyv.templates.Template`
         Subset template object.
-    method : `str`
+    _method : `str`
         Solver type. Options are 'ICGN' and 'FAGN'.
-    init_guess_size : int
+    _init_guess_size : int
         Size of subset used to define the initial guess, approximated by private method
         :meth:`~_get_initial_guess_size`.
-    f_coord : `numpy.ndarray` (x, y)
+    _f_coord : `numpy.ndarray` (x, y)
         1D array of the coordinates of the subset in reference image of type `float`.
-    f_coords : `numpy.ndarray` (Nx, 2)
+    _f_coords : `numpy.ndarray` (Nx, 2)
         2D array of subset coordinates in reference image of type `float`.
-    grad_f : `numpy.ndarray` (Nx, 2)
+    _grad_f : `numpy.ndarray` (Nx, 2)
         Gradients of reference image `f`.
-    SSSIG : float
+    _SSSIG : float
         Sum of the square of the reference subset intensity gradients.
-    sigma_intensity : float
+    _sigma_intensity : float
         Standard deviaition of the reference subset intensities.
-    p_0 : `numpy.ndarray` (Nx, 1)
+    _p_0 : `numpy.ndarray` (Nx, 1)
         1D array of initial warp function parameters of type `float`, used to precondition
         class method :meth:`~solve`.
-    p : `numpy.ndarray` (Nx, 1)
+    _p : `numpy.ndarray` (Nx, 1)
         1D array of warp function parameters of type `float`, output by class
         method :meth:`~solve`.
-    norm : float
+    _norm : float
         Custom norm of the increment in the warp function parameters after
         Gao et al. (2015), computed by private method :meth:`~_get_norm`.
-    C_ZNSSD : float
+    _C_ZNSSD : float
         Zero-normalised sum of squared differences coefficient, computed by private
         method :meth:`~_get_correlation`.
-    C_ZNCC : float
+    _C_ZNCC : float
         Zero-normalised cross-correlation coefficient, computed by private method
         :meth:`~_get_correlation`.
-    x : float
+    _x : float
         Initial horizontal coordinate.
-    y : float 
+    _y : float 
         Initial vertical coordinate.
-    u : float
+    _u : float
         Horizontal displacement.
-    v : float 
+    _v : float 
         Vertical displacement.
-    x_f : float
-        Final horizontal coordinate.self.initialised
-    y_f : float
+    _x_f : float
+        Final horizontal coordinate.
+    _y_f : float
         Final vertical coordinate.
-    settings: dict
+    _settings: dict
         Dictionary of settings.
-    quality: dict 
+    _quality: dict 
         Dictionary of image quality measures.
-    results: dict
+    _results: dict
         Dictionary of results.
     """
 
-    def __init__(self, f_coord=None, f_img=None, g_img=None, template=Circle(50)):
+    def __init__(self, *, f_coord=None, f_img=None, g_img=None, template=None):
         """Initialisation of geopyv subset object."""
-        self.initialised = False
-        self.f_coord = f_coord.astype(float)
-        self.f_img = f_img
-        self.g_img = g_img
-        self.template = template
+        self._initialised = False
+        self._f_coord = f_coord
+        self._f_img = f_img
+        self._g_img = g_img
+        self._template = template
 
         # Check types.
-        if type(self.f_img) != Image:
-            self.f_img = self._load_f_img()
-        if type(self.g_img) != Image:
-            self.g_img = self._load_g_img()
-        if type(self.f_coord) != np.ndarray:
-            self.f_coord = np.empty(2)
-            coordinate = CoordinateSelector()
-            self.f_coord = coordinate.select(self.f_img, self.template)
-        elif np.shape(self.f_coord) != np.shape(np.empty(2)):
+        if type(self._f_img) != gp.image.Image:
+            self._f_img = self._load_f_img()
+        if type(self._g_img) != gp.image.Image:
+            self._g_img = self._load_g_img()
+        if type(self._f_coord) != np.ndarray:
+            self._f_coord = np.empty(2)
+            coordinate = gp.gui.CoordinateSelector()
+            self._f_coord = coordinate.select(self._f_img, self._template)
+        elif np.shape(self._f_coord) != np.shape(np.empty(2)):
             raise TypeError("Coordinate is not an np.ndarray of length 2.")
-        if type(self.template) != Circle:
-            if type(template) != Square:
-                raise TypeError("Template is not a type defined in geopyv.templates.")
+        if self._template == None:
+            self._template = gp.templates.Circle(50)
+        elif type(self._template) != gp.templates.Circle and type(self._template) != gp.templates.Square:
+            raise TypeError("Template is not a type defined in geopyv.templates.")
 
         # Check subset is entirely within the reference image.
-        self.x = self.f_coord[0]
-        self.y = self.f_coord[1]
+        self._x = self._f_coord[0]
+        self._y = self._f_coord[1]
         subset_list = np.array([
-            [self.x-self.template.size, self.y-self.template.size],
-            [self.x+self.template.size, self.y+self.template.size],
-            [self.x-self.template.size, self.y+self.template.size],
-            [self.x+self.template.size, self.y-self.template.size]
+            [self._x-self._template.size, self._y-self._template.size],
+            [self._x+self._template.size, self._y+self._template.size],
+            [self._x-self._template.size, self._y+self._template.size],
+            [self._x+self._template.size, self._y-self._template.size]
             ])
         if np.any(subset_list<0):
             raise ValueError("Subset reference partially falls outside reference image.")
 
         # Initialise subset.
         self._get_initial_guess_size()
-        output = _init_reference(self.f_coord, self.template.coords, self.f_img.QCQT)
-        self.f_coords = output[0]
-        self.f = output[1]
-        self.f_m = output[2][0][0]
-        self.Delta_f = output[2][1][0]
-        self.grad_f = output[3]
-        self.SSSIG = output[4][0][0]
-        self.sigma_intensity = output[4][1][0]
-        self.solved = False
-        self.unsolvable = False
-        self.initialised == True
-        self.quality = {
-            "SSSIG": self.SSSIG,
-            "sigma_intensity": self.sigma_intensity,
+        output = gp._subset_extensions._init_reference(self._f_coord, self._template.coords, self._f_img.QCQT)
+        self._f_coords = output[0]
+        self._f = output[1]
+        self._f_m = output[2][0][0]
+        self._Delta_f = output[2][1][0]
+        self._grad_f = output[3]
+        self._SSSIG = output[4][0][0]
+        self._sigma_intensity = output[4][1][0]
+        self._solved = False
+        self._unsolvable = False
+        self._initialised == True
+        self._quality = {
+            "SSSIG": self._SSSIG,
+            "sigma_intensity": self._sigma_intensity,
         }
 
         # Data.
         self.data = {
             "type": "Subset",
-            "solved": self.solved,
-            "unsolvable": self.unsolvable,
+            "solved": self._solved,
+            "unsolvable": self._unsolvable,
             "images": {
-                "f_img": self.f_img.filepath,
-                "g_img": self.g_img.filepath,
+                "f_img": self._f_img.filepath,
+                "g_img": self._g_img.filepath,
             },
             "position": {
-                "x": self.x,
-                "y": self.y,
+                "x": self._x,
+                "y": self._y,
             },
-            "quality": self.quality,
+            "quality": self._quality,
             "template": {
-                "shape": self.template.shape,
-                "dimension": self.template.dimension,
-                "size": self.template.size,
-                "n_px": self.template.n_px,
+                "shape": self._template.shape,
+                "dimension": self._template.dimension,
+                "size": self._template.size,
+                "n_px": self._template.n_px,
             }
         }
 
-    def solve(self, max_norm=1e-3, max_iterations=15, order=1, p_0=None, tolerance=0.7, method="ICGN"):
+    def solve(self, *, max_norm=1e-3, max_iterations=15, order=1, p_0=None, tolerance=0.7, method="ICGN"):
         """Method to solve for the subset displacements using the various methods.
 
         Parameters
         ----------
         max_norm : float, optional
             Exit criterion for norm of increment in warp function. Defaults to value of
-            :math:`1 \cdot 10^{-5}`.
+            :math:`1 \cdot 10^{-3}`.
         max_iterations : int, optional
             Exit criterion for number of Gauss-Newton iterations. Defaults to value
             of 50.
@@ -192,6 +189,7 @@ class Subset(SubsetBase):
         method : str
             Solution method. Options are FAGN and ICGN. Default is ICGN since it
             is faster.
+
 
 
         .. note::
@@ -236,77 +234,77 @@ class Subset(SubsetBase):
                 raise TypeError("Warp function of incorrect type.")
 
         # Store settings.
-        self.method = method
-        self.order = order
-        self.max_norm = max_norm
-        self.max_iterations = max_iterations
-        self.tolerance = tolerance
-        self.settings = {
-            "method": self.method,
-            "order": self.order,
-            "max_norm": self.max_norm,
-            "max_iterations": self.max_iterations,
-            "tolerance": self.tolerance,
+        self._method = method
+        self._order = order
+        self._max_norm = max_norm
+        self._max_iterations = max_iterations
+        self._tolerance = tolerance
+        self._settings = {
+            "method": self._method,
+            "order": self._order,
+            "max_norm": self._max_norm,
+            "max_iterations": self._max_iterations,
+            "tolerance": self._tolerance,
         }
-        self.data.update({"settings": self.settings})
+        self.data.update({"settings": self._settings})
 
         # Compute initial guess if u and v in deformation parameter vector initialised
         # with zeros, otherwise precondition.
         if p_0[0] == 0 and p_0[1] == 0:
-            self.p_init = p_0
+            self._p_init = p_0
             self._get_initial_guess()
-            self.p = self.p_init
+            self._p = self._p_init
         else:
-            self.p = p_0
+            self._p = p_0
 
         # Call appropriate iterative solver:
         try:
-            if self.method == "ICGN" and np.mod(self.p.shape[0],2) == 0:
-                results = _solve_ICGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
-            elif self.method == "FAGN" and np.mod(self.p.shape[0],2) == 0:
-                results = _solve_FAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
+            if self._method == "ICGN" and np.mod(self._p.shape[0],2) == 0:
+                results = gp._subset_extensions._solve_ICGN(self._f_coord, self._f_coords, self._f, self._f_m, self._Delta_f, self._grad_f, self._f_img.QCQT, self._g_img.QCQT, self._p, self._max_norm, self._max_iterations)
+            elif self._method == "FAGN" and np.mod(self._p.shape[0],2) == 0:
+                results = gp._subset_extensions._solve_FAGN(self._f_coord, self._f_coords, self._f, self._f_m, self._Delta_f, self._grad_f, self._f_img.QCQT, self._g_img.QCQT, self._p, self._max_norm, self._max_iterations)
             # Unpack results.
-            self.g_coords = results[0]
-            self.g = results[1]
-            self.g_m = results[2][0][0]
-            self.g_m = results[2][1][0]
-            self.iterations = np.max(results[3][0,:]).astype(int)
-            self.history = results[3][:,:self.iterations]
-            self.norm = self.history[1][-1]
-            self.C_ZNCC = self.history[2][-1]
-            self.C_ZNSSD = self.history[3][-1]
-            self.p = results[4]
-            self.u = self.p[0][0]
-            self.v = self.p[1][0]
-            self.x_f = self.x+self.u
-            self.y_f = self.y+self.v
+            self._g_coords = results[0]
+            self._g = results[1]
+            self._g_m = results[2][0][0]
+            self._g_m = results[2][1][0]
+            self._iterations = np.max(results[3][0,:]).astype(int)
+            self._history = results[3][:,:self._iterations]
+            self._norm = self._history[1][-1]
+            self._C_ZNCC = self._history[2][-1]
+            self._C_ZNSSD = self._history[3][-1]
+            self._p = results[4]
+            self._u = self._p[0][0]
+            self._v = self._p[1][0]
+            self._x_f = self._x+self._u
+            self._y_f = self._y+self._v
 
             # Check for tolerance.
-            if self.C_ZNCC > self.tolerance:
-                self.solved = True
+            if self._C_ZNCC > self._tolerance:
+                self._solved = True
                 log.debug("Subset solved.")
-                log.debug("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self.x, y_i=self.y))
-                log.debug("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self.u, v=self.v))
-                log.debug("Correlation coefficient: CC = {C_ZNCC} (-), SSD = {C_ZNSSD} (-)".format(C_ZNCC=self.C_ZNCC, C_ZNSSD=self.C_ZNSSD))
-                log.debug("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self.x_f, y_f=self.y_f))
+                log.debug("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self._x, y_i=self._y))
+                log.debug("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self._u, v=self._v))
+                log.debug("Correlation coefficient: CC = {C_ZNCC} (-), SSD = {C_ZNSSD} (-)".format(C_ZNCC=self._C_ZNCC, C_ZNSSD=self._C_ZNSSD))
+                log.debug("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self._x_f, y_f=self._y_f))
         
             # Pack results.
-            self.data["solved"] = self.solved
-            self.data["unsolvable"] = self.unsolvable
-            self.results = {
-                "u": self.u,
-                "v": self.v,
-                "p": self.p,
-                "history": self.history,
-                "iterations": self.iterations,
-                "norm": self.norm,
-                "C_ZNCC": self.C_ZNCC,
-                "C_ZNSSD": self.C_ZNSSD,
+            self.data["solved"] = self._solved
+            self.data["unsolvable"] = self._unsolvable
+            self._results = {
+                "u": self._u,
+                "v": self._v,
+                "p": self._p,
+                "history": self._history,
+                "iterations": self._iterations,
+                "norm": self._norm,
+                "C_ZNCC": self._C_ZNCC,
+                "C_ZNSSD": self._C_ZNSSD,
             }
-            self.data.update({"results": self.results})
-            
+            self.data.update({"results": self._results})
+
             # Return solved boolean.
-            return self.solved
+            return self._solved
 
         except:
             raise RuntimeError("Runtime error in solve method.")
@@ -314,9 +312,9 @@ class Subset(SubsetBase):
     def _load_img(self, message):
         """Private method to open a file dialog and select an image."""
         directory = os.getcwd()
-        dialog = ImageSelector()
+        dialog = gp.gui.ImageSelector()
         imgpath = dialog.get_path(directory, message)
-        img = Image(imgpath)
+        img = gp.image.Image(imgpath)
         return img
 
     def _load_f_img(self):
@@ -332,30 +330,30 @@ class Subset(SubsetBase):
     def _get_initial_guess_size(self):
         """Private method to estimate the size of square subset to use in the
         initial guess."""
-        self.initial_guess_size = np.round(np.sqrt(self.template.n_px), 1)
+        self._initial_guess_size = np.round(np.sqrt(self._template.n_px), 1)
 
     def _get_initial_guess(self):
         """Private method to compute an initial guess of the subset displacement using
         OpenCV function :py:meth:`cv2.matchTemplate` and the Normalised
         Cross-Correlation (NCC) criteria."""
         # Extract square subset for initial guess.
-        x = self.f_coord.item(0)
-        y = self.f_coord.item(1)
-        x_min = (np.round(x, 0) - self.initial_guess_size / 2).astype(int)
-        x_max = (np.round(x, 0) + self.initial_guess_size / 2).astype(int)
-        y_min = (np.round(y, 0) - self.initial_guess_size / 2).astype(int)
-        y_max = (np.round(y, 0) + self.initial_guess_size / 2).astype(int)
-        subset = self.f_img.image_gs.astype(np.float32)[y_min:y_max, x_min:x_max]
+        x = self._f_coord.item(0)
+        y = self._f_coord.item(1)
+        x_min = (np.round(x, 0) - self._initial_guess_size / 2).astype(int)
+        x_max = (np.round(x, 0) + self._initial_guess_size / 2).astype(int)
+        y_min = (np.round(y, 0) - self._initial_guess_size / 2).astype(int)
+        y_max = (np.round(y, 0) + self._initial_guess_size / 2).astype(int)
+        subset = self._f_img.image_gs.astype(np.float32)[y_min:y_max, x_min:x_max]
 
         # Apply template matching technique.
         res = cv2.matchTemplate(
-            self.g_img.image_gs.astype(np.float32), subset, cv2.TM_CCORR_NORMED
+            self._g_img.image_gs.astype(np.float32), subset, cv2.TM_CCORR_NORMED
         )
         max_loc = cv2.minMaxLoc(res)[3]
 
         # Create initialised warp vector with affine displacements preconditioned.
-        self.p_init[0] = (max_loc[0] + self.initial_guess_size / 2) - x
-        self.p_init[1] = (max_loc[1] + self.initial_guess_size / 2) - y
+        self._p_init[0] = (max_loc[0] + self._initial_guess_size / 2) - x
+        self._p_init[1] = (max_loc[1] + self._initial_guess_size / 2) - y
   
 class SubsetResults(SubsetBase):
     """SubsetResults class for geopyv.

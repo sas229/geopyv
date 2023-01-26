@@ -15,3 +15,29 @@ Submodules
    ImageSelector/index.rst
 
 
+Package Contents
+----------------
+
+Classes
+~~~~~~~
+
+.. autoapisummary::
+
+   geopyv.gui.ImageSelector
+   geopyv.gui.CoordinateSelector
+
+
+
+
+.. py:class:: ImageSelector
+
+   .. py:method:: get_path(message, directory)
+
+
+
+.. py:class:: CoordinateSelector
+
+   .. py:method:: select(f_img, template)
+
+
+

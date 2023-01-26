@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 class Template:
     """Class for geopyv template.
@@ -21,6 +20,8 @@ class Template:
         Number of pixels in the subset template.
     coords : `numpy.ndarray` (Nx, 2)
         2D array of subset template coordinates of type `float`.
+    subset_mask : `numpy.ndarray` (Nx, 2)
+        2D array of coordinates to mask of type `float`.
     """
 
     def __init__(self, size):

@@ -278,10 +278,7 @@ class Mesh(MeshBase):
         """Private method to optimize the element size to generate approximately the desired number of elements."""
         f = lambda size: self._uniform_remesh(size, self.boundary, self.segments, self.curves, self.target_nodes, self.size_lower_bound)
         res = minimize_scalar(f, bounds=(self.size_lower_bound, self.size_upper_bound), method='bounded')
-        _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
-        _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element types, element tags, element node tags.
-        self.nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
-        self.elements = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
+        self._update_mesh()
 
     def _adaptive_mesh(self):
         message = "Adaptively remeshing..."
@@ -291,7 +288,7 @@ class Mesh(MeshBase):
             self.areas *= (np.clip(D/D_b, self.alpha, self.beta))**-2 # Target element areas calculated. 
             f = lambda scale: self._adaptive_remesh(scale, self.target_nodes, self.nodes, self.elements, self.areas)
             minimize_scalar(f)
-            bar()
+            bar()  
 
     @staticmethod
     def _uniform_remesh(size, boundary, segments, curves, target_nodes, size_lower_bound):
@@ -332,13 +329,13 @@ class Mesh(MeshBase):
         return abs(number_nodes - target_nodes)
 
     @staticmethod
-    def _adaptive_remesh(scale, target, nodes, triangulation, areas):
+    def _adaptive_remesh(scale, target, nodes, elements, areas):
         lengths = area_to_length(areas*scale) # Convert target areas to target characteristic lengths.
         bg = gmsh.view.add("bg", 1) # Create background view.
-        data = np.pad(nodes[triangulation[:,:3]], ((0,0),(0,0),(0,2)), mode='constant') # Prepare data input (coordinates and buffer).
+        data = np.pad(nodes[elements[:,:3]], ((0,0),(0,0),(0,2)), mode='constant') # Prepare data input (coordinates and buffer).
         data[:,:,3] = np.reshape(np.repeat(lengths, 3), (-1,3)) # Fill data input buffer with target weights.
         data = np.transpose(data, (0,2,1)).flatten() # Reshape for input.
-        gmsh.view.addListData(bg, "ST", len(triangulation),  data) # Add data to view.
+        gmsh.view.addListData(bg, "ST", len(elements),  data) # Add data to view.
         bgf = gmsh.model.mesh.field.add("PostView") # Add view to field. 
         gmsh.model.mesh.field.setNumber(bgf, "ViewTag", bg) # Establish field reference (important for function reuse).
         gmsh.model.mesh.field.setAsBackgroundMesh(bgf) # Set field as background.

@@ -1,3 +1,2 @@
-from . import Gui
-from . import ImageSelector
-from . import CoordinateSelector
+from .ImageSelector import ImageSelector
+from .CoordinateSelector import CoordinateSelector

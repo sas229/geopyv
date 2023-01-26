@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
-from ._image_extensions import _QCQT
-
+import geopyv as gp
 
 class Image:
     """Image class for geopyv.
@@ -114,5 +113,5 @@ class Image:
 
         # Call C++ extension to perform computations.
         C = self._get_C()
-        self.QCQT = _QCQT(Q, QT, C, self.image_gs.shape, self.border)
+        self.QCQT = gp._image_extensions._QCQT(Q, QT, C, self.image_gs.shape, self.border)
         return

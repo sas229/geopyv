@@ -2,15 +2,7 @@ import logging
 import cv2
 import os
 import numpy as np
-from geopyv.image import Image
-from geopyv.templates import Circle, Square
-from geopyv.gui import ImageSelector, CoordinateSelector
-from geopyv.plots import inspect_subset, convergence_subset
-from ._subset_extensions import (
-    _init_reference,
-    _solve_ICGN,
-    _solve_FAGN,
-)
+import geopyv as gp
 
 log = logging.getLogger(__name__)
 
@@ -18,12 +10,12 @@ class SubsetBase:
     """Subset base class to be used as a mixin."""
     def inspect(self, show=True, block=True, save=None):
         """Method to show the subset and associated quality metrics."""
-        inspect_subset(self.data, mask=None, show=show, block=block, save=save)
+        gp.plots.inspect_subset(self.data, mask=None, show=show, block=block, save=save)
 
     def convergence(self, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the subset."""
         if "results" in self.data:
-            convergence_subset(self.data, show=show, block=block, save=save)
+            gp.plots.convergence_subset(self.data, show=show, block=block, save=save)
         else:
             raise Exception("Warning: Subset not yet solved. Run the solve() method.")
 
@@ -34,20 +26,20 @@ class Subset(SubsetBase):
     ----------
     coord : `numpy.ndarray` (x, y)
         Subset coordinates.
-    f_img : geopyv.Image
-        Reference image of geopyv.Image class, instantiated by :mod:`~image.Image`.
-    g_img : geopyv.Image
-        Target image of geopyv.Image class, instantiated by :mod:`~image.Image`.
-    template : `geopyv.Template`
+    f_img : geopyv.image.Image
+        Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
+    g_img : geopyv.image.Image
+        Target image of geopyv.imageImage class, instantiated by :mod:`~image.Image`.
+    template : `geopyv.templates.Template`
         Subset template object.
 
     Attributes
     ----------
-    f_img : `geopyv.Image`
+    f_img : `geopyv.image.Image`
         Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
-    g_img : `geopyv.Image`
+    g_img : `geopyv.image.Image`
         Target image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
-    template: `geopyv.Template`
+    template: `geopyv.templates.Template`
         Subset template object.
     method : `str`
         Solver type. Options are 'ICGN' and 'FAGN'.
@@ -99,28 +91,29 @@ class Subset(SubsetBase):
         Dictionary of results.
     """
 
-    def __init__(self, f_coord=None, f_img=None, g_img=None, template=Circle(50)):
+    def __init__(self, *, f_coord=None, f_img=None, g_img=None, template=None):
         """Initialisation of geopyv subset object."""
         self.initialised = False
-        self.f_coord = f_coord.astype(float)
+        self.f_coord = f_coord
         self.f_img = f_img
         self.g_img = g_img
         self.template = template
 
         # Check types.
-        if type(self.f_img) != Image:
+        if type(self.f_img) != gp.image.Image:
             self.f_img = self._load_f_img()
-        if type(self.g_img) != Image:
+        if type(self.g_img) != gp.image.Image:
             self.g_img = self._load_g_img()
         if type(self.f_coord) != np.ndarray:
             self.f_coord = np.empty(2)
-            coordinate = CoordinateSelector()
+            coordinate = gp.gui.CoordinateSelector()
             self.f_coord = coordinate.select(self.f_img, self.template)
         elif np.shape(self.f_coord) != np.shape(np.empty(2)):
             raise TypeError("Coordinate is not an np.ndarray of length 2.")
-        if type(self.template) != Circle:
-            if type(template) != Square:
-                raise TypeError("Template is not a type defined in geopyv.templates.")
+        if self.template == None:
+            self.template = gp.templates.Circle(50)
+        elif type(self.template) != gp.templates.Circle and type(self.template) != gp.templates.Square:
+            raise TypeError("Template is not a type defined in geopyv.templates.")
 
         # Check subset is entirely within the reference image.
         self.x = self.f_coord[0]
@@ -136,7 +129,7 @@ class Subset(SubsetBase):
 
         # Initialise subset.
         self._get_initial_guess_size()
-        output = _init_reference(self.f_coord, self.template.coords, self.f_img.QCQT)
+        output = gp._subset_extensions._init_reference(self.f_coord, self.template.coords, self.f_img.QCQT)
         self.f_coords = output[0]
         self.f = output[1]
         self.f_m = output[2][0][0]
@@ -174,7 +167,7 @@ class Subset(SubsetBase):
             }
         }
 
-    def solve(self, max_norm=1e-3, max_iterations=15, order=1, p_0=None, tolerance=0.7, method="ICGN"):
+    def solve(self, *, max_norm=1e-3, max_iterations=15, order=1, p_0=None, tolerance=0.7, method="ICGN"):
         """Method to solve for the subset displacements using the various methods.
 
         Parameters
@@ -262,9 +255,9 @@ class Subset(SubsetBase):
         # Call appropriate iterative solver:
         try:
             if self.method == "ICGN" and np.mod(self.p.shape[0],2) == 0:
-                results = _solve_ICGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
+                results = gp._subset_extensions._solve_ICGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
             elif self.method == "FAGN" and np.mod(self.p.shape[0],2) == 0:
-                results = _solve_FAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
+                results = gp._subset_extensions._solve_FAGN(self.f_coord, self.f_coords, self.f, self.f_m, self.Delta_f, self.grad_f, self.f_img.QCQT, self.g_img.QCQT, self.p, self.max_norm, self.max_iterations)
             # Unpack results.
             self.g_coords = results[0]
             self.g = results[1]
@@ -314,9 +307,10 @@ class Subset(SubsetBase):
     def _load_img(self, message):
         """Private method to open a file dialog and select an image."""
         directory = os.getcwd()
-        dialog = ImageSelector()
+        print(gp.gui.ImageSelector)
+        dialog = gp.gui.ImageSelector()
         imgpath = dialog.get_path(directory, message)
-        img = Image(imgpath)
+        img = gp.image.Image(imgpath)
         return img
 
     def _load_f_img(self):

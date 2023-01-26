@@ -1,10 +1,8 @@
 import logging
 import json
 import numpy as np
+import geopyv as gp
 from numpyencoder import NumpyEncoder
-from geopyv.subset import Subset, SubsetResults
-from geopyv.mesh import Mesh, MeshResults
-from geopyv.particle import Particle
 from alive_progress import alive_bar
 
 log = logging.getLogger(__name__)
@@ -24,15 +22,15 @@ def load(filename=None):
             object_type = data["type"]
             log.info("Loaded {object_type} object from {filepath}.".format(object_type=object_type, filepath=filepath))
             if data["type"] == "Subset":
-                return SubsetResults(data)
+                return gp.subset.SubsetResults(data)
             elif data["type"] == "Mesh":
-                return MeshResults(data)
+                return gp.mesh.MeshResults(data)
     except:
         raise FileNotFoundError("File not found.")
 
 def save(object, filename):
     """Function to save data from a geopyv object."""
-    if type(object) == Subset or type(object) == Mesh or type(object == Particle):
+    if type(object) == gp.subset.Subset or type(object) == gp.mesh.Mesh or type(object == gp.particle.Particle):
         solved = object.data["solved"]
         if solved == True:
             ext = ".pyv"

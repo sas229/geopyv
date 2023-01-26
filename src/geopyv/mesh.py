@@ -1,11 +1,7 @@
 import logging
 import numpy as np
 import scipy as sp
-from geopyv.templates import Circle
-from geopyv.image import Image
-from geopyv.subset import Subset
-from geopyv.geometry.utilities import area_to_length
-from geopyv.plots import inspect_subset, convergence_subset, contour_mesh, inspect_mesh, convergence_mesh, quiver_mesh
+import geopyv as gp
 import gmsh
 from copy import deepcopy
 from scipy.optimize import minimize_scalar
@@ -29,44 +25,44 @@ class MeshBase:
                 subset_data = self.data["results"]["subsets"][subset]
                 if self.data["type"] == "Mesh":
                     mask = self.data["mask"]
-                inspect_subset(data=subset_data, mask=mask, show=show, block=block, save=save)
+                gp.plots.inspect_subset(data=subset_data, mask=mask, show=show, block=block, save=save)
             else:
                 raise ValueError("Subset index provided is out of the range of the mesh object contents.")
         # Otherwise inspect the mesh.
         else:
-            inspect_mesh(data=self.data, show=show, block=block, save=save)
+            gp.plots.inspect_mesh(data=self.data, show=show, block=block, save=save)
 
     def convergence(self, subset=None, quantity=None, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the mesh."""
         # If a subset index is given, inspect the subset.
         if subset != None:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
-                convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
+                gp.plots.convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
             else:
                 raise ValueError("Subset index provided is out of the range of the mesh object contents.")
         # Otherwise inspect the mesh.
         else:
-            convergence_mesh(data=self.data, quantity=quantity, show=show, block=block, save=save)
+            gp.plots.convergence_mesh(data=self.data, quantity=quantity, show=show, block=block, save=save)
     
     def contour(self, quantity="C_ZNCC", imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot the contours of a given measure."""
         if quantity != None:
-            fig, ax = contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, ticks=ticks, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
+            fig, ax = gp.plots.contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, ticks=ticks, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
             return fig, ax
     
     def quiver(self, scale=1, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot a quiver plot of the displacements."""
-        quiver_mesh(data=self.data, scale=scale, imshow=imshow, mesh=mesh, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
+        gp.plots.quiver_mesh(data=self.data, scale=scale, imshow=imshow, mesh=mesh, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
 
 class Mesh(MeshBase):
 
-    def __init__(self, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 1, size_upper_bound = 1000):
+    def __init__(self, *, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 1, size_upper_bound = 1000):
         """Initialisation of geopyv mesh object."""
         self.initialised = False
         # Check types.
-        if type(f_img) != Image:
-            raise TypeError("Reference image not geopyv.image.Image type.")
-        elif type(g_img) != Image:
+        if type(f_img) != gp.image.Image:
+            raise TypeError("Reference image not geopyv.image.gp.image.Image type.")
+        elif type(g_img) != gp.image.Image:
             raise TypeError("Target image not geopyv.image.Image type.")
         elif type(target_nodes) != int:
             raise TypeError("Maximum number of elements not of integer type.")
@@ -139,13 +135,17 @@ class Mesh(MeshBase):
         print("Mesh generated with {n} nodes and {e} elements.".format(n=len(self.nodes), e=len(self.elements)))
         gmsh.finalize()        
 
-    def solve(self, seed_coord=None, template=Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2):
+    def solve(self, *, seed_coord=None, template=None, max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2):
 
         # Check inputs.
         if type(seed_coord) != np.ndarray:
             raise TypeError("Coordinate is not of numpy.ndarray type. Cannot initiate solver.")
         elif type(adaptive_iterations) != int:
             raise TypeError("Number of adaptive iterations of invalid type. Must be an integer greater than or equal to zero.")
+        if template == None:
+            template = gp.templates.Circle(50)
+        elif type(template) != gp.templates.Circle and type(template) != gp.templates.Square:
+            raise TypeError("Template is not a type defined in geopyv.templates.")
 
         # Store variables.
         self.seed_coord = seed_coord
@@ -333,7 +333,7 @@ class Mesh(MeshBase):
 
     @staticmethod
     def _adaptive_remesh(scale, target, nodes, triangulation, areas):
-        lengths = area_to_length(areas*scale) # Convert target areas to target characteristic lengths.
+        lengths = gp.geometry.utilities.area_to_length(areas*scale) # Convert target areas to target characteristic lengths.
         bg = gmsh.view.add("bg", 1) # Create background view.
         data = np.pad(nodes[triangulation[:,:3]], ((0,0),(0,0),(0,2)), mode='constant') # Prepare data input (coordinates and buffer).
         data[:,:,3] = np.reshape(np.repeat(lengths, 3), (-1,3)) # Fill data input buffer with target weights.
@@ -456,9 +456,9 @@ class Mesh(MeshBase):
                 centre = self.nodes[tag]
                 template = deepcopy(self.template)
                 template.mask(centre, self.mask)
-                self.subsets[tag] = Subset(self.nodes[tag], self.f_img, self.g_img, template) # Create masked boundary subset. 
+                self.subsets[tag] = gp.subset.Subset(f_coord=self.nodes[tag], f_img=self.f_img, g_img=self.g_img, template=template) # Create masked boundary subset. 
             else:
-                self.subsets[tag] = Subset(self.nodes[tag], self.f_img, self.g_img, self.template) # Create full subset. 
+                self.subsets[tag] = gp.subset.Subset(f_coord=self.nodes[tag], f_img=self.f_img, g_img=self.g_img, template=self.template) # Create full subset. 
         # Solve subsets in mesh.
         number_nodes = np.shape(self.nodes)[0]
         with alive_bar(number_nodes, dual_line=True, bar='blocks', title=self.message) as self.bar:

@@ -1,50 +1,54 @@
 import logging 
 import numpy as np
-import geopyv
+import geopyv as gp
 import matplotlib.pyplot as plt
+from geopyv.gui import ImageSelector
 
 level = logging.INFO
-geopyv.log.initialise(level)
+gp.log.initialise(level)
 
-# # Subset test.
-# ref = geopyv.image.Image("./images/T-Bar/IMG_1062.jpg")
-# tar = geopyv.image.Image("./images/T-Bar/IMG_1064.jpg")
-# template = geopyv.templates.Circle(50)
-# subset = geopyv.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000,1000]), template=template)
-# # subset = Subset(f_img=ref, g_img=tar)
-# subset.inspect()
-# subset.solve()
-# subset.convergence()
+dialog = ImageSelector()
+print(type(dialog))
 
-# geopyv.io.save(subset, "test")
-# del(subset)
+# Subset test.
+ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
+tar = gp.image.Image("./images/T-Bar/IMG_1064.jpg")
+template = gp.templates.Circle(50)
+subset = gp.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000,1000]), template=template)
+# subset = gp.subset.Subset()
+subset.inspect()
+subset.solve()
+subset.convergence()
 
-# # Load subset test.
-# subset = geopyv.io.load("test")
-# subset.inspect(show=False)
-# subset.convergence(show=False)
+gp.io.save(subset, "test")
+del(subset)
 
-# # Mesh test.
-# template = geopyv.templates.Circle(50)
-# boundary = np.asarray(
-#     [[200.0, 200.0],
-#     [200.0, 2700.0],
-#     [3900.0, 2700.0],
-#     [3900.0, 200.0]]
-# )
-# exclusions = []
-# exclusions.append(geopyv.geometry.exclusions.circular_exclusion(np.asarray([1925, 1470]), radius=430, size=100))
-# seed = np.asarray([400, 400.0])
-# mesh = geopyv.mesh.Mesh(f_img=ref, g_img=tar, target_nodes=2000, boundary=boundary, exclusions=exclusions)
-# mesh.inspect()
-# geopyv.io.save(mesh, "mesh")
-# beta = 5.0
-# alpha = 1/beta
-# mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta, tolerance=0.7)
-# geopyv.io.save(mesh, "mesh")
-# del(mesh)
+# Load subset test.
+subset = gp.io.load("test")
+subset.inspect(show=False)
+subset.convergence(show=False)
 
-mesh = geopyv.io.load("mesh")
+# Mesh test.
+template = gp.templates.Circle(50)
+boundary = np.asarray(
+    [[200.0, 200.0],
+    [200.0, 2700.0],
+    [3900.0, 2700.0],
+    [3900.0, 200.0]]
+)
+exclusions = []
+exclusions.append(gp.geometry.exclusions.circular_exclusion(np.asarray([1925, 1470]), radius=430, size=100))
+seed = np.asarray([400, 400.0])
+mesh = gp.mesh.Mesh(f_img=ref, g_img=tar, target_nodes=2000, boundary=boundary, exclusions=exclusions)
+mesh.inspect()
+gp.io.save(mesh, "mesh")
+beta = 5.0
+alpha = 1/beta
+mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta, tolerance=0.7)
+gp.io.save(mesh, "mesh")
+del(mesh)
+
+mesh = gp.io.load("mesh")
 
 # The commands are basically standard matplotlib...
 mesh.convergence()

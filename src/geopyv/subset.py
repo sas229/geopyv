@@ -307,7 +307,8 @@ class Subset(SubsetBase):
             return self._solved
 
         except:
-            raise RuntimeError("Runtime error in solve method.")
+            log.error("Subset not solved.")
+            # raise RuntimeError("Runtime error in solve method.")
 
     def _load_img(self, message):
         """Private method to open a file dialog and select an image."""

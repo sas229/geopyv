@@ -187,6 +187,7 @@ class Mesh(MeshBase):
         try:
             self._reliability_guided()
             if self._unsolvable:
+                log.error("Specified correlation coefficient tolerance not met.")
                 return self._solved
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations+1):
@@ -197,7 +198,9 @@ class Mesh(MeshBase):
                 self._find_seed_node()
                 self._reliability_guided()
                 if self._unsolvable:
-                    return self._solved
+                    log.error("Specified correlation coefficient tolerance not met. Minimum correlation coefficient: {min_C:.2f}; tolerance: {tolerance:.2f}.".format(min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]), tolerance=self._tolerance))
+                    return self._solved    
+            log.info("Solved mesh. Minimum correlation coefficient: {min_C:.2f}; maximum correlation coefficient: {max_C:.2f}.".format(min_C=np.amin(self._C_ZNCC), max_C=np.amax(self._C_ZNCC)))
 
             # Pack data.
             self._solved = True
@@ -231,10 +234,11 @@ class Mesh(MeshBase):
                 "C_ZNCC": self._C_ZNCC,
             }
             self.data.update({"results": self._results})
-        except ValueError:
-            log.error(traceback.format_exc())
-            log.error("Error! Could not solve for all subsets.")
+
+        except:
             self._update = True
+            self._solved = False
+            self._unsolvable = True
         gmsh.finalize()
         return self._solved
         
@@ -475,7 +479,7 @@ class Mesh(MeshBase):
             # If seed not solved, log error, otherwise store variables and solve neighbours.
             if not self._subsets[self._seed_node].data["solved"]:
                 self._update = True 
-                log.error('Error! The seed subset correlation is below tolerance {seed:.3f} < {tolerance:.3f}'.format(seed=self._subsets[self._seed_node].C_ZNCC, tolerance=self._subsets[self._seed_node].tolerance))
+                log.error("Error! The seed subset correlation is below tolerance.")
             else:
                 self._store_variables(self._seed_node, seed=True)
                 
@@ -485,31 +489,29 @@ class Mesh(MeshBase):
 
                 # Solve through sorted queue.
                 self._bar.text = "-> Solving remaining subsets using reliability guided approach..."
-                count = 0
+                count = 1
                 while np.max(self._subset_solved)>-1:
                     # Identify next subset.
                     cur_idx = np.argmax(self._subset_solved*self._C_ZNCC) # Subset with highest correlation coefficient selected.
                     p_0 = self._subsets[cur_idx].data["results"]["p"] # Precondition based on selected subset.
                     self._subset_solved[cur_idx] = -1 # Set as solved. 
                     solved = self._neighbours(cur_idx, p_0) # Calculate for neighbouring subsets.
-                    if solved == False:
-                        break
-                    if count == number_nodes:
-                        break
                     count += 1
                     self._bar()
-                
-        # Update
+                    if count == number_nodes:
+                        break
+                    elif solved == False:
+                        break
+
+        # Update check.
         if any(self._subset_solved != -1):
-            log.error("Specified correlation coefficient tolerance not met. Minimum correlation coefficient: {min_C:.3f}; tolerance: {tolerance:.3f}.".format(min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]), tolerance=self._tolerance))
             self._update = True
             self._solved = False
             self._unsolvable = True
         else:
             # Compute element areas and strains.
-            log.info("Solved mesh. Minimum correlation coefficient: {min_C:.3f}; maximum correlation coefficient: {max_C:.3f}.".format(min_C=np.amin(self._C_ZNCC), max_C=np.amax(self._C_ZNCC)))
-            self._solved = True
             self._update = False
+            self._solved = True
             self._unsolvable = False
             self._element_area()
             self._element_strains()
@@ -566,7 +568,7 @@ class Mesh(MeshBase):
                 else:
                     # Try more extrapolated pre-conditioning.
                     diff = self._nodes[idx] - self._nodes[cur_idx]
-                    p = self._subsets[cur_idx].p
+                    p = self._subsets[cur_idx].data["results"]["p"]
                     if np.shape(p)[0] == 6:
                         p_0[0] = p[0] + p[2]*diff[0] + p[3]*diff[1]
                         p_0[1] = p[1] + p[4]*diff[0] + p[5]*diff[1]
@@ -574,12 +576,12 @@ class Mesh(MeshBase):
                         p_0[0] = p[0] + p[2]*diff[0] + p[3]*diff[1] + 0.5*p[6]*diff[0]**2 + p[7]*diff[0]*diff[1] + 0.5*p[8]*diff[1]**2 # CHECK!!
                         p_0[1] = p[1] + p[4]*diff[0] + p[5]*diff[1] + 0.5*p[9]*diff[0]**2 + p[10]*diff[0]*diff[1] + 0.5*p[11]*diff[1]**2 # CHECK!!
                     self._subsets[idx].solve(max_norm=self._max_norm, max_iterations=self._max_iterations, p_0=p_0, method=self._method, tolerance=self._tolerance)
-                    if self._subsets[idx].solved:
+                    if self._subsets[idx].data["solved"]:
                         self._store_variables(idx)
                     else:
                         # Finally, try the NCC initial guess.
                         self._subsets[idx].solve(max_norm=self._max_norm, max_iterations=self._max_iterations, p_0 = np.zeros(np.shape(p_0)), method=self._method, tolerance=self._tolerance)
-                        if self._subsets[idx].solved:
+                        if self._subsets[idx].data["solved"]:
                             self._store_variables(idx)
                             return True
                         else:

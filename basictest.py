@@ -8,7 +8,7 @@ gp.log.initialise(level)
 
 # Subset test.
 ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
-tar = gp.image.Image("./images/T-Bar/IMG_1064.jpg")
+tar = gp.image.Image("./images/T-Bar/IMG_1066.jpg")
 template = gp.templates.Circle(50)
 subset = gp.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000,1000]), template=template)
 # subset = gp.subset.Subset()
@@ -39,7 +39,7 @@ mesh.inspect()
 gp.io.save(mesh, "mesh")
 beta = 5.0
 alpha = 1/beta
-mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta, tolerance=0.7)
+mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta, tolerance=0.95)
 gp.io.save(mesh, "mesh")
 del(mesh)
 

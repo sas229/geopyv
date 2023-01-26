@@ -46,7 +46,7 @@ Attributes
 
 
 
-.. py:class:: Subset(f_coord=None, f_img=None, g_img=None, template=Circle(50))
+.. py:class:: Subset(*, f_coord=None, f_img=None, g_img=None, template=None)
 
    Bases: :py:obj:`SubsetBase`
 
@@ -54,169 +54,175 @@ Attributes
 
    :param coord: Subset coordinates.
    :type coord: `numpy.ndarray` (x, y)
-   :param f_img: Reference image of geopyv.Image class, instantiated by :mod:`~image.Image`.
-   :type f_img: geopyv.Image
-   :param g_img: Target image of geopyv.Image class, instantiated by :mod:`~image.Image`.
-   :type g_img: geopyv.Image
+   :param f_img: Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
+   :type f_img: geopyv.image.Image
+   :param g_img: Target image of geopyv.imageImage class, instantiated by :mod:`~image.Image`.
+   :type g_img: geopyv.image.Image
    :param template: Subset template object.
-   :type template: `geopyv.Template`
+   :type template: `geopyv.templates.Template`
 
-   .. attribute:: f_img
+   .. attribute:: data
+
+      Data object containing all settings and results.
+
+      :type: dict
+
+   .. attribute:: _f_img
 
       Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
 
-      :type: `geopyv.Image`
+      :type: `geopyv.image.Image`
 
-   .. attribute:: g_img
+   .. attribute:: _g_img
 
       Target image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
 
-      :type: `geopyv.Image`
+      :type: `geopyv.image.Image`
 
-   .. attribute:: template
+   .. attribute:: _template
 
       Subset template object.
 
-      :type: `geopyv.Template`
+      :type: `geopyv.templates.Template`
 
-   .. attribute:: method
+   .. attribute:: _method
 
       Solver type. Options are 'ICGN' and 'FAGN'.
 
       :type: `str`
 
-   .. attribute:: init_guess_size
+   .. attribute:: _init_guess_size
 
       Size of subset used to define the initial guess, approximated by private method
       :meth:`~_get_initial_guess_size`.
 
       :type: int
 
-   .. attribute:: f_coord
+   .. attribute:: _f_coord
 
       1D array of the coordinates of the subset in reference image of type `float`.
 
       :type: `numpy.ndarray` (x, y)
 
-   .. attribute:: f_coords
+   .. attribute:: _f_coords
 
       2D array of subset coordinates in reference image of type `float`.
 
       :type: `numpy.ndarray` (Nx, 2)
 
-   .. attribute:: grad_f
+   .. attribute:: _grad_f
 
       Gradients of reference image `f`.
 
       :type: `numpy.ndarray` (Nx, 2)
 
-   .. attribute:: SSSIG
+   .. attribute:: _SSSIG
 
       Sum of the square of the reference subset intensity gradients.
 
       :type: float
 
-   .. attribute:: sigma_intensity
+   .. attribute:: _sigma_intensity
 
       Standard deviaition of the reference subset intensities.
 
       :type: float
 
-   .. attribute:: p_0
+   .. attribute:: _p_0
 
       1D array of initial warp function parameters of type `float`, used to precondition
       class method :meth:`~solve`.
 
       :type: `numpy.ndarray` (Nx, 1)
 
-   .. attribute:: p
+   .. attribute:: _p
 
       1D array of warp function parameters of type `float`, output by class
       method :meth:`~solve`.
 
       :type: `numpy.ndarray` (Nx, 1)
 
-   .. attribute:: norm
+   .. attribute:: _norm
 
       Custom norm of the increment in the warp function parameters after
       Gao et al. (2015), computed by private method :meth:`~_get_norm`.
 
       :type: float
 
-   .. attribute:: C_ZNSSD
+   .. attribute:: _C_ZNSSD
 
       Zero-normalised sum of squared differences coefficient, computed by private
       method :meth:`~_get_correlation`.
 
       :type: float
 
-   .. attribute:: C_ZNCC
+   .. attribute:: _C_ZNCC
 
       Zero-normalised cross-correlation coefficient, computed by private method
       :meth:`~_get_correlation`.
 
       :type: float
 
-   .. attribute:: x
+   .. attribute:: _x
 
       Initial horizontal coordinate.
 
       :type: float
 
-   .. attribute:: y
+   .. attribute:: _y
 
       Initial vertical coordinate.
 
       :type: float
 
-   .. attribute:: u
+   .. attribute:: _u
 
       Horizontal displacement.
 
       :type: float
 
-   .. attribute:: v
+   .. attribute:: _v
 
       Vertical displacement.
 
       :type: float
 
-   .. attribute:: x_f
+   .. attribute:: _x_f
 
-      Final horizontal coordinate.self.initialised
+      Final horizontal coordinate.
 
       :type: float
 
-   .. attribute:: y_f
+   .. attribute:: _y_f
 
       Final vertical coordinate.
 
       :type: float
 
-   .. attribute:: settings
+   .. attribute:: _settings
 
       Dictionary of settings.
 
       :type: dict
 
-   .. attribute:: quality
+   .. attribute:: _quality
 
       Dictionary of image quality measures.
 
       :type: dict
 
-   .. attribute:: results
+   .. attribute:: _results
 
       Dictionary of results.
 
       :type: dict
 
-   .. py:method:: solve(max_norm=0.001, max_iterations=15, order=1, p_0=None, tolerance=0.7, method='ICGN')
+   .. py:method:: solve(*, max_norm=0.001, max_iterations=15, order=1, p_0=None, tolerance=0.7, method='ICGN')
 
       Method to solve for the subset displacements using the various methods.
 
       :param max_norm: Exit criterion for norm of increment in warp function. Defaults to value of
-                       :math:`1 \cdot 10^{-5}`.
+                       :math:`1 \cdot 10^{-3}`.
       :type max_norm: float, optional
       :param max_iterations: Exit criterion for number of Gauss-Newton iterations. Defaults to value
                              of 50.

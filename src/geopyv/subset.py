@@ -188,6 +188,8 @@ class Subset(SubsetBase):
             Solution method. Options are FAGN and ICGN. Default is ICGN since it
             is faster.
 
+
+
         .. note::
             * If all members of the warp function parameter array are zero, then an
               initial guess at the subset displacement is performed by

@@ -25,6 +25,8 @@ numpyencoder = "*"
 ipykernel = "*"
 sphinxcontrib-bibtex = "*"
 geopyv = {editable = true, path = "."}
+sphinx-autoapi = "*"
+sphinx-copybutton = "*"
 
 [requires]
 python_version = "3"

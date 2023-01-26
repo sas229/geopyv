@@ -136,7 +136,7 @@ def convergence_mesh(data, quantity, show, block, save):
     C_ZNCC = np.asarray(C_ZNCC)
 
     # Create plot.
-    title = "Subset convergence: f_img = {f_img} (px)".format(f_img=f_img)
+    title = "Subset convergence: f_img = {f_img}".format(f_img=f_img)
     fig, ax = plt.subplots(num=title)
     if quantity == "norm":
         ax.hist(norm, bins=50)

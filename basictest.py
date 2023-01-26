@@ -2,13 +2,9 @@ import logging
 import numpy as np
 import geopyv as gp
 import matplotlib.pyplot as plt
-from geopyv.gui import ImageSelector
 
 level = logging.INFO
 gp.log.initialise(level)
-
-dialog = ImageSelector()
-print(type(dialog))
 
 # Subset test.
 ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
@@ -19,7 +15,6 @@ subset = gp.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000,1000]),
 subset.inspect()
 subset.solve()
 subset.convergence()
-
 gp.io.save(subset, "test")
 del(subset)
 

@@ -27,7 +27,7 @@ class MeshBase:
                     mask = self.data["mask"]
                 gp.plots.inspect_subset(data=subset_data, mask=mask, show=show, block=block, save=save)
             else:
-                raise ValueError("Subset index provided is out of the range of the mesh object contents.")
+                log.error("Subset index provided is out of the range of the mesh object contents.")
         # Otherwise inspect the mesh.
         else:
             gp.plots.inspect_mesh(data=self.data, show=show, block=block, save=save)
@@ -39,7 +39,7 @@ class MeshBase:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
                 gp.plots.convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
             else:
-                raise ValueError("Subset index provided is out of the range of the mesh object contents.")
+                log.error("Subset index provided is out of the range of the mesh object contents.")
         # Otherwise inspect the mesh.
         else:
             gp.plots.convergence_mesh(data=self.data, quantity=quantity, show=show, block=block, save=save)
@@ -468,14 +468,14 @@ class Mesh(MeshBase):
             self.bar()
 
             # If seed not solved, log error, otherwise store variables and solve neighbours.
-            if not self.subsets[self.seed_node].solved:
+            if not self.subsets[self.seed_node].data["solved"]:
                 self.update = True 
                 log.error('Error! The seed subset correlation is below tolerance {seed:.3f} < {tolerance:.3f}'.format(seed=self.subsets[self.seed_node].C_ZNCC, tolerance=self.subsets[self.seed_node].tolerance))
             else:
                 self._store_variables(self.seed_node, seed=True)
                 
                 # Solve for neighbours of the seed subset.
-                p_0 = self.subsets[self.seed_node].p # Set seed subset warp function as the preconditioning. 
+                p_0 = self.subsets[self.seed_node].data["results"]["p"] # Set seed subset warp function as the preconditioning. 
                 self._neighbours(self.seed_node, p_0) # Solve for neighbouring subsets.
 
                 # Solve through sorted queue.
@@ -484,7 +484,7 @@ class Mesh(MeshBase):
                 while np.max(self.subset_solved)>-1:
                     # Identify next subset.
                     cur_idx = np.argmax(self.subset_solved*self.C_ZNCC) # Subset with highest correlation coefficient selected.
-                    p_0 = self.subsets[cur_idx].p # Precondition based on selected subset.
+                    p_0 = self.subsets[cur_idx].data["results"]["p"] # Precondition based on selected subset.
                     self.subset_solved[cur_idx] = -1 # Set as solved. 
                     solved = self._neighbours(cur_idx, p_0) # Calculate for neighbouring subsets.
                     if solved == False:
@@ -556,7 +556,7 @@ class Mesh(MeshBase):
             if self.subset_solved[idx] == 0: # If not previously solved.
             # Use nearest-neighbout pre-conditioning.
                 self.subsets[idx].solve(max_norm=self.max_norm, max_iterations=self.max_iterations, p_0=p_0, method=self.method, tolerance=self.tolerance)
-                if self.subsets[idx].solved: # Check against tolerance.
+                if self.subsets[idx].data["solved"]: # Check against tolerance.
                     self._store_variables(idx)
                 else:
                     # Try more extrapolated pre-conditioning.
@@ -587,10 +587,10 @@ class Mesh(MeshBase):
         else:
             flag = 1
         self.subset_solved[idx] = flag
-        self.C_ZNCC[idx] = np.max((self.subsets[idx].C_ZNCC, 0)) # Clip correlation coefficient to positive values.
-        self.p[idx] = self.subsets[idx].p.flatten()
-        self.displacements[idx, 0] = self.subsets[idx].u
-        self.displacements[idx, 1] = self.subsets[idx].v
+        self.C_ZNCC[idx] = np.max((self.subsets[idx].data["results"]["C_ZNCC"], 0)) # Clip correlation coefficient to positive values.
+        self.p[idx] = self.subsets[idx].data["results"]["p"].flatten()
+        self.displacements[idx, 0] = self.subsets[idx].data["results"]["u"]
+        self.displacements[idx, 1] = self.subsets[idx].data["results"]["v"]
 
 class MeshResults(MeshBase):
     """MeshResults class for geopyv.

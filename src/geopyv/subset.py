@@ -10,12 +10,14 @@ class SubsetBase:
     """Subset base class to be used as a mixin."""
     def inspect(self, show=True, block=True, save=None):
         """Method to show the subset and associated quality metrics."""
-        gp.plots.inspect_subset(data=self.data, mask=None, show=show, block=block, save=save)
+        fig, ax = gp.plots.inspect_subset(data=self.data, mask=None, show=show, block=block, save=save)
+        return fig, ax
 
     def convergence(self, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the subset."""
         if "results" in self.data:
-            gp.plots.convergence_subset(data=self.data, show=show, block=block, save=save)
+            fig, ax = gp.plots.convergence_subset(data=self.data, show=show, block=block, save=save)
+            return fig, ax
         else:
             log.error("Subset not yet solved. Run the solve() method.")
 

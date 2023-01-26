@@ -25,24 +25,28 @@ class MeshBase:
                 subset_data = self.data["results"]["subsets"][subset]
                 if self.data["type"] == "Mesh":
                     mask = self.data["mask"]
-                gp.plots.inspect_subset(data=subset_data, mask=mask, show=show, block=block, save=save)
+                fig, ax = gp.plots.inspect_subset(data=subset_data, mask=mask, show=show, block=block, save=save)
+                return fig, ax
             else:
                 log.error("Subset index provided is out of the range of the mesh object contents.")
         # Otherwise inspect the mesh.
         else:
-            gp.plots.inspect_mesh(data=self.data, show=show, block=block, save=save)
+            fig, ax = gp.plots.inspect_mesh(data=self.data, show=show, block=block, save=save)
+            return fig, ax
 
     def convergence(self, subset=None, quantity=None, show=True, block=True, save=None):
         """Method to plot the rate of convergence for the mesh."""
         # If a subset index is given, inspect the subset.
         if subset != None:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
-                gp.plots.convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
+                fig, ax = gp.plots.convergence_subset(self.data["results"]["subsets"][subset], show=show, block=block, save=save)
+                return fig, ax
             else:
                 log.error("Subset index provided is out of the range of the mesh object contents.")
         # Otherwise inspect the mesh.
         else:
-            gp.plots.convergence_mesh(data=self.data, quantity=quantity, show=show, block=block, save=save)
+            fig, ax = gp.plots.convergence_mesh(data=self.data, quantity=quantity, show=show, block=block, save=save)
+            return fig, ax
     
     def contour(self, quantity="C_ZNCC", imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot the contours of a given measure."""
@@ -52,7 +56,8 @@ class MeshBase:
     
     def quiver(self, scale=1, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
         """Method to plot a quiver plot of the displacements."""
-        gp.plots.quiver_mesh(data=self.data, scale=scale, imshow=imshow, mesh=mesh, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
+        fig, ax = gp.plots.quiver_mesh(data=self.data, scale=scale, imshow=imshow, mesh=mesh, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
+        return fig, ax
 
 class Mesh(MeshBase):
 

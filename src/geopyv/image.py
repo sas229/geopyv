@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import geopyv as gp
 
+
 class Image:
     """Image class for geopyv.
 

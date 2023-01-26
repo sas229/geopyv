@@ -8,6 +8,7 @@ from geopyv.mesh import Mesh
 from geopyv.gui import Gui
 from geopyv.particle import Particle
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize_scalar
 import gmsh
 import cv2
 # from ._subset_extensions import _init_reference, _solve_ICGN, _solve_FAGN, _solve_WFAGN
@@ -129,91 +130,13 @@ class Sequence:
                 self.meshes[g_index-1] = mesh # Store the generated mesh.
                 g_index += 1 # Iterate the target image index. 
         
-    def particle(self, key = "AUTO", coords = None, vols = None, opt = 0): #key = 1, coord_opt = 0, par_pts = None, par_vols = None):
-        """A method to generate strain paths using interpolation from the meshes to a distribution of numerical particles.
-        
-        Parameters
-        ----------
-        key : str
-            "AUTO" : Particle positions defined according to a kernel density estimation using all meshes in the sequence,
-                    volumes defined using Voronoi method.
-                    inp : None.
-            "MANUAL" : Particle positions defined by the user via "inp", volumes defined using Voronoi method.
-                    inp : np.ndarray, (N,2). 
-            "MESH" : Particle positions defined using a user-selected mesh via "inp", volumes defined using Voronoi method.
-                    inp : geopyv.Mesh object. 
-        opt : int
-            0 - Combined kde particle distribution with size function 0:
-            1 - Combined kde particle distribution with size function 1:
-            2 - Combined kde particle distribution with size function 2:
-            3 - Combined kde particle distribution with size function 3:
+    def particle(self, coords, vols):
+        """A method to propogate "particles" across the domain upon which strain path interpolation is performed."""
 
-        """
-
-        if key == "AUTO":
-            if type(opt) != int:
-                raise TypeError("opt must be an integer.")
-            elif opt > 3 or opt < 0:
-                raise ValueError("opt must be 0, 1, 2, or 3.")
-            init_coords, init_vols = _distribution(inp = opt)
-        elif key == "MANUAL":
-            if type(coords) != np.ndarray:
-                raise TypeError("Expected np.ndarray, instead recieved {} for coords.".format(type(input)))
-            elif type(vols) != np.ndarray:
-                raise TypeError("Expected np.ndarray, instead recieved {} for vols.".format(type(input)))
-            elif coords.shape[1] != 2:
-                raise ValueError("Expected an np.ndarray of shape (N,2) for coords, instead recieved np.ndarray of shape {}.".format(input.shape))
-            elif len(coords) != len(vols):
-                raise ValueError("Coordinate and volume lengths mismatched.")
-            init_coords = coords
-            init_vols = vols
-        else:
-            raise ValueError("Distribution key not recognised.")
-    
-        self.particles = np.empty(len(init_vols), dtype=object)
+        self.particles = np.empty(len(coords), dtype = object)
         for i in range(len(self.particles)):
-            self.particles[i] = Particle(coord = init_coords[i], meshes = self.meshes, update_register = self.update_register, vol = init_vols[i])
+            self.particles[i] = Particle(coord = coords[i], meshes = self.meshes, update_register = self.update_register, vol = vols[i])
             self.particles[i].solve()
-
-    def _distribution(self, opt = None):
-        """Internal method for distributing particles across the region of interest (RoI). 
-        
-        Parameters
-        ----------
-        opt : int
-            Specifies the size function for the kde produced mesh:
-            0 - Combined kde particle distribution with size function 0:
-            1 - Combined kde particle distribution with size function 1:
-            2 - Combined kde particle distribution with size function 2:
-            3 - Combined kde particle distribution with size function 3:"""
-
-        mesh = _combination_mesh(opt)
-        init_coords = np.mean(mesh.nodes[mesh.triangulation], axis = 1)
-        M = np.ones((len(mesh.triangulation),3,3))
-        M[:,1] = mesh.nodes[mesh.triangulation][:,:,0]
-        M[:,2] = mesh.nodes[mesh.triangulation][:,:,1]
-        init_vols = abs(0.5*np.linalg.det(M))
-
-        return init_coords, init_vols
-         
-    def _combination_mesh(self, opt):
-        mesh = Mesh(f_img = self.img_sequence[0], g_img = self.img_sequence[1], target_nodes=self.target_nodes, boundary = self.boundary, exclusions = self.exclusions) # Create mesh object with roi corresponding to the first image.
-        mesh.nodes = self.mesh.boundary # Overwrite mesh points with roi.
-        for i in range(len(self.meshes)):
-            mesh.nodes = np.append(mesh.nodes, self.meshes[i].nodes[len(mesh.boundary):], axis=0) # Append non-roi mesh points.
-        mesh.triangulation = np.reshape(gmsh.model.mesh.triangulate(mesh.nodes.flatten())-1, (-1,3)) # Define triangles for combined points.
-        kernel = spst.gaussian_kde(mesh.nodes.T) # Create kde.
-        Z = kernel(np.mean(mesh.nodes[mesh.triangulation], axis=1).T) # Sample kde at element centroids.
-        if opt == 0:
-            mesh.areas = 0.5*spsp.erfc(3.6*((Z-np.min(Z))/(np.max(Z)-np.min(Z))-0.5))*area # Set target element areas.
-        elif opt == 1:
-            mesh.areas = area*10**(-2*(Z-np.min(Z))/(np.max(Z)-np.min(Z)))
-        elif opt == 2:
-            mesh.areas = area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))
-        elif opt == 3:
-            mesh.areas = area*(1-((Z-np.min(Z))/(np.max(Z)-np.min(Z))))**2
-        mesh._adaptive_remesh(scale=1.7, target=self.target_nodes, nodes = mesh.nodes, triangulation = mesh.triangulation, areas = mesh.areas) # Generate background field. 
-        mesh._update_mesh() # Extract the numerical particle control mesh.
 
 def PolyArea(pts):
     """A function that returns the area of the input polygon.

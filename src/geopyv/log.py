@@ -87,4 +87,3 @@ def set_level(level):
     """Function to set the log level after initialisation."""
     log = logging.getLogger(__name__)
     log.setLevel(level)
-

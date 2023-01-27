@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "53f9879ad04a81ce160a6769eba46da4666f6b49b206a99775194e8597b580fa"
+            "sha256": "e34a10fd49809e1fe94671b6adb32082ae6de6d0ad6a4bf47cc1c9cc998c7fde"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -307,6 +307,10 @@
             ],
             "markers": "python_version >= '3.7'",
             "version": "==4.38.0"
+        },
+        "geopyv": {
+            "path": ".",
+            "version": "==0.0.1"
         },
         "gmsh": {
             "hashes": [
@@ -1200,10 +1204,6 @@
             ],
             "version": "==1.2.0"
         },
-        "geopyv": {
-            "editable": true,
-            "path": "."
-        },
         "idna": {
             "hashes": [
                 "sha256:814f528e8dead7d329833b91c5faa87d60bf71824cd12a7530b5526063d02cb4",
@@ -1230,11 +1230,11 @@
         },
         "ipython": {
             "hashes": [
-                "sha256:da01e6df1501e6e7c32b5084212ddadd4ee2471602e2cf3e0190f4de6b0ea481",
-                "sha256:f3bf2c08505ad2c3f4ed5c46ae0331a8547d36bf4b21a451e8ae80c0791db95b"
+                "sha256:71618e82e6d59487bea059626e7c79fb4a5b760d1510d02fab1160db6fdfa1f7",
+                "sha256:9c207b0ef2d276d1bfcfeb9a62804336abbe4b170574ea061500952319b1d78c"
             ],
             "markers": "python_version >= '3.8'",
-            "version": "==8.8.0"
+            "version": "==8.9.0"
         },
         "jedi": {
             "hashes": [
@@ -1254,11 +1254,11 @@
         },
         "jupyter-client": {
             "hashes": [
-                "sha256:9d84c114223b79c1ccebd74b8b53404b1a49c48181fe26936d21a160337efc33",
-                "sha256:a19a531a95c0903a9a6d38f9180ff1d7aed8039bfdf60fd01a98def7d9a001f0"
+                "sha256:3f67b1c8b7687e6db09bef10ff97669932b5e6ef6f5a8ee56d444b89022c5007",
+                "sha256:6016b874fd1111d721bc5bee30624399e876e79e6f395d1a559e6dce9fb2e1ba"
             ],
             "markers": "python_version >= '3.8'",
-            "version": "==8.0.0rc0"
+            "version": "==8.0.1"
         },
         "jupyter-core": {
             "hashes": [

@@ -37,6 +37,7 @@ extensions = [
     'sphinx_copybutton',
     'sphinxcontrib.bibtex',
     'sphinx.ext.todo',
+    "sphinx.ext.intersphinx",
 ]
 
 # Napoleon settings.
@@ -67,15 +68,15 @@ html_theme_options = {
 }
 html_show_sourcelink = False
 
+
+# Automatic API documentation.
+autodoc_typehints = "signature"
 add_module_names = True
-
 math_number_all = False
-
 autoapi_dirs = ['../../src/geopyv']
 autoapi_options = [
     'members',
-    'undoc-members',
-    'private-members',
+    # 'undoc-members',
     'show-inheritance',
     'show-module-summary',
     'special-members',
@@ -84,9 +85,22 @@ autoapi_options = [
 autoapi_keep_files = True
 suppress_warnings = ['autoapi']
 autoapi_add_toctree_entry = False
+autoapi_python_class_content = "init"
+autoapi_template_dir = '_templates/autoapi'
 
+# References.
 bibtex_bibfiles = ['refs.bib']
 bibtex_default_style = 'plain'
 
+# To do. 
 todo_include_todos = True
+
+# Figure numbering.
 numfig = True
+
+# Intersphinx.
+intersphinx_mapping = {
+    "matplotlib": ("https://matplotlib.org/stable/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+}
+myst_url_schemes = ["http", "https", ]

@@ -1,3 +1,5 @@
+:orphan:
+
 :py:mod:`geopyv.image`
 ======================
 
@@ -19,11 +21,11 @@ Classes
 
 .. py:class:: Image(filepath, border=20)
 
-   Image class for geopyv.
+   Image class for geopyv Image object.
 
    :param filepath: Path to image.
    :type filepath: str
-   :param border: Bi-quintic B-spline interpolation border.
+   :param border: Bi-quintic B-spline interpolation border. Defaults to a value of 20.
    :type border: int
 
    .. attribute:: image_gs
@@ -39,27 +41,5 @@ Classes
       type `float`, computed by :meth:`~_get_QCQT`.
 
       :type: `numpy.ndarray` (6*Nx, 6*Ny)
-
-   .. py:method:: _get_image_gs()
-
-      Private method to convert colour image to grayscale image for image
-      processing purposes using OpenCV functions 'imread' and 'cvtColor', and apply Gaussian
-      prefilter with 5x5 kernel after Pan et al. (2013), assuming
-      :math:`\sigma_{x} = \sigma_{y} = 0.3 \cdot (0.5 \cdot (k-1)-1) + 0.8 = 1.1`.
-
-
-   .. py:method:: _get_C()
-
-      Private method to calculate the bi-quintic B-spline coefficient matrix
-      :math:`\mathbf{C}` for image intensity interpolation.
-
-
-   .. py:method:: _get_QCQT()
-
-      Private method to precompute the :math:`\mathbf{Q} \cdot
-      \mathbf{C}_\left(i-2:i+3, j-2:j+3\right) \cdot \mathbf{Q^T}` matrix for the
-      image for use in the bi-quintic B-spline image intensity interpolation
-      process.
-
 
 

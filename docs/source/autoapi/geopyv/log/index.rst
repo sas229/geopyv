@@ -1,3 +1,5 @@
+:orphan:
+
 :py:mod:`geopyv.log`
 ====================
 
@@ -30,33 +32,19 @@ Functions
 
    Bases: :py:obj:`logging.Formatter`
 
-   Function to format the std log output such that INFO logs provide
-   just the log message and other levels also provide the level type.
+   Initialize the formatter with specified format strings.
 
-   .. py:attribute:: white
-      :value: '\x1b[37m'
+   Initialize the formatter either with the specified format string, or a
+   default as described above. Allow for specialized date formatting with
+   the optional datefmt argument. If datefmt is omitted, you get an
+   ISO8601-like (or RFC 3339-like) format.
 
-      
+   Use a style parameter of '%', '{' or '$' to specify that you want to
+   use one of %-formatting, :meth:`str.format` (``{}``) formatting or
+   :class:`string.Template` formatting in your format string.
 
-   .. py:attribute:: yellow
-      :value: '\x1b[38;5;226m'
-
-      
-
-   .. py:attribute:: red
-      :value: '\x1b[38;5;196m'
-
-      
-
-   .. py:attribute:: bold_red
-      :value: '\x1b[31;1m'
-
-      
-
-   .. py:attribute:: reset
-      :value: '\x1b[0m'
-
-      
+   .. versionchanged:: 3.2
+      Added the ``style`` parameter.
 
    .. py:method:: format(record)
 

@@ -1,3 +1,5 @@
+:orphan:
+
 :py:mod:`geopyv.subset`
 =======================
 
@@ -19,30 +21,55 @@ Classes
 
 
 
-Attributes
-~~~~~~~~~~
-
-.. autoapisummary::
-
-   geopyv.subset.log
-
-
-.. py:data:: log
-
-   
-
 .. py:class:: SubsetBase
 
-   Subset base class to be used as a mixin.
+   Subset base class to be used as a mixin. Contains plot functionality.
 
    .. py:method:: inspect(show=True, block=True, save=None)
 
-      Method to show the subset and associated quality metrics.
+      Method to show the subset and associated quality metrics using :mod:`~geopyv.plots.inspect_subset`.
+
+      :param show: Control whether the plot is displayed.
+      :type show: bool, optional
+      :param block: Control whether the plot blocks execution until closed.
+      :type block: bool, optional
+      :param save: Name to use to save plot. Uses default extension of `.png`.
+      :type save: str, optional
+
+      :returns: * **fig** (`matplotlib.pyplot.figure`) -- Figure object.
+                * **ax** (`matplotlib.pyplot.axes`) -- Axes object.
+
+      .. note::
+          * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
+
+      .. seealso::
+          :meth:`~geopyv.plots.inspect_subset`
+
 
 
    .. py:method:: convergence(show=True, block=True, save=None)
 
-      Method to plot the rate of convergence for the subset.
+      Method to plot the rate of convergence for the subset using :mod:`~geopyv.plots.convergence_subset`.
+
+      :param show: Control whether the plot is displayed.
+      :type show: bool, optional
+      :param block: Control whether the plot blocks execution until closed.
+      :type block: bool, optional
+      :param save: Name to use to save plot. Uses default extension of `.png`.
+      :type save: str, optional
+
+      :returns: * **fig** (*matplotlib.pyplot.figure*) -- Figure object.
+                * **ax** (`matplotlib.pyplot.axes`) -- Axes object.
+
+      .. note::
+          * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
+
+      .. warning::
+          * Can only be used once the subset has been solved using the :meth:`~geopyv.subset.Subset.solve` method.
+
+      .. seealso::
+          :meth:`~geopyv.plots.convergence_subset`
+
 
 
 
@@ -50,172 +77,28 @@ Attributes
 
    Bases: :py:obj:`SubsetBase`
 
-   Subset class for geopyv.
+   Initialisation of geopyv subset object.
 
    :param coord: Subset coordinates.
-   :type coord: `numpy.ndarray` (x, y)
-   :param f_img: Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
-   :type f_img: geopyv.image.Image
-   :param g_img: Target image of geopyv.imageImage class, instantiated by :mod:`~image.Image`.
-   :type g_img: geopyv.image.Image
-   :param template: Subset template object.
-   :type template: `geopyv.templates.Template`
+   :type coord: `numpy.ndarray` (x, y), optional
+   :param f_img: Reference image of geopyv.image.Image class, instantiated by :mod:`~geopyv.image.Image`.
+   :type f_img: geopyv.image.Image, optional
+   :param g_img: Target image of geopyv.imageImage class, instantiated by :mod:`~geopyv.image.Image`.
+   :type g_img: geopyv.image.Image, optional
+   :param template: Subset template object, instantiated by :mod:`~geopyv.templates.Circle` or :mod:`~geopyv.templates.Square`.
+   :type template: geopyv.templates.Template, optional
 
    .. attribute:: data
 
-      Data object containing all settings and results.
+      Data object containing all settings and results. See the data structure :ref:`here <subset_data_structure>`.
 
       :type: dict
 
-   .. attribute:: _f_img
+   .. attribute:: solved
 
-      Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
+      Boolean to indicate if the subset has been solved.
 
-      :type: `geopyv.image.Image`
-
-   .. attribute:: _g_img
-
-      Target image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
-
-      :type: `geopyv.image.Image`
-
-   .. attribute:: _template
-
-      Subset template object.
-
-      :type: `geopyv.templates.Template`
-
-   .. attribute:: _method
-
-      Solver type. Options are 'ICGN' and 'FAGN'.
-
-      :type: `str`
-
-   .. attribute:: _init_guess_size
-
-      Size of subset used to define the initial guess, approximated by private method
-      :meth:`~_get_initial_guess_size`.
-
-      :type: int
-
-   .. attribute:: _f_coord
-
-      1D array of the coordinates of the subset in reference image of type `float`.
-
-      :type: `numpy.ndarray` (x, y)
-
-   .. attribute:: _f_coords
-
-      2D array of subset coordinates in reference image of type `float`.
-
-      :type: `numpy.ndarray` (Nx, 2)
-
-   .. attribute:: _grad_f
-
-      Gradients of reference image `f`.
-
-      :type: `numpy.ndarray` (Nx, 2)
-
-   .. attribute:: _SSSIG
-
-      Sum of the square of the reference subset intensity gradients.
-
-      :type: float
-
-   .. attribute:: _sigma_intensity
-
-      Standard deviaition of the reference subset intensities.
-
-      :type: float
-
-   .. attribute:: _p_0
-
-      1D array of initial warp function parameters of type `float`, used to precondition
-      class method :meth:`~solve`.
-
-      :type: `numpy.ndarray` (Nx, 1)
-
-   .. attribute:: _p
-
-      1D array of warp function parameters of type `float`, output by class
-      method :meth:`~solve`.
-
-      :type: `numpy.ndarray` (Nx, 1)
-
-   .. attribute:: _norm
-
-      Custom norm of the increment in the warp function parameters after
-      Gao et al. (2015), computed by private method :meth:`~_get_norm`.
-
-      :type: float
-
-   .. attribute:: _C_ZNSSD
-
-      Zero-normalised sum of squared differences coefficient, computed by private
-      method :meth:`~_get_correlation`.
-
-      :type: float
-
-   .. attribute:: _C_ZNCC
-
-      Zero-normalised cross-correlation coefficient, computed by private method
-      :meth:`~_get_correlation`.
-
-      :type: float
-
-   .. attribute:: _x
-
-      Initial horizontal coordinate.
-
-      :type: float
-
-   .. attribute:: _y
-
-      Initial vertical coordinate.
-
-      :type: float
-
-   .. attribute:: _u
-
-      Horizontal displacement.
-
-      :type: float
-
-   .. attribute:: _v
-
-      Vertical displacement.
-
-      :type: float
-
-   .. attribute:: _x_f
-
-      Final horizontal coordinate.
-
-      :type: float
-
-   .. attribute:: _y_f
-
-      Final vertical coordinate.
-
-      :type: float
-
-   .. attribute:: _settings
-
-      Dictionary of settings.
-
-      :type: dict
-
-   .. attribute:: _quality
-
-      Dictionary of image quality measures.
-
-      :type: dict
-
-   .. attribute:: _results
-
-      Dictionary of results.
-
-      :type: dict
+      :type: bool
 
    .. py:method:: solve(*, max_norm=0.001, max_iterations=15, order=1, p_0=None, tolerance=0.7, method='ICGN')
 
@@ -231,51 +114,27 @@ Attributes
       :type order: int
       :param p_0: 1D array of warp function parameters with `float` type.
       :type p_0: ndarray, optional
+      :param tolerance: Correlation coefficient tolerance. Defaults to a value of 0.7.
+      :type tolerance: float, optional
       :param method: Solution method. Options are FAGN and ICGN. Default is ICGN since it
                      is faster.
       :type method: str
 
+      :returns: **solved** -- Boolean to indicate if the subset instance has been solved.
+      :rtype: `bool`
+
       .. note::
-          * If all members of the warp function parameter array are zero, then an
-            initial guess at the subset displacement is performed by
+          * The warp function parameter array can be used to precondition the computation if passed non-zero values.
+          * Otherwise, the initial guess at the subset displacement is performed by
             :meth:`~_get_initial_guess`.
-          * Otherwise, if any members of the warp function parameter array are
-            non-zero, the array is used to precondition the ICGN computation directly.
           * If not specified, the solver defaults to a first order warp function.
-          * If an array length of 12 is specified a second order warp function is
-            assumed.
+          * For guidance on how to use this class see the subset tutorial :ref:`here <Subset Tutorial>`.
+
 
       .. seealso::
           :meth:`~_get_initial_guess_size`
           :meth:`~_get_initial_guess`
 
-
-   .. py:method:: _load_img(message)
-
-      Private method to open a file dialog and select an image.
-
-
-   .. py:method:: _load_f_img()
-
-      Private method to load the reference image.
-
-
-   .. py:method:: _load_g_img()
-
-      Private method to load the target image.
-
-
-   .. py:method:: _get_initial_guess_size()
-
-      Private method to estimate the size of square subset to use in the
-      initial guess.
-
-
-   .. py:method:: _get_initial_guess()
-
-      Private method to compute an initial guess of the subset displacement using
-      OpenCV function :py:meth:`cv2.matchTemplate` and the Normalised
-      Cross-Correlation (NCC) criteria.
 
 
 
@@ -283,7 +142,7 @@ Attributes
 
    Bases: :py:obj:`SubsetBase`
 
-   SubsetResults class for geopyv.
+   Subset results object for geopyv.
 
    :param data: geopyv data dict from Subset object.
    :type data: dict
@@ -293,5 +152,12 @@ Attributes
       geopyv data dict from Subset object.
 
       :type: dict
+
+   .. note::
+       * Contains all of the plot functionality provied by :class:`~geopyv.subset.SubsetBase` but none of the algorithms provided by :class:`~geopyv.subset.Subset` (i.e. you can't use this to re-analyse images). Purely used to store data and interrogate results.
+
+   .. warning::
+       * To re-analyse data instantiate a new object using :class:`~geopyv.subset.Subset` and use the :class:`~geopyv.subset.Subset.solve` method.
+
 
 

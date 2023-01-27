@@ -54,3 +54,16 @@ def plot_triangulation(elements, x, y):
     y_p = np.asarray(y_p)
 
     return mesh_triangulation, x_p, y_p
+
+def PolyArea(pts):
+    """A function that returns the area of the input polygon.
+
+    Parameters
+    ----------
+    pts : numpy.ndarray (N,2)
+        Clockwise/anti-clockwise ordered coordinates.
+    """
+
+    x = pts[:,0]
+    y = pts[:,1]
+    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))

@@ -1,152 +1,138 @@
+import logging
 import numpy as np
-import scipy.stats as spst
-import scipy.special as spsp
-from geopyv.templates import Circle
-from geopyv.image import Image
-from geopyv.subset import Subset
-from geopyv.mesh import Mesh
-from geopyv.gui import Gui
-from geopyv.particle import Particle
-import matplotlib.pyplot as plt
-from scipy.optimize import minimize_scalar
-import gmsh
-import cv2
-# from ._subset_extensions import _init_reference, _solve_ICGN, _solve_FAGN, _solve_WFAGN
+import scipy as sp
+import geopyv as gp 
+import re
+import os
+log = logging.getLogger(__name__)
 
-class Sequence:
-    """Sequence class for geopyv.
+class SequenceBase:
+    """Sequence base class to be used as a mixin."""
+    def inspect(self, mesh=None, show=True, block=True, save=None):
+        """Method to show the sequence and associated mesh properties."""
+        # If a mesh index is given, inspect the mesh.
+        #if mesh != None:
+        #    if mesh >= 0 and mesh < len(self.data[])
 
-    Attributes
-    ----------
-    img_sequence : `numpy.ndarray` (N) 
-        1D array of the image sequence, `geopyv.Image` class objects.
-    SETUP PARAMETERS
-    meshes : `numpy.ndarray` (N)
-        1D array of the mesh sequence, `geopyv.Mesh` class objects.
-    update_register : `numpy.ndarray` (N)s
-        1D array of the reference image indexes for the mesh sequence.
-    ppp : `numpy.ndarray` (N,M,2)
-        3D array of the numerical particle position paths (ppp). 
-        N: particle index, M: time step (M=0 initiation step, M=1 1st mesh applied), 2: (x,y) coordinates.
-        Computed by method :meth:`~particle`. 
-    pep : `numpy.ndarray` (N,M,3)
-        3D array of the numerical particle strain paths (pep) (total strain). 
-        N: particle index, M: time step (M=0 initiation step, M=1 1st mesh applied), 3: (du/dx, dv/dy, du/dy+dv/dx).
-        Computed by method :meth:`~particle`. 
-    pvp : `numpy.ndarray` (N,M)
-        2D array of the numerical particle volume paths (pvp). 
-        N: particle index, M: time step (M=0 initiation step, M=1 1st mesh applied).
-        Computed by method :meth:`~particle`. 
-    """
 
-    def __init__(self, img_sequence, target_nodes=1000, boundary=None, exclusions=[]):
-        """Initialisation of geopyv sequence object.
+class Sequence(SequenceBase):
 
-        Parameters
-        ----------
-        img_sequence : numpy.ndarray (N) 
-            1D array of the image sequence of type `geopyv.Image` objects.
-        """
+    def __init__(self, *, image_folder = '.', image_file_type = ".jpg", target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 1, size_upper_bound = 1000):
+        """Initialisation of geopyv sequence object."""
         self.initialised = False
         # Check types.
-        if type(img_sequence) != np.ndarray:
-            raise TypeError("Image sequence array of invalid type. Cannot initialise sequence.")
-        elif type(target_nodes) != int:
-            raise TypeError("Maximum number of elements not of integer type.")
-        elif target_nodes <= 0:
-            raise ValueError("Invalid maximum number of elements.")
-        elif type(boundary) != np.ndarray:
-            raise TypeError("Boundary coordinate array of invalid type. Cannot initialise mesh.")
-        elif type(exclusions) != list:
-            raise TypeError("Exclusion coordinate array of invalid type. Cannot initialise mesh.")
-        for img in img_sequence:
-            if type(img) != Image:
-                raise TypeError("Sequence image not geopyv.image.Image type.")
+        if type(image_folder) != str:
+            log.error("image_folder type not recognised. Expected a string.")
+            return False
+        elif os.path.isdir(image_folder) == False:
+            log.error("image_folder does not exist.")
+            return False
+        if type(image_file_type) != str:
+            log.error("image_file_type type not recognised. Expected a string.")
+            return False
+        elif image_file_type not in [".jpg", ".png", ".bmp"]:
+            log.error("image_file_type not recognised. Expected: '.jpg', '.png', or '.bmp'.")
+            return False
+        if type(target_nodes) != int:
+            log.error("Target nodes not of integer type.")
+            return False
+        if type(boundary) != np.ndarray:
+            log.error("Boundary coordinate array of invalid type. Cannot initialise mesh.")
+        if np.shape(boundary)[1] != 2:
+            log.error("Boundary coordinate array of invalid shape. Must be numpy.ndarray of size (n, 2).")
+            return False
+        if type(exclusions) != list:
+            log.error("Exclusion coordinate array of invalid type. Cannot initialise mesh.")
+            return False
         for exclusion in exclusions:
             if np.shape(exclusion)[1] != 2:
-                raise ValueError("Exclusion coordinate array of invalid shape. Must be numpy.ndarray of size (n, 2).")
-
+                log.error("Exclusion coordinate array of invalid shape. Must be numpy.ndarray of size (n, 2).")
+                return False
         
         # Store variables.
-        self.img_sequence = img_sequence
-        self.target_nodes = target_nodes
-        self.boundary = boundary
-        self.exclusions = exclusions
+        self._image_folder = image_folder
+        self._common_file_name = os.path.commonprefix(os.listdir(image_folder)).rstrip('0123456789')
+        self._image_indices = np.asarray(sorted([int(re.findall(r'\d+',x)[-1]) for x in os.listdir(image_folder)]))
+        self._image_file_type = image_file_type
+        self._target_nodes = target_nodes
+        self._boundary = boundary
+        self._exclusions = exclusions
+        self._size_lower_bound = size_lower_bound
+        self._size_upper_bound = size_upper_bound
         
-    def solve(self, seed_coord=None, template=Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2, size_lower_bound = 25, size_upper_bound = 250):
-        """A method to generate a mesh sequence for the image sequence input at initiation. A reliability guided (RG) approach is implemented, 
-        updating the reference image according to correlation coefficient threshold criteria. An elemental shear strain-based mesh adaptivity is implemented.
-        The meshes are stored in self.meshes and the mesh-image index references are stored in self.update_register. 
-
-        .. note::
-                * For more details on the RG approach implemented, see:
-                  Stanier, S.A., Blaber, J., Take, W.A. and White, D.J. (2016) Improved image-based deformation measurment for geotechnical applications.
-                  Can. Geotech. J. 53:727-739 dx.doi.org/10.1139/cgj-2015-0253.
-                * For more details on the adaptivity method implemented, see:
-                  Tapper, L. (2013) Bearing capacity of perforated offshore foundations under combined loading, University of Oxford PhD Thesis p.73-74.
-        """
+    def solve(self, *, trace = False, seed_coord=None, template=gp.templates.Circle(50), max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2):
 
         # Check inputs.
         if type(seed_coord) != np.ndarray:
-            raise TypeError("Coordinate is not of numpy.ndarray type. Cannot initiate solver.")
+            try:
+                seed_coord = np.asarray(seed_coord)
+            except:
+                log.error("Seed coordinate is not of numpy.ndarray type. Cannot initiate solver.")
+                return False
         elif type(adaptive_iterations) != int:
-            raise TypeError("Number of adaptive iterations of invalid type. Must be an integer greater than or equal to zero.")
+            log.error("Number of adaptive iterations of invalid type. Must be an integer greater than or equal to zero.")
+            return False
+        if template == None:
+            template = gp.templates.Circle(50)
+        elif type(template) != gp.templates.Circle and type(template) != gp.templates.Square:
+            log.error("Template is not a type defined in geopyv.templates.")
+            return False
         
         # Store variables.
-        self.seed_coord = seed_coord
-        self.template = template
-        self.max_iterations = max_iterations
-        self.max_norm = max_norm
-        self.adaptive_iterations = adaptive_iterations
-        self.method = method
-        self.order = order
-        self.tolerance = tolerance
-        self.alpha = alpha
-        self.beta = beta
-        self.size_lower_bound = size_lower_bound
-        self.size_upper_bound = size_upper_bound
-        if self.order == 1 and self.method != "WFAGN":
-            self.p_0 = np.zeros(6)
-        elif self.order == 1 and self.method == "WFAGN":
-            self.p_0 = np.zeros(7)
-        elif self.order == 2 and self.method != "WFAGN":
-            self.p_0 = np.zeros(12)
+        self._seed_coord = seed_coord
+        self._template = template
+        self._max_iterations = max_iterations
+        self._max_norm = max_norm
+        self._adaptive_iterations = adaptive_iterations
+        self._method = method
+        self._order = order
+        self._tolerance = tolerance
+        self._alpha = alpha
+        self._beta = beta
+        self._p_0 = np.zeros(6*self._order)
 
         # Prepare output. 
-        self.meshes = np.empty(len(self.img_sequence)-1, dtype=object) # Adapted meshes. 
-        self.update_register = np.zeros(len(self.img_sequence)-1, dtype=int) # Mesh-image reference.
+        self.meshes = np.empty(len(self._image_indices)-1, dtype=object) # Adapted meshes. 
+        self.update_register = np.zeros(len(self._image_indices)-1, dtype=int) # Mesh-image reference.
 
         # Solve. 
-        f_index = 0
-        g_index = 1
-        while g_index < len(self.img_sequence):
-            print("Solving for image pair {}-{}".format(f_index, g_index))
-            mesh = Mesh(f_img = self.img_sequence[f_index], g_img = self.img_sequence[g_index], target_nodes = self.target_nodes, boundary = self.boundary, exclusions = self.exclusions, size_lower_bound = self.size_lower_bound, size_upper_bound = self.size_upper_bound) # Initialise mesh object.
-            mesh.solve(seed_coord=self.seed_coord, template=self.template, max_iterations=self.max_iterations, max_norm=self.max_norm, adaptive_iterations=self.adaptive_iterations, method=self.method, order=self.order, tolerance=self.tolerance, alpha=self.alpha, beta=self.beta) # Solve mesh.
-            if mesh.update and self.update_register[g_index-1] == 0: # Correlation coefficient thresholds not met (consequently no mesh generated).  
-                f_index = g_index - 1
-                self.update_register[f_index] = 1 # Update recorded reference image for future meshes.
+        _f_index = 0
+        _g_index = 1
+        _f_img = gp.image.Image(self._image_folder+"/"+self._common_file_name+str(self._image_indices[_f_index])+self._image_file_type)
+        _g_img = gp.image.Image(self._image_folder+"/"+self._common_file_name+str(self._image_indices[_g_index])+self._image_file_type)
+        while _g_index < len(self._image_indices-1):
+            print("Solving for image pair {}-{}".format(self._image_indices[_f_index], self._image_indices[_g_index]))
+            mesh = gp.mesh.Mesh(f_img = _f_img, g_img = _g_img, target_nodes = self._target_nodes, boundary = self._boundary, exclusions = self._exclusions, size_lower_bound = self._size_lower_bound, size_upper_bound = self._size_upper_bound) # Initialise mesh object.
+            mesh.solve(seed_coord=self._seed_coord, template=self._template, max_iterations=self._max_iterations, max_norm=self._max_norm, adaptive_iterations=self._adaptive_iterations, method=self._method, order=self._order, tolerance=self._tolerance, alpha=self._alpha, beta=self._beta) # Solve mesh.
+            if mesh._update and self.update_register[_g_index-1] == 0: # Correlation coefficient thresholds not met (consequently no mesh generated).  
+                if trace:
+                    self._trace(_f_index, _g_index)
+                _f_index = _g_index - 1
+                self.update_register[_f_index] = 1 # Update recorded reference image for future meshes.
+                del(_f_img)
+                _f_img = gp.image.Image(self._image_folder+"/"+self._common_file_name+str(self._image_indices[_f_index])+self._image_file_type)
             else:
-                self.meshes[g_index-1] = mesh # Store the generated mesh.
-                g_index += 1 # Iterate the target image index. 
-        
+                gp.io.save(mesh, "mesh_"+str(self._image_indices[_f_index])+"_"+str(self._image_indices[_g_index]))
+                del(mesh)
+                _g_index += 1 # Iterate the target image index. 
+                del(_g_img)
+                if _g_index != len(self._image_indices-1):
+                    _g_img = gp.image.Image(self._image_folder+"/"+self._common_file_name+str(self._image_indices[_g_index])+self._image_file_type)
+        del(_f_img)
+    
+    def _trace(self, _f_index, _g_index):
+        log.message("Tracing exclusion displacement.")
+        mesh = gp.io.load("mesh_"+str(self._image_indices[_f_index])+"_"+str(self._image_indices[_g_index-1]))
+        i = len(self._boundary)
+        for exclusion in self._exclusions:
+            j = len(exclusion)
+            exclusion += mesh.data["results"]["displacements"][i+j]
+        del(mesh)
+
     def particle(self, coords, vols):
         """A method to propogate "particles" across the domain upon which strain path interpolation is performed."""
 
         self.particles = np.empty(len(coords), dtype = object)
         for i in range(len(self.particles)):
-            self.particles[i] = Particle(coord = coords[i], meshes = self.meshes, update_register = self.update_register, vol = vols[i])
+            self.particles[i] = gp.particle.Particle(coord = coords[i], meshes = self.meshes, update_register = self.update_register, vol = vols[i])
             self.particles[i].solve()
-
-def PolyArea(pts):
-    """A function that returns the area of the input polygon.
-
-    Parameters
-    ----------
-    pts : numpy.ndarray (N,2)
-        Clockwise/anti-clockwise ordered coordinates.
-    """
-
-    x = pts[:,0]
-    y = pts[:,1]
-    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))

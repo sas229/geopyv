@@ -70,3 +70,20 @@ mesh.convergence(subset=0)
 
 # If you supply a subset index that is out of range you get a ValueError.
 mesh.convergence(subset=4000)
+
+# Sequence test.
+template = gp.templates.Circle(50)
+boundary = np.asarray(
+    [[200.0, 200.0],
+    [200.0, 2700.0],
+    [3900.0, 2700.0],
+    [3900.0, 200.0]]
+)
+exclusions = []
+exclusions.append(gp.geometry.exclusions.circular_exclusion(np.asarray([1925, 1470]), radius=430, size=100))
+seed = np.asarray([400, 400.0])
+sequence = gp.sequence.Sequence(image_folder = "./images/T-Bar", target_nodes=1000, boundary=boundary, exclusions=exclusions)
+
+beta = 5.0
+alpha = 1/beta
+sequence.solve(trace = False, seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta, tolerance=0.7)

@@ -5,7 +5,9 @@ import geopyv.image
 import geopyv._image_extensions
 import geopyv.io
 import geopyv.mesh
+import geopyv.particle
 import geopyv.plots
+import geopyv.sequence
 import geopyv.subset
 import geopyv._subset_extensions
 import geopyv.templates
@@ -16,3 +18,4 @@ level = logging.INFO
 geopyv.log.initialise(level)
 log = logging.getLogger(__name__)
 log.debug("Initialised geopyv log.")
+

@@ -9,3 +9,6 @@ from . import plots
 from . import subset
 from . import _subset_extensions
 from . import templates
+import logging
+level = logging.INFO
+log.initialise(level)

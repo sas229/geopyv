@@ -1,10 +1,6 @@
-import logging 
 import numpy as np
 import geopyv as gp
 import matplotlib.pyplot as plt
-
-level = logging.INFO
-gp.log.initialise(level)
 
 # Subset test.
 ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")

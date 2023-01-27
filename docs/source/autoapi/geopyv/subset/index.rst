@@ -12,9 +12,9 @@ Classes
 
 .. autoapisummary::
 
+   geopyv.subset.SubsetBase
    geopyv.subset.Subset
    geopyv.subset.SubsetResults
-   geopyv.subset.SubsetBase
 
 
 
@@ -30,6 +30,58 @@ Attributes
 .. py:data:: log
 
    
+
+.. py:class:: SubsetBase
+
+   Subset base class to be used as a mixin. Contains plot functionality.
+
+   .. py:method:: inspect(show=True, block=True, save=None)
+
+      Method to show the subset and associated quality metrics using :mod:`~geopyv.plots.inspect_subset`.
+
+      :param show: Control whether the plot is displayed.
+      :type show: bool, optional
+      :param block: Control whether the plot blocks execution until closed.
+      :type block: bool, optional
+      :param save: Name to use to save plot. Uses default extension of `.png`.
+      :type save: str, optional
+
+      :returns: * **fig** (`matplotlib.pyplot.figure`) -- Figure object.
+                * **ax** (`matplotlib.pyplot.axes`) -- Axes object.
+
+      .. note::
+          * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
+
+      .. seealso::
+          :meth:`~geopyv.plots.inspect_subset`
+
+
+
+   .. py:method:: convergence(show=True, block=True, save=None)
+
+      Method to plot the rate of convergence for the subset using :mod:`~geopyv.plots.convergence_subset`.
+
+      :param show: Control whether the plot is displayed.
+      :type show: bool, optional
+      :param block: Control whether the plot blocks execution until closed.
+      :type block: bool, optional
+      :param save: Name to use to save plot. Uses default extension of `.png`.
+      :type save: str, optional
+
+      :returns: * **fig** (*matplotlib.pyplot.figure*) -- Figure object.
+                * **ax** (`matplotlib.pyplot.axes`) -- Axes object.
+
+      .. note::
+          * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
+
+      .. warning::
+          * Can only be used once the subset has been solved using the :meth:`~geopyv.subset.Subset.solve` method.
+
+      .. seealso::
+          :meth:`~geopyv.plots.convergence_subset`
+
+
+
 
 .. py:class:: Subset(*, f_coord=None, f_img=None, g_img=None, template=None)
 
@@ -116,58 +168,6 @@ Attributes
 
    .. warning::
        * To re-analyse data instantiate a new object using :class:`~geopyv.subset.Subset` and use the :class:`~geopyv.subset.Subset.solve` method.
-
-
-
-.. py:class:: SubsetBase
-
-   Subset base class to be used as a mixin. Contains plot functionality.
-
-   .. py:method:: inspect(show=True, block=True, save=None)
-
-      Method to show the subset and associated quality metrics using :mod:`~geopyv.plots.inspect_subset`.
-
-      :param show: Control whether the plot is displayed.
-      :type show: bool, optional
-      :param block: Control whether the plot blocks execution until closed.
-      :type block: bool, optional
-      :param save: Name to use to save plot. Uses default extension of `.png`.
-      :type save: str, optional
-
-      :returns: * **fig** (`matplotlib.pyplot.figure`) -- Figure object.
-                * **ax** (`matplotlib.pyplot.axes`) -- Axes object.
-
-      .. note::
-          * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
-
-      .. seealso::
-          :meth:`~geopyv.plots.inspect_subset`
-
-
-
-   .. py:method:: convergence(show=True, block=True, save=None)
-
-      Method to plot the rate of convergence for the subset using :mod:`~geopyv.plots.convergence_subset`.
-
-      :param show: Control whether the plot is displayed.
-      :type show: bool, optional
-      :param block: Control whether the plot blocks execution until closed.
-      :type block: bool, optional
-      :param save: Name to use to save plot. Uses default extension of `.png`.
-      :type save: str, optional
-
-      :returns: * **fig** (*matplotlib.pyplot.figure*) -- Figure object.
-                * **ax** (`matplotlib.pyplot.axes`) -- Axes object.
-
-      .. note::
-          * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
-
-      .. warning::
-          * Can only be used once the subset has been solved using the :meth:`~geopyv.subset.Subset.solve` method.
-
-      .. seealso::
-          :meth:`~geopyv.plots.convergence_subset`
-
 
 
 

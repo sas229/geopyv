@@ -1,7 +1,7 @@
-:py:mod:`geopyv.gui.CoordinateSelector`
-=======================================
+:py:mod:`geopyv.gui.selectors.coordinate`
+=========================================
 
-.. py:module:: geopyv.gui.CoordinateSelector
+.. py:module:: geopyv.gui.selectors.coordinate
 
 
 Module Contents
@@ -12,7 +12,7 @@ Classes
 
 .. autoapisummary::
 
-   geopyv.gui.CoordinateSelector.CoordinateSelector
+   geopyv.gui.selectors.coordinate.CoordinateSelector
 
 
 
@@ -22,7 +22,7 @@ Attributes
 
 .. autoapisummary::
 
-   geopyv.gui.CoordinateSelector.log
+   geopyv.gui.selectors.coordinate.log
 
 
 .. py:data:: log

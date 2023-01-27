@@ -7,38 +7,81 @@ import geopyv as gp
 log = logging.getLogger(__name__)
 
 class SubsetBase:
-    """Subset base class to be used as a mixin."""
+    """Subset base class to be used as a mixin. Contains plot functionality."""
+    
     def inspect(self, show=True, block=True, save=None):
-        """Method to show the subset and associated quality metrics."""
+        """Method to show the subset and associated quality metrics using :mod:`~geopyv.plots.inspect_subset`.
+        
+        Parameters
+        ----------
+        show : bool, optional
+            Control whether the plot is displayed.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
+
+        Returns
+        -------
+        fig :  `matplotlib.pyplot.figure`
+            Figure object.
+        ax : `matplotlib.pyplot.axes`
+            Axes object.
+
+
+        .. note::
+            * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
+
+        .. seealso::
+            :meth:`~geopyv.plots.inspect_subset`
+
+        """
         fig, ax = gp.plots.inspect_subset(data=self.data, mask=None, show=show, block=block, save=save)
         return fig, ax
 
     def convergence(self, show=True, block=True, save=None):
-        """Method to plot the rate of convergence for the subset."""
+        """Method to plot the rate of convergence for the subset using :mod:`~geopyv.plots.convergence_subset`.
+        
+        Parameters
+        ----------
+        show : bool, optional
+            Control whether the plot is displayed.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
+
+
+        Returns
+        -------
+        fig :  matplotlib.pyplot.figure
+            Figure object.
+        ax : `matplotlib.pyplot.axes`
+            Axes object.
+
+
+        .. note::
+            * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
+
+        .. warning::
+            * Can only be used once the subset has been solved using the :meth:`~geopyv.subset.Subset.solve` method.
+        
+        .. seealso::
+            :meth:`~geopyv.plots.convergence_subset`
+
+        """
         if "results" in self.data:
             fig, ax = gp.plots.convergence_subset(data=self.data, show=show, block=block, save=save)
             return fig, ax
         else:
             log.error("Subset not yet solved. Run the solve() method.")
 
+
 class Subset(SubsetBase):
     """Subset class for geopyv.
 
-    Parameters
-    ----------
-    coord : `numpy.ndarray` (x, y)
-        Subset coordinates.
-    f_img : geopyv.image.Image
-        Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
-    g_img : geopyv.image.Image
-        Target image of geopyv.imageImage class, instantiated by :mod:`~image.Image`.
-    template : `geopyv.templates.Template`
-        Subset template object.
-
-    Attributes
-    ----------
-    data : dict
-        Data object containing all settings and results.
+    Private Attributes
+    ------------------
     _f_img : `geopyv.image.Image`
         Reference image of geopyv.image.Image class, instantiated by :mod:`~image.Image`.
     _g_img : `geopyv.image.Image`
@@ -93,10 +136,33 @@ class Subset(SubsetBase):
         Dictionary of image quality measures.
     _results: dict
         Dictionary of results.
+
     """
 
     def __init__(self, *, f_coord=None, f_img=None, g_img=None, template=None):
-        """Initialisation of geopyv subset object."""
+        """Initialisation of geopyv subset object.
+        
+        Parameters
+        ----------
+        coord : `numpy.ndarray` (x, y), optional
+            Subset coordinates.
+        f_img : geopyv.image.Image, optional
+            Reference image of geopyv.image.Image class, instantiated by :mod:`~geopyv.image.Image`.
+        g_img : geopyv.image.Image, optional
+            Target image of geopyv.imageImage class, instantiated by :mod:`~geopyv.image.Image`.
+        template : geopyv.templates.Template, optional
+            Subset template object, instantiated by :mod:`~geopyv.templates.Circle` or :mod:`~geopyv.templates.Square`.
+
+
+        Attributes
+        ----------
+        data : dict
+            Data object containing all settings and results. See the data structure :ref:`here <subset_data_structure>`.
+        solved : bool
+            Boolean to indicate if the subset has been solved.
+
+        """
+        
         self._initialised = False
         self._f_coord = f_coord
         self._f_img = f_img
@@ -110,7 +176,7 @@ class Subset(SubsetBase):
             self._g_img = self._load_g_img()
         if type(self._f_coord) != np.ndarray:
             self._f_coord = np.empty(2)
-            coordinate = gp.gui.CoordinateSelector()
+            coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
             self._f_coord = coordinate.select(self._f_img, self._template)
         elif np.shape(self._f_coord) != np.shape(np.empty(2)):
             raise TypeError("Coordinate is not an np.ndarray of length 2.")
@@ -141,7 +207,7 @@ class Subset(SubsetBase):
         self._grad_f = output[3]
         self._SSSIG = output[4][0][0]
         self._sigma_intensity = output[4][1][0]
-        self._solved = False
+        self.solved = False
         self._unsolvable = False
         self._initialised == True
         self._quality = {
@@ -152,7 +218,7 @@ class Subset(SubsetBase):
         # Data.
         self.data = {
             "type": "Subset",
-            "solved": self._solved,
+            "solved": self.solved,
             "unsolvable": self._unsolvable,
             "images": {
                 "f_img": self._f_img.filepath,
@@ -186,25 +252,31 @@ class Subset(SubsetBase):
             Warp function order. Options are 1 and 2.
         p_0 : ndarray, optional
             1D array of warp function parameters with `float` type.
+        tolerance: float, optional
+            Correlation coefficient tolerance. Defaults to a value of 0.7.
         method : str
             Solution method. Options are FAGN and ICGN. Default is ICGN since it
             is faster.
 
 
+        Returns
+        -------
+        solved : `bool`
+            Boolean to indicate if the subset instance has been solved.
+
 
         .. note::
-            * If all members of the warp function parameter array are zero, then an
-              initial guess at the subset displacement is performed by
+            * The warp function parameter array can be used to precondition the computation if passed non-zero values.
+            * Otherwise, the initial guess at the subset displacement is performed by
               :meth:`~_get_initial_guess`.
-            * Otherwise, if any members of the warp function parameter array are
-              non-zero, the array is used to precondition the ICGN computation directly.
             * If not specified, the solver defaults to a first order warp function.
-            * If an array length of 12 is specified a second order warp function is
-              assumed.
+            * For guidance on how to use this class see the subset tutorial :ref:`here <Subset Tutorial>`.
+            
 
         .. seealso::
             :meth:`~_get_initial_guess_size`
             :meth:`~_get_initial_guess`
+
         """
 
         # Check other control parameters.
@@ -281,7 +353,7 @@ class Subset(SubsetBase):
 
             # Check for tolerance.
             if self._C_ZNCC > self._tolerance:
-                self._solved = True
+                self.solved = True
                 log.debug("Subset solved.")
                 log.debug("Initial horizontal coordinate: {x_i} (px); Initial vertical coordinate: {y_i} (px)".format(x_i=self._x, y_i=self._y))
                 log.debug("Horizontal displacement: {u} (px); Vertical displacement: {v} (px)".format(u=self._u, v=self._v))
@@ -289,7 +361,7 @@ class Subset(SubsetBase):
                 log.debug("Final horizontal coordinate: {x_f} (px); Final vertical coordinate: {y_f} (px)".format(x_f=self._x_f, y_f=self._y_f))
         
             # Pack results.
-            self.data["solved"] = self._solved
+            self.data["solved"] = self.solved
             self.data["unsolvable"] = self._unsolvable
             self._results = {
                 "u": self._u,
@@ -304,7 +376,7 @@ class Subset(SubsetBase):
             self.data.update({"results": self._results})
 
             # Return solved boolean.
-            return self._solved
+            return self.solved
 
         except:
             log.error("Subset not solved.")
@@ -313,7 +385,7 @@ class Subset(SubsetBase):
     def _load_img(self, message):
         """Private method to open a file dialog and select an image."""
         directory = os.getcwd()
-        dialog = gp.gui.ImageSelector()
+        dialog = gp.gui.selectors.image.ImageSelector()
         imgpath = dialog.get_path(directory, message)
         img = gp.image.Image(imgpath)
         return img
@@ -357,19 +429,27 @@ class Subset(SubsetBase):
         self._p_init[1] = (max_loc[1] + self._initial_guess_size / 2) - y
   
 class SubsetResults(SubsetBase):
-    """SubsetResults class for geopyv.
-
-    Parameters
-    ----------
-    data : dict
-        geopyv data dict from Subset object.
-
-    Attributes
-    ----------
-    data : dict
-        geopyv data dict from Subset object.
-    """
 
     def __init__(self, data):
-        """Initialisation of geopyv SubsetResults class."""
+        """Subset results object for geopyv. 
+        
+        Parameters
+        ----------
+        data : dict
+            geopyv data dict from Subset object.
+
+        Attributes
+        ----------
+        data : dict
+            geopyv data dict from Subset object.
+
+        
+        .. note::
+            * Contains all of the plot functionality provied by :class:`~geopyv.subset.SubsetBase` but none of the algorithms provided by :class:`~geopyv.subset.Subset` (i.e. you can't use this to re-analyse images). Purely used to store data and interrogate results.
+
+        .. warning::
+            * To re-analyse data instantiate a new object using :class:`~geopyv.subset.Subset` and use the :class:`~geopyv.subset.Subset.solve` method.
+
+        """
         self.data = data
+

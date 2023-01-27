@@ -7,21 +7,37 @@ def area_to_length(area):
         ----------
         area : float
             Element area.
+
+        Returns
+        -------
+        length : float
+            Characteristic length.
         """
 
-        return np.sqrt(4*abs(area)/np.sqrt(3))
+        length = np.sqrt(4*abs(area)/np.sqrt(3))
+        return length
 
 def plot_triangulation(elements, x, y):
-    """Method to compute a first order triangulation from a second order element.
+    """Method to compute a first order triangulation from a second order element connectivity array and coordinates.
 
     Parameters
     ----------
-    elements : np.ndarray
+    elements : np.ndarray (Nx, 6)
         Element connectivity array.
-    x : np.ndarray
+    x : np.ndarray (Nx, 1)
         Horizontal coordinate array.
-    y : np.ndarray
+    y : np.ndarray (Nx, 1)
         Vertical coordinate array.
+
+    Returns
+    -------
+    mesh_triangulation : np.ndarray (Nx, 7)
+        Mesh triangulation array for plot purposes forming closed triangles.
+    x_p : np.ndarray (Nx, 1)
+        Horizontal coordinate of triangle vertices.
+    y_p : np.ndarray (Nx, 1)
+        Vertical coordinate of triangle vertices.
+    
     """
     plot_elements = []
     x_p = []

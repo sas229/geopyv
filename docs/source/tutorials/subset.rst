@@ -171,6 +171,9 @@ This will generate :numref:`convergence_subset` showing the iterative progressio
 
     A slow rate of convergence, or saturation of the number of iterations (i.e. iterations performed equal to the maximum specific iterations) indicates problems with the analysis.
 
+
+.. _subset_data_structure:
+
 Accessing the data
 ------------------
 

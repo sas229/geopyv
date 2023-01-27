@@ -12,7 +12,6 @@ Classes
 
 .. autoapisummary::
 
-   geopyv.gui.CoordinateSelector.Selector
    geopyv.gui.CoordinateSelector.CoordinateSelector
 
 
@@ -30,17 +29,21 @@ Attributes
 
    
 
-.. py:class:: Selector(img, template)
-
-   Bases: :py:obj:`PySide6.QtWidgets.QMainWindow`
-
-   .. py:method:: select()
-
-
-
 .. py:class:: CoordinateSelector
 
    .. py:method:: select(f_img, template)
+
+      Method to select f_coord if not supplied by the user.
+
+
+   .. py:method:: on_click(event)
+
+      Method to store and plot the currently selected coordinate in self.f_coord.
+
+
+   .. py:method:: selected(event)
+
+      Method to print the selected coordinates.
 
 
 

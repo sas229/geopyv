@@ -27,14 +27,6 @@ Classes
 
    Bases: :py:obj:`QGraphicsPathItem`
 
-   .. py:attribute:: marker
-
-      
-
-   .. py:attribute:: crosshair
-
-      
-
    .. py:method:: hoverEnterEvent(event)
 
 
@@ -46,6 +38,14 @@ Classes
 
    .. py:method:: itemChange(change, value)
 
+
+   .. py:attribute:: marker
+
+      
+
+   .. py:attribute:: crosshair
+
+      
 
 
 .. py:class:: modQGraphicsView(parent=None)

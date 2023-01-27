@@ -1,3 +1,5 @@
+:orphan:
+
 :py:mod:`geopyv.subset`
 =======================
 
@@ -18,18 +20,6 @@ Classes
 
 
 
-
-Attributes
-~~~~~~~~~~
-
-.. autoapisummary::
-
-   geopyv.subset.log
-
-
-.. py:data:: log
-
-   
 
 .. py:class:: SubsetBase
 

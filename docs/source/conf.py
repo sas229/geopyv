@@ -76,7 +76,7 @@ math_number_all = False
 autoapi_dirs = ['../../src/geopyv']
 autoapi_options = [
     'members',
-    'undoc-members',
+    # 'undoc-members',
     'show-inheritance',
     'show-module-summary',
     'special-members',

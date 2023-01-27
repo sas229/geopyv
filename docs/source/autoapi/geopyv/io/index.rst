@@ -1,3 +1,5 @@
+:orphan:
+
 :py:mod:`geopyv.io`
 ===================
 
@@ -17,18 +19,6 @@ Functions
    geopyv.io.save
 
 
-
-Attributes
-~~~~~~~~~~
-
-.. autoapisummary::
-
-   geopyv.io.log
-
-
-.. py:data:: log
-
-   
 
 .. py:function:: load(filename=None)
 

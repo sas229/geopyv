@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "53f9879ad04a81ce160a6769eba46da4666f6b49b206a99775194e8597b580fa"
+            "sha256": "e34a10fd49809e1fe94671b6adb32082ae6de6d0ad6a4bf47cc1c9cc998c7fde"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -307,6 +307,10 @@
             ],
             "markers": "python_version >= '3.7'",
             "version": "==4.38.0"
+        },
+        "geopyv": {
+            "path": ".",
+            "version": "==0.0.1"
         },
         "gmsh": {
             "hashes": [
@@ -1199,10 +1203,6 @@
                 "sha256:19da64c18d2d851112f09c287f8d3dbbdf725ab0e569077efb6cdcbd3497c107"
             ],
             "version": "==1.2.0"
-        },
-        "geopyv": {
-            "editable": true,
-            "path": "."
         },
         "idna": {
             "hashes": [

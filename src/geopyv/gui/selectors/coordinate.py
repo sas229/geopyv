@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
-from geopyv.templates import Circle, Square
+import geopyv.templates as templates
 
 log = logging.getLogger(__name__)
 
@@ -40,13 +40,13 @@ class CoordinateSelector:
                         if self.boundary != None:
                             self.boundary[0].remove()
                         self.point = self.ax.plot(self.x, self.y, marker="+", color="b", zorder=10)
-                        if type(self.template) == Circle:
+                        if type(self.template) == templates.Circle:
                             theta = np.linspace(0, 2*np.pi, 150)
                             radius = self.template.size
                             x = self.x+radius*np.cos(theta)
                             y = self.y+radius*np.sin(theta)
                             self.boundary = self.ax.plot(x, y, color='b')
-                        elif type(self.template) == Square:
+                        elif type(self.template) == templates.Square:
                             x = [
                                 self.x-self.template.size, 
                                 self.x-self.template.size,

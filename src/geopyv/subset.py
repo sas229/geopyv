@@ -162,7 +162,7 @@ class Subset(SubsetBase):
             Boolean to indicate if the subset has been solved.
 
         """
-        
+        log.debug("Initialising geopyv Subset object.")
         self._initialised = False
         self._f_coord = f_coord
         self._f_img = f_img

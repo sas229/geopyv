@@ -1,3 +1,5 @@
+:orphan:
+
 :py:mod:`geopyv.log`
 ====================
 
@@ -57,31 +59,6 @@ Functions
       called to format the event time. If there is exception information,
       it is formatted using formatException() and appended to the message.
 
-
-   .. py:attribute:: white
-      :value: '\x1b[37m'
-
-      
-
-   .. py:attribute:: yellow
-      :value: '\x1b[38;5;226m'
-
-      
-
-   .. py:attribute:: red
-      :value: '\x1b[38;5;196m'
-
-      
-
-   .. py:attribute:: bold_red
-      :value: '\x1b[31;1m'
-
-      
-
-   .. py:attribute:: reset
-      :value: '\x1b[0m'
-
-      
 
 
 .. py:function:: initialise(level)

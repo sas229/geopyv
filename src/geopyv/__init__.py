@@ -1,14 +1,18 @@
-from . import geometry
-from . import gui
-from . import image
-from . import _image_extensions
-from . import io
-from . import log
-from . import mesh
-from . import plots
-from . import subset
-from . import _subset_extensions
-from . import templates
+import geopyv.log
+import geopyv.geometry
+import geopyv.gui
+import geopyv.image
+import geopyv._image_extensions
+import geopyv.io
+import geopyv.mesh
+import geopyv.plots
+import geopyv.subset
+import geopyv._subset_extensions
+import geopyv.templates
 import logging
+
+# Initialise log at default settings.
 level = logging.INFO
-log.initialise(level)
+geopyv.log.initialise(level)
+log = logging.getLogger(__name__)
+log.debug("Initialised geopyv log.")

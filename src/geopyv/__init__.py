@@ -6,6 +6,7 @@ from . import io
 from . import log
 from . import mesh
 from . import plots
+from . import sequence
 from . import subset
 from . import _subset_extensions
 from . import templates

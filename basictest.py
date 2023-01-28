@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 # Subset test.
 ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
-tar = gp.image.Image("./images/T-Bar/IMG_1066.jpg")
+tar = gp.image.Image("./images/T-Bar/IMG_1064.jpg")
 template = gp.templates.Circle(50)
 subset = gp.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000,1000]), template=template)
 # subset = gp.subset.Subset(g_img=tar, template=template)

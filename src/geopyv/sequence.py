@@ -4,6 +4,7 @@ import scipy as sp
 import geopyv as gp 
 import re
 import os
+
 log = logging.getLogger(__name__)
 
 class SequenceBase:
@@ -53,6 +54,7 @@ class Sequence(SequenceBase):
         self._image_folder = image_folder
         self._common_file_name = os.path.commonprefix(os.listdir(image_folder)).rstrip('0123456789')
         self._image_indices = np.asarray(sorted([int(re.findall(r'\d+',x)[-1]) for x in os.listdir(image_folder)]))
+        self._number_images = np.shape(self._image_indices)[0]
         self._image_file_type = image_file_type
         self._target_nodes = target_nodes
         self._boundary = boundary
@@ -101,7 +103,7 @@ class Sequence(SequenceBase):
         _f_img = gp.image.Image(self._image_folder+"/"+self._common_file_name+str(self._image_indices[_f_index])+self._image_file_type)
         _g_img = gp.image.Image(self._image_folder+"/"+self._common_file_name+str(self._image_indices[_g_index])+self._image_file_type)
         while _g_index < len(self._image_indices-1):
-            print("Solving for image pair {}-{}".format(self._image_indices[_f_index], self._image_indices[_g_index]))
+            log.info("Solving for image pair {}-{}.".format(self._image_indices[_f_index], self._image_indices[_g_index]))
             mesh = gp.mesh.Mesh(f_img = _f_img, g_img = _g_img, target_nodes = self._target_nodes, boundary = self._boundary, exclusions = self._exclusions, size_lower_bound = self._size_lower_bound, size_upper_bound = self._size_upper_bound) # Initialise mesh object.
             mesh.solve(seed_coord=self._seed_coord, template=self._template, max_iterations=self._max_iterations, max_norm=self._max_norm, adaptive_iterations=self._adaptive_iterations, method=self._method, order=self._order, tolerance=self._tolerance, alpha=self._alpha, beta=self._beta) # Solve mesh.
             if mesh._update and self.update_register[_g_index-1] == 0: # Correlation coefficient thresholds not met (consequently no mesh generated).  
@@ -119,6 +121,7 @@ class Sequence(SequenceBase):
                 if _g_index != len(self._image_indices-1):
                     _g_img = gp.image.Image(self._image_folder+"/"+self._common_file_name+str(self._image_indices[_g_index])+self._image_file_type)
         del(_f_img)
+
     
     def _trace(self, _f_index, _g_index):
         log.message("Tracing exclusion displacement.")

@@ -1,31 +1,41 @@
+import logging
 import numpy as np
 
+log = logging.getLogger(__name__)
+
 class Template:
-    """Class for geopyv template.
-
-    Parameters
-    ----------
-    size : int
-        Size of the subset.
-
-    Attributes
-    ----------
-    shape : `str`
-        String describing the shape of the subset.
-    dimension : `str`
-        String describing the meaning of the size attribute.
-    size : `int`
-        Size of the subset.
-    n_px : `int`
-        Number of pixels in the subset template.
-    coords : `numpy.ndarray` (Nx, 2)
-        2D array of subset template coordinates of type `float`.
-    subset_mask : `numpy.ndarray` (Nx, 2)
-        2D array of coordinates to mask of type `float`.
     """
-
+    
+    Template base class.
+    
+    """
     def __init__(self, size):
-        """Initialisation of geopyv subset template."""
+        """
+        
+        Base class for geopyv subset template.
+
+        Parameters
+        ----------
+        size : int
+            Size of the subset.
+
+
+        Attributes
+        ----------
+        shape : `str`
+            String describing the shape of the subset.
+        dimension : `str`
+            String describing the meaning of the size attribute.
+        size : `int`
+            Size of the subset.
+        n_px : `int`
+            Number of pixels in the subset template.
+        coords : `numpy.ndarray` (Nx, 2)
+            2D array of subset template coordinates of type `float`.
+        subset_mask : `numpy.ndarray` (Nx, 2)
+            2D array of coordinates to mask of type `float`.
+
+        """
         self.size = size
         self._check_size_and_type()
         self.n_px = []
@@ -35,24 +45,39 @@ class Template:
         self.subset_mask = np.zeros(((2*self.size)+1, (2*self.size)+1)).astype(np.intc)
 
     def _check_size_and_type(self):
-        """Private method to check if size is a positive integer, and if not convert to
-        a positive integer."""
+        """
+        
+        Private method to check if size is a positive integer, and if not convert to
+        a positive integer.
+        
+        """
         # Check size.
         if self.size < 0:
             self.size = int(np.abs(self.size))
-            print(
-                "Warning: Negative subset size specified. Converted to an absolute value of {} pixels.".format(self.size)
+            log.warning(
+                "Negative subset size specified. Converted to an absolute value of {} pixels.".format(self.size)
             )
         # Check type of size.
         if isinstance(self.size, int) is False:
             self.size = int(self.size)
-            print(
-                "Warning: Subset size not specified as an integer. Converted to an integer of {} pixels.".format(self.size)
+            log.warning(
+                "Subset size not specified as an integer. Converted to an integer of {} pixels.".format(self.size)
             )
         return
     
     def mask(self, centre, mask):
-        """Method to mask subset based on binary mask from mesh."""
+        """
+        
+        Method to mask subset based on binary mask from mesh.
+        
+        Parameters
+        ----------
+        centre : `numpy.ndarray` (x,y)
+            Centre of subset.
+        mask : `numpy.ndarray` (Nx,Ny)
+            Mask to be applied to the mesh. Value of 0 indicates pixels to mask in template.
+
+        """
         x_coords = (self.coords[:,0] + centre[0]).astype(np.intc)
         y_coords = (self.coords[:,1] + centre[1]).astype(np.intc)
         masked_coords = np.zeros((1,2))
@@ -75,29 +100,38 @@ class Template:
 
 
 class Circle(Template):
-    """Class for circular subset template. Subclassed from Template.
-
-    Parameters
-    ----------
-    radius : int
-        Radius of the subset.
-
-    Attributes
-    ----------
-    shape : `str`
-        String describing the shape of the subset.
-    dimension : `str`
-        String describing the meaning of the size attribute.
-    size : `int`
-        Radius of the subset.
-    n_px : `int`
-        Number of pixels in the subset template.
-    coords : `numpy.ndarray` (Nx, 2)
-        2D array of subset template coordinates of type `float`.
     """
+    
+    Circular subset template class.
 
+    """
     def __init__(self, radius=25):
-        """Initialisation of geopyv circular subset template."""
+        """
+        
+        Class for circular subset template. Subclassed from Template.
+
+        Parameters
+        ----------
+        radius : int, optional
+            Radius of the subset. Defaults to a value of 25.
+
+
+        Attributes
+        ----------
+        shape : `str`
+            String describing the shape of the subset.
+        dimension : `str`
+            String describing the meaning of the size attribute.
+        size : `int`
+            Radius of the subset.
+        n_px : `int`
+            Number of pixels in the subset template.
+        coords : `numpy.ndarray` (Nx, 2)
+            2D array of subset template coordinates of type `float`.
+        subset_mask : `numpy.ndarray` (Nx, 2)
+            2D array of coordinates to mask of type `float`.
+        
+        """
         super().__init__(radius)
         self.shape = "circle"
         self.dimension = "radius"
@@ -127,29 +161,38 @@ class Circle(Template):
 
 
 class Square(Template):
-    """Class for square subset template. Subclassed from Template.
-
-    Parameters
-    ----------
-    length : int
-        Half length of the side of the subset.
-
-    Attributes
-    ----------
-    shape : `str`
-        String describing the shape of the subset.
-    dimension : `str`
-        String describing the meaning of the size attribute.
-    size : `int`
-        Half length of side of the subset.
-    n_px : `int`
-        Number of pixels in the subset template.
-    coords : `numpy.ndarray` (Nx, 2)
-        2D array of subset template coordinates of type `float`.
     """
+    
+    Square subset template class.
 
-    def __init__(self, length=50):
-        """Initialisation of geopyv square subset template."""
+    """
+    def __init__(self, length=25):
+        """
+        
+        Class for square subset template. Subclassed from Template.
+
+        Parameters
+        ----------
+        length : int, optional
+            Half length of the side of the subset. Defaults to a value of 25.
+
+
+        Attributes
+        ----------
+        shape : `str`
+            String describing the shape of the subset.
+        dimension : `str`
+            String describing the meaning of the size attribute.
+        size : `int`
+            Half length of side of the subset.
+        n_px : `int`
+            Number of pixels in the subset template.
+        coords : `numpy.ndarray` (Nx, 2)
+            2D array of subset template coordinates of type `float`.
+        subset_mask : `numpy.ndarray` (Nx, 2)
+            2D array of coordinates to mask of type `float`.
+        
+        """
         super().__init__(length)
         self.shape = "square"
         self.dimension = "length"

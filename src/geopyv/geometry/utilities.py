@@ -1,24 +1,29 @@
 import numpy as np
 
 def area_to_length(area):
-        """Function that returns a characteristic length given an element area, based on an equilateral triangle.
+        """
+        
+        Function that returns a characteristic length given an element area, based on an equilateral triangle.
         
         Parameters
         ----------
         area : float
             Element area.
 
+
         Returns
         -------
         length : float
             Characteristic length.
-        """
 
+        """
         length = np.sqrt(4*abs(area)/np.sqrt(3))
         return length
 
 def plot_triangulation(elements, x, y):
-    """Method to compute a first order triangulation from a second order element connectivity array and coordinates.
+    """
+    
+    Method to compute a first order triangulation from a second order element connectivity array and coordinates.
 
     Parameters
     ----------
@@ -28,6 +33,7 @@ def plot_triangulation(elements, x, y):
         Horizontal coordinate array.
     y : np.ndarray (Nx, 1)
         Vertical coordinate array.
+
 
     Returns
     -------
@@ -56,14 +62,16 @@ def plot_triangulation(elements, x, y):
     return mesh_triangulation, x_p, y_p
 
 def PolyArea(pts):
-    """A function that returns the area of the input polygon.
+    """
+    
+    A function that returns the area of the input polygon.
 
     Parameters
     ----------
-    pts : numpy.ndarray (N,2)
+    pts : `numpy.ndarray` (Nx,2)
         Clockwise/anti-clockwise ordered coordinates.
-    """
 
+    """
     x = pts[:,0]
     y = pts[:,1]
     return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))

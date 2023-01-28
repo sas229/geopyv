@@ -15,6 +15,7 @@ Functions
 
    geopyv.geometry.utilities.area_to_length
    geopyv.geometry.utilities.plot_triangulation
+   geopyv.geometry.utilities.PolyArea
 
 
 
@@ -43,5 +44,13 @@ Functions
    :returns: * **mesh_triangulation** (*np.ndarray (Nx, 7)*) -- Mesh triangulation array for plot purposes forming closed triangles.
              * **x_p** (*np.ndarray (Nx, 1)*) -- Horizontal coordinate of triangle vertices.
              * **y_p** (*np.ndarray (Nx, 1)*) -- Vertical coordinate of triangle vertices.
+
+
+.. py:function:: PolyArea(pts)
+
+   A function that returns the area of the input polygon.
+
+   :param pts: Clockwise/anti-clockwise ordered coordinates.
+   :type pts: `numpy.ndarray` (Nx,2)
 
 

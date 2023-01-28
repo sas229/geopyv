@@ -14,5 +14,7 @@ Solving the mesh
 Adaptivity
 ^^^^^^^^^^
 
+.. _mesh_data_structure:
+
 Accessing the data
 ------------------

@@ -23,7 +23,7 @@ Functions
    Function to define an array of circular exclusion coordinates.
 
    :param coord: Coordinate of exclusion in pixels.
-   :type coord: np.ndarray (x, y)
+   :type coord: `numpy.ndarray` (x, y)
    :param radius: Radius of exclusion in pixels.
    :type radius: int
    :param size: Required subset spacing on exclusion boundary in pixels.
@@ -36,6 +36,7 @@ Functions
 .. py:function:: circular_exclusion_list(coords, radius, size)
 
    Function to define a list of circular exclusion coordinates.
+
 
    :param coord: Coordinate of exclusion in pixels.
    :type coord: np.ndarray (x,y)

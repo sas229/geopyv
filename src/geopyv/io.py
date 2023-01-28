@@ -104,13 +104,13 @@ def _convert_list_to_ndarray(data):
     Parameters
     ----------
     data : dict
-        Data dictionary containing lists to be parsed into numpy.ndarray.
+        Data dictionary containing lists to be parsed into `numpy.ndarray`.
 
 
     Returns
     -------
     data : dict
-        Data dictionary containing numpy.ndarray after conversion from lists.
+        Data dictionary containing `numpy.ndarray` after conversion from lists.
 
     
     """

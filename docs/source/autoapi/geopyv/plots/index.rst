@@ -29,7 +29,7 @@ Functions
    :param data: Subset data dict.
    :type data: dict
    :param mask: Subset mask.
-   :type mask: numpy.ndarray
+   :type mask: `numpy.ndarray`
    :param show: Control whether the plot is displayed.
    :type show: bool
    :param block: Control whether the plot blocks execution until closed.

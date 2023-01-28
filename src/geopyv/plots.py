@@ -15,7 +15,7 @@ def inspect_subset(data, mask, show, block, save):
     ----------
     data : dict
         Subset data dict.
-    mask : numpy.ndarray
+    mask : `numpy.ndarray`
         Subset mask.
     show : bool
         Control whether the plot is displayed.

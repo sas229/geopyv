@@ -16,9 +16,17 @@ faulthandler.enable()
 log = logging.getLogger(__name__)
 
 class MeshBase:
-    """Mesh base class to be used as a mixin."""
+    """
+    
+    Mesh base class to be used as a mixin.
+    
+    """
     def inspect(self, subset=None, show=True, block=True, save=None):
-        """Method to show the mesh and associated subset quality metrics."""
+        """
+        
+        Method to show the mesh and associated subset quality metrics.
+        
+        """
         # If a subset index is given, inspect the subset.
         if subset != None:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
@@ -35,7 +43,11 @@ class MeshBase:
             return fig, ax
 
     def convergence(self, subset=None, quantity=None, show=True, block=True, save=None):
-        """Method to plot the rate of convergence for the mesh."""
+        """
+        
+        Method to plot the rate of convergence for the mesh.
+        
+        """
         # If a subset index is given, inspect the subset.
         if subset != None:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
@@ -51,20 +63,57 @@ class MeshBase:
             return fig, ax
     
     def contour(self, quantity="C_ZNCC", imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
-        """Method to plot the contours of a given measure."""
+        """
+        
+        Method to plot the contours of a given measure.
+        
+        """
         if quantity != None:
             fig, ax = gp.plots.contour_mesh(data=self.data, imshow=imshow, quantity=quantity, colorbar=colorbar, ticks=ticks, mesh=mesh, alpha=alpha, levels=levels, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
             return fig, ax
     
     def quiver(self, scale=1, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None):
-        """Method to plot a quiver plot of the displacements."""
+        """
+        
+        Method to plot a quiver plot of the displacements.
+        
+        """
         fig, ax = gp.plots.quiver_mesh(data=self.data, scale=scale, imshow=imshow, mesh=mesh, axis=axis, xlim=xlim, ylim=ylim, show=show, block=block, save=save)
         return fig, ax
 
 class Mesh(MeshBase):
 
     def __init__(self, *, f_img, g_img, target_nodes=1000, boundary=None, exclusions=[], size_lower_bound = 1, size_upper_bound = 1000):
-        """Initialisation of geopyv mesh object."""
+        """
+        
+        Mesh class for geopyv.
+
+        Parameters
+        ----------
+        f_img : geopyv.image.Image, optional
+            Reference image of geopyv.image.Image class, instantiated by :mod:`~geopyv.image.Image`.
+        g_img : geopyv.image.Image, optional
+            Target image of geopyv.imageImage class, instantiated by :mod:`~geopyv.image.Image`.
+        target_nodes : int, optional
+            Target number of nodes.
+        boundary : `numpy.ndarray` (Nx,Ny)
+            Array of coordinates to define the mesh boundary.
+        exclusions : list, optional
+            List of `numpy.ndarray` to define the mesh exclusions.
+        size_lower_bound : int, optional
+            Lower bound on element size. Defaults to a value of 1.
+        upper_lower_bound : int, optional
+            Lower bound on element size. Defaults to a value of 1000.
+
+
+        Attributes
+        ----------
+        data : dict
+            Data object containing all settings and results. See the data structure :ref:`here <mesh_data_structure>`.
+        solved : bool
+            Boolean to indicate if the mesh has been solved.
+        
+        """
         self._initialised = False
         # Check types.
         if type(f_img) != gp.image.Image:
@@ -81,7 +130,7 @@ class Mesh(MeshBase):
             raise TypeError("Exclusion coordinate array of invalid type. Cannot initialise mesh.")
         for exclusion in exclusions:
             if np.shape(exclusion)[1] != 2:
-                raise ValueError("Exclusion coordinate array of invalid shape. Must be numpy.ndarray of size (n, 2).")
+                raise ValueError("Exclusion coordinate array of invalid shape. Must be `numpy.ndarray` of size (n, 2).")
 
         # Store variables.
         self._f_img = f_img
@@ -91,7 +140,7 @@ class Mesh(MeshBase):
         self._exclusions = exclusions
         self._size_lower_bound = size_lower_bound
         self._size_upper_bound = size_upper_bound
-        self._solved = False
+        self.solved = False
         self._unsolvable = False
 
         # Define region of interest.
@@ -111,7 +160,7 @@ class Mesh(MeshBase):
         # Data.
         self.data = {
             "type": "Mesh",
-            "solved": self._solved,
+            "solved": self.solved,
             "unsolvable": self._unsolvable,
             "images": {
                 "f_img": self._f_img.filepath,
@@ -128,7 +177,21 @@ class Mesh(MeshBase):
         }
 
     def set_target_nodes(self, target_nodes):
-        """Method to create a mesh with a target number of nodes."""
+        """
+        
+        Method to create a mesh with a target number of nodes.
+
+        Parameters
+        ----------
+        target_nodes : int
+            Target number of nodes.
+
+        
+        .. note::
+            * This method can be used to update the number of target nodes.
+            * It will generate a new initial mesh with the specified target number of nodes.
+        
+        """
         self._target_nodes = target_nodes
 
         # Initialize gmsh if not already initialized.
@@ -142,11 +205,42 @@ class Mesh(MeshBase):
         log.info("Mesh generated with {n} nodes and {e} elements.".format(n=len(self._nodes), e=len(self._elements)))
         gmsh.finalize()        
 
-    def solve(self, *, seed_coord=None, template=None, max_iterations=15, max_norm=1e-3, adaptive_iterations=0, method="ICGN", order=1, tolerance=0.7, alpha=0.5, beta=2):
+    def solve(self, *, seed_coord=None, template=None, max_norm=1e-3, max_iterations=15, order=1, tolerance=0.7, method="ICGN", adaptive_iterations=0, alpha=0.5, beta=2):
+        """
+        
+        Method to solve for the mesh.
 
+        Parameters
+        ----------
+        max_norm : float, optional
+            Exit criterion for norm of increment in warp function. Defaults to value of
+            :math:`1 \cdot 10^{-3}`.
+        max_iterations : int, optional
+            Exit criterion for number of Gauss-Newton iterations. Defaults to value
+            of 50.
+        order : int
+            Warp function order. Options are 1 and 2.
+        tolerance: float, optional
+            Correlation coefficient tolerance. Defaults to a value of 0.7.
+        method : str
+            Solution method. Options are FAGN and ICGN. Default is ICGN since it is faster.
+        adaptive_iterations : int, optional
+            Number of mesh adaptivity iterations to perform. Defaults to a value of 0.
+        alpha : float, optional
+            Mesh adaptivity control parameter. Defaults to a value of 0.5.
+        beta : float, optional
+            Mesh adaptivity control parameter. Defaults to a value of 2.0.
+
+
+        Returns
+        -------
+        solved : bool
+            Boolean to indicate if the subset instance has been solved.
+
+        """
         # Check inputs.
         if type(seed_coord) != np.ndarray:
-            raise TypeError("Coordinate is not of numpy.ndarray type. Cannot initiate solver.")
+            raise TypeError("Coordinate is not of `numpy.ndarray` type. Cannot initiate solver.")
         elif type(adaptive_iterations) != int:
             raise TypeError("Number of adaptive iterations of invalid type. Must be an integer greater than or equal to zero.")
         if template == None:
@@ -190,7 +284,7 @@ class Mesh(MeshBase):
             self._reliability_guided()
             if self._unsolvable:
                 log.error("Specified correlation coefficient tolerance not met.")
-                return self._solved
+                return self.solved
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations+1):
                 self._message = "Adaptive iteration {}".format(iteration)
@@ -201,14 +295,14 @@ class Mesh(MeshBase):
                 self._reliability_guided()
                 if self._unsolvable:
                     log.error("Specified correlation coefficient tolerance not met. Minimum correlation coefficient: {min_C:.2f}; tolerance: {tolerance:.2f}.".format(min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]), tolerance=self._tolerance))
-                    return self._solved    
+                    return self.solved    
             log.info("Solved mesh. Minimum correlation coefficient: {min_C:.2f}; maximum correlation coefficient: {max_C:.2f}.".format(min_C=np.amin(self._C_ZNCC), max_C=np.amax(self._C_ZNCC)))
 
             # Pack data.
-            self._solved = True
+            self.solved = True
             self.data["nodes"] = self._nodes
             self.data["elements"] = self._elements
-            self.data["solved"] = self._solved
+            self.data["solved"] = self.solved
             self.data["unsolvable"] = self._unsolvable
 
             # Pack settings.
@@ -239,28 +333,37 @@ class Mesh(MeshBase):
 
         except:
             self._update = True
-            self._solved = False
+            self.solved = False
             self._unsolvable = True
         gmsh.finalize()
-        return self._solved
+        return self.solved
         
     def _update_mesh(self):
-        """Private method to update the mesh variables."""
+        """
+        
+        Private method to update the mesh variables.
+        
+        """
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2) # Extracts: element node tags.
         self._nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
         self._elements = np.reshape((np.asarray(ent)-1).flatten(), (-1, 6)) # Element connectivity array. 
     
     def _find_seed_node(self):
-        """Private method to find seed node given seed coordinate."""
+        """
+        
+        Private method to find seed node given seed coordinate.
+        
+        """
         dist = np.sqrt((self._nodes[:,0]-self._seed_coord[0])**2 + (self._nodes[:,1]-self._seed_coord[1])**2)
         self._seed_node = np.argmin(dist)
 
     def _define_RoI(self):
         """
+        
         Private method to define the RoI.
+        
         """
-
         # Create binary mask RoI.
         binary_img = ImagePIL.new('L', (np.shape(self._f_img.image_gs)[1], np.shape(self._f_img.image_gs)[0]), 0)
         ImageDrawPIL.Draw(binary_img).polygon(self._boundary.flatten().tolist(), outline=1, fill=1)
@@ -286,13 +389,21 @@ class Mesh(MeshBase):
         self._mask = np.array(binary_img)
 
     def _initial_mesh(self):
-        """Private method to optimize the element size to generate approximately the desired number of elements."""
-
+        """
+        
+        Private method to optimize the element size to generate approximately the desired number of elements.
+        
+        """
         f = lambda size: self._uniform_remesh(size, self._boundary, self._segments, self._curves, self._target_nodes, self._size_lower_bound)
         res = minimize_scalar(f, bounds=(self._size_lower_bound, self._size_upper_bound), method='bounded')
         self._update_mesh()
         
     def _adaptive_mesh(self):
+        """
+        
+        Private method to perform adaptive remeshing.
+
+        """
         message = "Adaptively remeshing..."
         with alive_bar(dual_line=True, bar=None, title=message) as bar:
             D = abs(self._du[:,0,1]+self._du[:,1,0])*self._areas # Elemental shear strain-area products.
@@ -305,7 +416,30 @@ class Mesh(MeshBase):
     @staticmethod
     def _uniform_remesh(size, boundary, segments, curves, target_nodes, size_lower_bound):
         """
-        Private method to prepare the initial mesh.
+        
+        Private method to create the initial mesh.
+
+        Parameters
+        ----------
+        size : int
+            Target size of elements.
+        boundary : `numpy.ndarray` (Nx,Ny)
+            Array of coordinates to define the mesh boundary.
+        segments : `numpy.ndarray` (Nx,Ny)
+            Array of segments for gmsh mesh generation.
+        curves : `numpy.ndarray` (Nx,Ny)
+            Array of curves for gmsh mesh generation.
+        target_nodes : int
+            Target number of nodes.
+        size_lower_bound : int
+            Lower bound on element size.
+
+
+        Returns
+        -------
+        error : int
+            Error between target and actual number of nodes.
+        
         """
         # Make mesh.
         gmsh.model.add("base") # Create model.
@@ -337,13 +471,36 @@ class Mesh(MeshBase):
         _, nc, _ = gmsh.model.mesh.getNodes() # Extracts: node tags, node coordinates, parametric coordinates.
         nodes = np.column_stack((nc[0::3], nc[1::3])) # Nodal coordinate array (x,y).
         number_nodes = len(nodes)
-
-        return abs(number_nodes - target_nodes)
+        error = abs(number_nodes - target_nodes) 
+        return error
 
     @staticmethod
     def _adaptive_remesh(scale, target, nodes, elements, areas):
-        lengths = gp.geometry.utilities.area_to_length(areas*scale) # Convert target areas to target characteristic lengths.
+        """
+        
+        Private method to perform adaptive mesh generation.
 
+        Parameters
+        ----------
+        scale : float
+            Scale factor on element size.
+        target : int
+            Target number of nodes.
+        nodes : `numpy.ndarray`
+            Nodes for background mesh.
+        elements : `numpy.ndarray`
+            Elements for background mesh.
+        areas : float
+            Target element areas.
+
+        
+        Returns
+        -------
+        error : float
+            Error between target and actual number of nodes.
+
+        """
+        lengths = gp.geometry.utilities.area_to_length(areas*scale) # Convert target areas to target characteristic lengths.
         bg = gmsh.view.add("bg", 1) # Create background view.
         data = np.pad(nodes[elements[:,:3]], ((0,0),(0,0),(0,2)), mode='constant') # Prepare data input (coordinates and buffer).
         data[:,:,3] = np.reshape(np.repeat(lengths, 3), (-1,3)) # Fill data input buffer with target weights.
@@ -367,10 +524,20 @@ class Mesh(MeshBase):
         return error
 
     def _adaptive_subset(self):
+        """
+        
+        Private method to compute adaptive subset size. Implementation not yet complete.
+        
+        """
         subset_bgf = sp.interpolate.RBFInterpolator(self._subset_bgf_nodes,self._subset_bgf_values,neighbors = 10, kernel = "cubic")
         subset_sizes = subset_bgf(self._nodes)
 
     def _update_subset_bgf(self):
+        """
+        
+        Private method to compute the background mesh.
+
+        """
         if self._subset_bgf_nodes is not None:
             self._subset_bgf_nodes = np.append(self._subset_bgf_nodes, np.mean(self._nodes[self._elements], axis = 1),axis=0)
             self._subset_bgf_values = np.append(self._subset_bgf_values, np.mean(self._d2u, axis=(1,2)), axis = 0)
@@ -380,9 +547,9 @@ class Mesh(MeshBase):
 
     def _element_area(self):
         """
-        A private method to calculate the element areas.
+        Private method to calculate the element areas.
+        
         """
-
         M = np.ones((len(self._elements),3,3))
         M[:,1] = self._nodes[self._elements[:,:3]][:,:,0] # [:3] will provide corner nodes in both 1st and 2nd order element case.
         M[:,2] = self._nodes[self._elements[:,:3]][:,:,1]
@@ -390,8 +557,9 @@ class Mesh(MeshBase):
 
     def _element_strains(self):
         """
-        A private method to calculate the elemental strain the "B" matrix relating 
-        element node displacements to elemental strain.
+        
+        Private method to calculate the elemental strain the "B" matrix relating element node displacements to elemental strain.
+        
         """
         # Local coordinates
         A = np.ones((len(self._elements),3,3))
@@ -433,9 +601,10 @@ class Mesh(MeshBase):
 
     def _reliability_guided(self):
         """
-        A private method to perform reliability-guided (RG) PIV analysis.
-        """
 
+        Private method to perform reliability-guided (RG) PIV analysis.
+
+        """
         # Set up.
         m = np.shape(self._nodes)[0]
         n = np.shape(self._p_0)[0]
@@ -507,12 +676,12 @@ class Mesh(MeshBase):
         # Update check.
         if any(self._subset_solved != -1):
             self._update = True
-            self._solved = False
+            self.solved = False
             self._unsolvable = True
         else:
             # Compute element areas and strains.
             self._update = False
-            self._solved = True
+            self.solved = True
             self._unsolvable = False
             self._element_area()
             self._element_strains()
@@ -520,13 +689,18 @@ class Mesh(MeshBase):
 
     def _connectivity(self,idx):
         """
+        
         A private method that returns the indices of nodes connected to the index node according to the input array.
         
         Parameters
         ----------
         idx : int
             Index of node. 
-        arr : numpy.ndarray (N) 
+
+
+        Returns
+        -------
+        pts_idx : `numpy.ndarray` (N) 
             Mesh array. 
 
         """
@@ -551,14 +725,21 @@ class Mesh(MeshBase):
 
     def _neighbours(self, cur_idx, p_0):
         """
-        Method to calculate the correlation coefficients and warp functions of the neighbouring nodes.
+        
+        Private method to calculate the correlation coefficients and warp functions of the neighbouring nodes.
 
         Parameters
         __________
-        p_0 : numpy.ndarray (N)
+        p_0 : `numpy.ndarray` (N)
             Preconditioning warp function.
+
+
+        Returns
+        -------
+        solved : bool
+            Boolean to indicate whether the neighbouring subsets have been solved.
+
         """
-        
         neighbours = self._connectivity(cur_idx)
         for idx in neighbours:
             if self._subset_solved[idx] == 0: # If not previously solved.
@@ -589,7 +770,18 @@ class Mesh(MeshBase):
                             return False
 
     def _store_variables(self, idx, seed=False):
-        """Store variables."""
+        """
+        
+        Private method to store variables.
+
+        Parameters
+        ----------
+        idx : int
+            Index of current subset.
+        seed : bool
+            Boolean to indicate whether this is the seed subset.
+        
+        """
         if seed == True:
             flag = -1
         else:
@@ -601,19 +793,22 @@ class Mesh(MeshBase):
         self._displacements[idx, 1] = self._subsets[idx].data["results"]["v"]
 
 class MeshResults(MeshBase):
-    """MeshResults class for geopyv.
+    """
+    
+    MeshResults class for geopyv.
 
     Parameters
     ----------
     data : dict
         geopyv data dict from Mesh object.
 
+
     Attributes
     ----------
     data : dict
         geopyv data dict from Mesh object.
-    """
 
+    """
     def __init__(self, data):
         """Initialisation of geopyv MeshResults class."""
         self.data = data

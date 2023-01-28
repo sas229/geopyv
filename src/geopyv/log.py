@@ -4,20 +4,34 @@ import sys
 import platform
 
 class CustomFormatter(logging.Formatter):
-    """Function to format the std log output such that INFO logs provide
-    just the log message and other levels also provide the level type."""
-
-    # Colours.
-    white = '\u001b[37m'
-    yellow = '\x1b[38;5;226m'
-    red = '\x1b[38;5;196m'
-    bold_red = '\x1b[31;1m'
-    reset = '\x1b[0m'
-
+    
     def __init__(self, fmt, fmt_INFO):
+        """
+        
+        Override to format the std log output such that INFO logs provide
+        just the log message and other levels also provide the level type.
+
+        Parameters
+        ----------
+        fmt : str
+            Format of general log message.
+        fmt_INFO : str
+            Modified format of logging.INFO message.
+        
+        
+        """
         super().__init__()
         self.fmt = fmt
         self.fmt_INFO = fmt_INFO
+        
+        # Colours.
+        self.white = "\u001b[37m"
+        self.yellow = "\x1b[38;5;226m"
+        self.red = "\x1b[38;5;196m"
+        self.bold_red = "\x1b[31;1m"
+        self.reset = "\x1b[0m"
+
+        # Format.
         self.FORMATS = {
             logging.DEBUG: self.white + self.fmt + self.reset,
             logging.INFO: self.white + self.fmt_INFO + self.reset,
@@ -27,12 +41,31 @@ class CustomFormatter(logging.Formatter):
         }
 
     def format(self, record):
+        """
+        
+        Override to provide a custom log format.
+        
+        Parameters
+        ----------
+        record: LogRecord
+            Log record object.
+
+        """
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
 def initialise(level):
-    """Function to initialise the log file."""
+    """
+    
+    Function to initialise the log file.
+    
+    Parameters
+    ----------
+    level : logging.level
+        Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
+
+    """
     # Get platform and define destination for the logging file.
     operating_system = platform.system()
     home_dir = os.path.expanduser( '~' )
@@ -84,6 +117,15 @@ def initialise(level):
     return
 
 def set_level(level):
-    """Function to set the log level after initialisation."""
+    """
+    
+    Function to set the log level after initialisation.
+    
+    Parameters
+    ----------
+    level : logging.level
+        Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
+    
+    """
     log = logging.getLogger(__name__)
     log.setLevel(level)

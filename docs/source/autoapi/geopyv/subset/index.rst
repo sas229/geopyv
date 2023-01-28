@@ -1,5 +1,3 @@
-:orphan:
-
 :py:mod:`geopyv.subset`
 =======================
 
@@ -21,9 +19,22 @@ Classes
 
 
 
+Attributes
+~~~~~~~~~~
+
+.. autoapisummary::
+
+   geopyv.subset.log
+
+
+.. py:data:: log
+
+   
+
 .. py:class:: SubsetBase
 
    Subset base class to be used as a mixin. Contains plot functionality.
+
 
    .. py:method:: inspect(show=True, block=True, save=None)
 

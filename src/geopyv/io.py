@@ -1,5 +1,6 @@
 import logging
 import json
+import os
 import numpy as np
 import geopyv as gp
 from numpyencoder import NumpyEncoder
@@ -8,9 +9,35 @@ from alive_progress import alive_bar
 log = logging.getLogger(__name__)
 
 def load(filename=None):
-    """Function to load a geopyv data file."""
-    ext = ".pyv"
-    filepath = filename + ext
+    """
+    
+    Function to load a geopyv data object into the workspace. If no filename is provided, the host OS default file browser will be used to allow the user to select a geopyv data file with .pyv extension.
+    
+
+    Parameters
+    ----------
+    filename : str, optional
+        Name of file containing a geopy data object.
+
+
+    Returns
+    -------
+    object : geopyv.object
+        The geopyv data object loaded.
+
+    
+    .. note::
+        * Any .pyv object can be loaded with this function.
+        * The data object will be loaded into a `ObjectResults` instance where `Object` represents the instance type that generated the data. For example, data from a `Subset` instance will be loaded into a `SubsetResults` instance. 
+    
+    """
+    if filename == None:
+        directory = os.getcwd()
+        dialog = gp.gui.selectors.file.FileSelector()
+        filepath = dialog.get_path("Select geopyv data file", directory)
+    else:
+        ext = ".pyv"
+        filepath = filename + ext
     try:
         with open(filepath, "r") as infile:
             message = "Loading geopyv object"
@@ -28,13 +55,33 @@ def load(filename=None):
     except:
         raise FileNotFoundError("File not found.")
 
-def save(object, filename):
-    """Function to save data from a geopyv object."""
+def save(object, filename=None):
+    """
+    
+    Function to save data from a geopyv object. If no filename is provided, the host OS default file browser will be used to allow the user to choose a filename and storage location.
+    
+
+    Parameters
+    ----------
+    object : geopyv.object
+        The object to be saved.
+    filename : str, optional
+        The filename to give to the saved data file.
+
+
+    .. note::
+        * Any geopyv object can be passed to this function.
+        * Do not include the .pyv extension in the `filename` argument.
+    
+    """
+    directory = os.getcwd()
+    if filename == None:
+        filename = "test"
     if type(object) == gp.subset.Subset or type(object) == gp.mesh.Mesh or type(object == gp.particle.Particle):
         solved = object.data["solved"]
         if solved == True:
             ext = ".pyv"
-            filepath = filename + ext
+            filepath = directory + "/" + filename + ext
             with open(filepath, "w") as outfile:
                 message = "Saving geopyv object"
                 with alive_bar(dual_line=True, bar=None, title=message) as bar:
@@ -49,7 +96,24 @@ def save(object, filename):
         raise TypeError("Not a geopyv type.")
 
 def _convert_list_to_ndarray(data):
-    """Recursive function to convert lists back to numpy ndarray."""
+    """
+    
+    Recursive function to convert lists back to numpy ndarray.
+
+    
+    Parameters
+    ----------
+    data : dict
+        Data dictionary containing lists to be parsed into numpy.ndarray.
+
+
+    Returns
+    -------
+    data : dict
+        Data dictionary containing numpy.ndarray after conversion from lists.
+
+    
+    """
     for key, value in data.items():
         # If not a list of subsets, convert to numpy ndarray.
         if type(value) == list and key != "subsets":

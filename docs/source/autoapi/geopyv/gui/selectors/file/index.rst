@@ -1,7 +1,7 @@
-:py:mod:`geopyv.gui.selectors.image`
-====================================
+:py:mod:`geopyv.gui.selectors.file`
+===================================
 
-.. py:module:: geopyv.gui.selectors.image
+.. py:module:: geopyv.gui.selectors.file
 
 
 Module Contents
@@ -12,14 +12,14 @@ Classes
 
 .. autoapisummary::
 
-   geopyv.gui.selectors.image.ImageSelector
+   geopyv.gui.selectors.file.FileSelector
 
 
 
 
-.. py:class:: ImageSelector
+.. py:class:: FileSelector
 
-   Graphical user interface to allow the user to select an image using the native file browser on the host OS.
+   Graphical user interface to allow the user to select a results file using the native file browser on the host OS.
 
 
    .. py:method:: get_path(message, directory)

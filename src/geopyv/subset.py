@@ -7,10 +7,15 @@ import geopyv as gp
 log = logging.getLogger(__name__)
 
 class SubsetBase:
-    """Subset base class to be used as a mixin. Contains plot functionality."""
+    """
     
+    Subset base class to be used as a mixin. Contains plot functionality.
+    
+    """
     def inspect(self, show=True, block=True, save=None):
-        """Method to show the subset and associated quality metrics using :mod:`~geopyv.plots.inspect_subset`.
+        """
+        
+        Method to show the subset and associated quality metrics using :mod:`~geopyv.plots.inspect_subset`.
         
         Parameters
         ----------
@@ -20,6 +25,7 @@ class SubsetBase:
             Control whether the plot blocks execution until closed.
         save : str, optional
             Name to use to save plot. Uses default extension of `.png`.
+
 
         Returns
         -------
@@ -40,7 +46,9 @@ class SubsetBase:
         return fig, ax
 
     def convergence(self, show=True, block=True, save=None):
-        """Method to plot the rate of convergence for the subset using :mod:`~geopyv.plots.convergence_subset`.
+        """
+        
+        Method to plot the rate of convergence for the subset using :mod:`~geopyv.plots.convergence_subset`.
         
         Parameters
         ----------
@@ -78,7 +86,9 @@ class SubsetBase:
 
 
 class Subset(SubsetBase):
-    """Subset class for geopyv.
+    """
+    
+    Subset class for geopyv.
 
     Private Attributes
     ------------------
@@ -138,9 +148,10 @@ class Subset(SubsetBase):
         Dictionary of results.
 
     """
-
     def __init__(self, *, f_coord=None, f_img=None, g_img=None, template=None):
-        """Initialisation of geopyv subset object.
+        """
+        
+        Initialisation of geopyv subset object.
         
         Parameters
         ----------
@@ -238,7 +249,9 @@ class Subset(SubsetBase):
         }
 
     def solve(self, *, max_norm=1e-3, max_iterations=15, order=1, p_0=None, tolerance=0.7, method="ICGN"):
-        """Method to solve for the subset displacements using the various methods.
+        """
+        
+        Method to solve for the subset displacements using the various methods.
 
         Parameters
         ----------
@@ -278,7 +291,6 @@ class Subset(SubsetBase):
             :meth:`~_get_initial_guess`
 
         """
-
         # Check other control parameters.
         if max_norm < 1e-10:
             raise ValueError("Maximum norm value too small. Suggested default is 1e-3.")
@@ -383,7 +395,11 @@ class Subset(SubsetBase):
             # raise RuntimeError("Runtime error in solve method.")
 
     def _load_img(self, message):
-        """Private method to open a file dialog and select an image."""
+        """
+        
+        Private method to open a file dialog and select an image.
+        
+        """
         directory = os.getcwd()
         dialog = gp.gui.selectors.image.ImageSelector()
         imgpath = dialog.get_path(directory, message)
@@ -391,24 +407,37 @@ class Subset(SubsetBase):
         return img
 
     def _load_f_img(self):
-        """Private method to load the reference image."""
+        """
+        
+        Private method to load the reference image.
+        
+        """
         log.warn("No reference image supplied. Please select the reference image.")
         return self._load_img("Select reference image.")
 
     def _load_g_img(self):
-        """Private method to load the target image."""
+        """
+        
+        Private method to load the target image.
+        
+        """
         log.warn("No target image supplied. Please select the target image.")
         return self._load_img("Select target image.")
 
     def _get_initial_guess_size(self):
-        """Private method to estimate the size of square subset to use in the
-        initial guess."""
+        """
+        
+        Private method to estimate the size of square subset to use in the initial guess.
+        
+        """
         self._initial_guess_size = np.round(np.sqrt(self._template.n_px), 1)
 
     def _get_initial_guess(self):
-        """Private method to compute an initial guess of the subset displacement using
-        OpenCV function :py:meth:`cv2.matchTemplate` and the Normalised
-        Cross-Correlation (NCC) criteria."""
+        """
+        
+        Private method to compute an initial guess of the subset displacement using OpenCV function :py:meth:`cv2.matchTemplate` and the Normalised Cross-Correlation (NCC) criteria.
+        
+        """
         # Extract square subset for initial guess.
         x = self._f_coord.item(0)
         y = self._f_coord.item(1)
@@ -431,12 +460,15 @@ class Subset(SubsetBase):
 class SubsetResults(SubsetBase):
 
     def __init__(self, data):
-        """Subset results object for geopyv. 
+        """
+        
+        Subset results object for geopyv. 
         
         Parameters
         ----------
         data : dict
             geopyv data dict from Subset object.
+
 
         Attributes
         ----------

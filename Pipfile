@@ -21,13 +21,13 @@ opencv-python = "*"
 colorlog = "*"
 numpyencoder = "*"
 pyqtgraph = "*"
-geopyv = {path = "."}
 
 [dev-packages]
 ipykernel = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-autoapi = "*"
 sphinx-copybutton = "*"
+geopyv = {editable = true, path = "."}
 
 [requires]
 python_version = "3"

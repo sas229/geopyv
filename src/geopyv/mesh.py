@@ -45,6 +45,8 @@ class MeshBase:
                 log.error("Subset index provided is out of the range of the mesh object contents.")
         # Otherwise inspect the mesh.
         else:
+            if quantity == None:
+                quantity = "C_ZNCC"
             fig, ax = gp.plots.convergence_mesh(data=self.data, quantity=quantity, show=show, block=block, save=save)
             return fig, ax
     

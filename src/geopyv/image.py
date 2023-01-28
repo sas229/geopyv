@@ -2,13 +2,13 @@ import logging
 import cv2
 import numpy as np
 import geopyv as gp
-from os.path import exists
+import os
 
 log = logging.getLogger(__name__)
 
 class Image:
 
-    def __init__(self, filepath, border=20):
+    def __init__(self, filepath=None, border=20):
         """Image class for geopyv Image object.
         
         Parameters
@@ -30,7 +30,11 @@ class Image:
 
         """
         log.debug("Initialising geopyv Image object at {}.".format(filepath))
-        if exists(filepath):
+        if filepath == None:
+            directory = os.getcwd()
+            dialog = gp.gui.selectors.image.ImageSelector()
+            filepath = dialog.get_path(directory, "Select image")
+        elif os.path.exists(filepath):
             self.filepath = filepath
             self.border = np.int_(border)
             self._get_image_gs()

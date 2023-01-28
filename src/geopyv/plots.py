@@ -7,8 +7,39 @@ import re
 import geopyv as gp
 
 def inspect_subset(data, mask, show, block, save):
-    """Function to show the subset and associated quality metrics."""
+    """
+    
+    Function to show the Subset and associated quality metrics.
+    
+    Parameters
+    ----------
+    data : dict
+        Subset data dict.
+    mask : numpy.ndarray
+        Subset mask.
+    show : bool
+        Control whether the plot is displayed.
+    block : bool
+        Control whether the plot blocks execution until closed.
+    save : str
+        Name to use to save plot. Uses default extension of `.png`.
 
+
+    Returns
+    -------
+    fig :  matplotlib.pyplot.figure
+        Figure object.
+    ax : matplotlib.pyplot.axes
+        Axes object.
+
+
+    .. note::
+        * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
+
+    .. seealso::
+        :meth:`~geopyv.subset.SubsetBase.inspect`
+
+    """
     # Load data.
     image = cv2.imread(data["images"]["f_img"], cv2.IMREAD_COLOR)
     image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -65,8 +96,37 @@ def inspect_subset(data, mask, show, block, save):
     return fig, ax
 
 def convergence_subset(data, show, block, save):
-    """Function to plot subset convergence."""
+    """
+    
+    Function to plot Subset convergence.
+    
+    Parameters
+    ----------
+    data : dict
+        Subset data dict.
+    show : bool
+        Control whether the plot is displayed.
+    block : bool
+        Control whether the plot blocks execution until closed.
+    save : str
+        Name to use to save plot. Uses default extension of `.png`.
 
+
+    Returns
+    -------
+    fig :  matplotlib.pyplot.figure
+        Figure object.
+    ax : matplotlib.pyplot.axes
+        Axes object.
+
+
+    .. note::
+        * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
+
+    .. seealso::
+        :meth:`~geopyv.subset.SubsetBase.convergence`
+
+    """
     # Load data.
     history = data["results"]["history"]
     max_iterations = data["settings"]["max_iterations"]
@@ -78,12 +138,12 @@ def convergence_subset(data, show, block, save):
     # Create plot.
     title = "Subset convergence: f_coord = ({x},{y}) (px)".format(x=x, y=y)
     fig, ax = plt.subplots(2, 1, sharex=True, num=title)
-    ax[0].semilogy(history[0,:], history[1,:], marker="o", clip_on=False, label="Convergence")
+    ax[0].semilogy(history[0,:], history[1,:], marker="o", clip_on=True, label="Convergence")
     ax[0].plot([1, max_iterations], [max_norm, max_norm], "--r", label="Threshold")
     ax[0].set_ylabel(r"$\Delta$ Norm (-)")
     ax[0].set_ylim(max_norm/1000, max_norm*1000)
     ax[0].set_yticks([max_norm*1000, max_norm*100, max_norm*10, max_norm, max_norm/10, max_norm/100, max_norm/1000])
-    ax[1].plot(history[0,:], history[2,:], marker="o", clip_on=False, label="Convergence")
+    ax[1].plot(history[0,:], history[2,:], marker="o", clip_on=True, label="Convergence")
     ax[1].plot([1, max_iterations], [tolerance, tolerance], "--r", label="Threshold")
     ax[1].set_ylabel(r"$C_{CC}$ (-)")
     ax[1].set_xlabel("Iteration number (-)")
@@ -107,8 +167,39 @@ def convergence_subset(data, show, block, save):
     return fig, ax
 
 def convergence_mesh(data, quantity, show, block, save):
-    """Function to plot subset convergence."""
+    """
+    
+    Function to plot Mesh convergence.
+    
+    Parameters
+    ----------
+    data : dict
+        Mesh data dict.
+    quantity : str
+        Quantity to plot. Options are "C_ZNCC", "iterations", or "norm".
+    show : bool
+        Control whether the plot is displayed.
+    block : bool
+        Control whether the plot blocks execution until closed.
+    save : str
+        Name to use to save plot. Uses default extension of `.png`.
 
+
+    Returns
+    -------
+    fig :  matplotlib.pyplot.figure
+        Figure object.
+    ax : matplotlib.pyplot.axes
+        Axes object.
+
+
+    .. note::
+        * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
+
+    .. seealso::
+        :meth:`~geopyv.mesh.MeshBase.convergence`
+
+    """
     # Get image names.
     platform = sys.platform
     if platform == "linux" or platform == "linux2" or platform == "darwin":
@@ -136,20 +227,20 @@ def convergence_mesh(data, quantity, show, block, save):
     C_ZNCC = np.asarray(C_ZNCC)
 
     # Create plot.
-    title = "Subset convergence: f_img = {f_img}".format(f_img=f_img)
+    title = "Mesh convergence: f_img = {f_img}".format(f_img=f_img)
     fig, ax = plt.subplots(num=title)
-    if quantity == "norm":
-        ax.hist(norm, bins=50)
-        ax.set_xlabel(r"$\Delta Norm$ (-)")
-        ax.set_xlim([0, max_norm])
+    if quantity == "C_ZNCC":
+        ax.hist(C_ZNCC, bins=50)
+        ax.set_xlabel(r"$C_{ZNCC}$ (-)")
+        ax.set_xlim([tolerance, 1.0])
     elif quantity == "iterations":
         ax.hist(iterations)
         ax.set_xlabel(r"Iterations (-)")
         ax.set_xlim([0, max_iterations])
-    else:
-        ax.hist(C_ZNCC, bins=50)
-        ax.set_xlabel(r"$C_{ZNCC}$ (-)")
-        ax.set_xlim([tolerance, 1.0])
+    elif quantity == "norm":
+        ax.hist(norm, bins=50)
+        ax.set_xlabel(r"$\Delta Norm$ (-)")
+        ax.set_xlim([0, max_norm])
     ax.set_ylabel("Count (-)")    
     plt.tight_layout()
 
@@ -271,7 +362,7 @@ def contour_mesh(data, quantity, imshow, colorbar, ticks, mesh, alpha, levels, a
     return fig, ax
 
 def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
-    """Function to plot contours of mesh data."""
+    """Function to plot quiver plot of mesh data."""
 
     # Load data.
     elements = data["elements"]
@@ -353,8 +444,37 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
     return fig, ax
 
 def inspect_mesh(data, show, block, save):
-    """Function to inspect the mesh."""
+    """
+    
+    Function to inspect Mesh topology.
+    
+    Parameters
+    ----------
+    data : dict
+        Mesh data dict.
+    show : bool
+        Control whether the plot is displayed.
+    block : bool
+        Control whether the plot blocks execution until closed.
+    save : str
+        Name to use to save plot. Uses default extension of `.png`.
 
+
+    Returns
+    -------
+    fig :  matplotlib.pyplot.figure
+        Figure object.
+    ax : matplotlib.pyplot.axes
+        Axes object.
+
+
+    .. note::
+        * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
+
+    .. seealso::
+        :meth:`~geopyv.mesh.MeshBase.inspect`
+
+    """
     # Load image.
     image_path = data["images"]["f_img"]
     image = cv2.imread(image_path, cv2.IMREAD_COLOR)

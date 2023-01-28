@@ -1,5 +1,3 @@
-:orphan:
-
 :py:mod:`geopyv.image`
 ======================
 
@@ -19,7 +17,19 @@ Classes
 
 
 
-.. py:class:: Image(filepath, border=20)
+Attributes
+~~~~~~~~~~
+
+.. autoapisummary::
+
+   geopyv.image.log
+
+
+.. py:data:: log
+
+   
+
+.. py:class:: Image(filepath=None, border=20)
 
    Image class for geopyv Image object.
 

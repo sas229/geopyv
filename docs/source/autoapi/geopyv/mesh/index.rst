@@ -1,5 +1,3 @@
-:orphan:
-
 :py:mod:`geopyv.mesh`
 =====================
 
@@ -20,6 +18,18 @@ Classes
 
 
 
+
+Attributes
+~~~~~~~~~~
+
+.. autoapisummary::
+
+   geopyv.mesh.log
+
+
+.. py:data:: log
+
+   
 
 .. py:class:: MeshBase
 
@@ -55,6 +65,9 @@ Classes
    .. py:method:: set_target_nodes(target_nodes)
 
       Method to create a mesh with a target number of nodes.
+
+
+   .. py:method:: solve(*, seed_coord=None, template=None, max_iterations=15, max_norm=0.001, adaptive_iterations=0, method='ICGN', order=1, tolerance=0.7, alpha=0.5, beta=2)
 
 
 

@@ -18,9 +18,7 @@ opencv-contrib-python = "*"
 pyside6 = "*"
 alive-progress = "*"
 opencv-python = "*"
-colorlog = "*"
 numpyencoder = "*"
-pyqtgraph = "*"
 
 [dev-packages]
 ipykernel = "*"

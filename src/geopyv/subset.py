@@ -190,11 +190,13 @@ class Subset(SubsetBase):
             coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
             self._f_coord = coordinate.select(self._f_img, self._template)
         elif np.shape(self._f_coord) != np.shape(np.empty(2)):
-            raise TypeError("Coordinate is not an np.ndarray of length 2.")
+            coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
+            self._f_coord = coordinate.select(self._f_img, self._template)
         if self._template == None:
             self._template = gp.templates.Circle(50)
         elif type(self._template) != gp.templates.Circle and type(self._template) != gp.templates.Square:
-            raise TypeError("Template is not a type defined in geopyv.templates.")
+            log.error("Template ot defined in geopyv.template. Using default of gp.templates.Circle(50).")
+            self._template = gp.templates.Circle(50)
 
         # Check subset is entirely within the reference image.
         self._x = self._f_coord[0]
@@ -324,6 +326,12 @@ class Subset(SubsetBase):
             if type(p_0) != np.ndarray:
                 log.error("Warp function of incorrect type.")
                 return False
+            if order == 1 and np.shape(p_0)[0] != 6:
+                log.error("Warp function preconditioning vector of incorrect shape.")
+                return False
+            if order == 2 and np.shape(p_0)[0] != 12:
+                log.error("Warp function preconditioning vector of incorrect shape.")
+                return False
 
         # Store settings.
         self._method = method
@@ -400,7 +408,7 @@ class Subset(SubsetBase):
 
         except:
             log.error("Subset not solved.")
-            # raise RuntimeError("Runtime error in solve method.")
+            return False
 
     def _load_img(self, message):
         """

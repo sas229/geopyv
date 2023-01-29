@@ -23,8 +23,8 @@ def test_Subset_solve_ICGN_W1():
     template = Circle(25)
     coord = np.asarray((200.43,200.76))
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
-    subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="FAGN")
-    assert subset.data["results"]["norm"] <= max_norm or subset.data["results"]["iterations"] < max_iterations
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="FAGN")
+    assert success == True
 
 def test_Subset_solve_FAGN_W1():
     """Integration test for Subset.solve() for first order FAGN."""
@@ -35,8 +35,8 @@ def test_Subset_solve_FAGN_W1():
     template = Circle(25)
     coord = np.asarray((200.43,200.76))
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
-    subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="FAGN")
-    assert subset.data["results"]["norm"] <= max_norm or subset.data["results"]["iterations"] < max_iterations
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="FAGN")
+    assert success == True
 
 def test_Subset_solve_ICGN_W2():
     """Integration test for Subset.solve() for second order ICGN."""
@@ -47,8 +47,8 @@ def test_Subset_solve_ICGN_W2():
     template = Circle(25)
     coord = np.asarray((200.43,200.76))
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
-    subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="ICGN")
-    assert subset.data["results"]["norm"] <= max_norm or subset.data["results"]["iterations"] < max_iterations
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="ICGN")
+    assert success == True
 
 def test_Subset_solve_FAGN_W2():
     """Integration test for Subset.solve() for second order FAGN."""
@@ -59,8 +59,8 @@ def test_Subset_solve_FAGN_W2():
     template = Circle(25)
     coord = np.asarray((200.43,200.76))
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
-    subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="FAGN")
-    assert subset.data["results"]["norm"] <= max_norm or subset.data["results"]["iterations"] < max_iterations
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="FAGN")
+    assert success == True
 
 def test_Subset_solve_ICGN_W1_precondition():
     """Integration test for Subset.solve() for first order ICGN with preconditioning."""
@@ -72,8 +72,8 @@ def test_Subset_solve_ICGN_W1_precondition():
     coord = np.asarray((200.43,200.76))
     p_0 = np.asarray([0.01, 0.02, 0, 0, 0, 0])
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
-    subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, p_0=p_0, method="FAGN")
-    assert subset.data["results"]["norm"] <= max_norm or subset.data["results"]["iterations"] < max_iterations
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, p_0=p_0, method="FAGN")
+    assert success == True
 
 def test_Subset_solve_FAGN_W1_precondition():
     """Integration test for Subset.solve() for first order FAGN with preconditioning."""
@@ -85,8 +85,8 @@ def test_Subset_solve_FAGN_W1_precondition():
     coord = np.asarray((200.43,200.76))
     p_0 = np.asarray([0.01, 0.02, 0, 0, 0, 0])
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
-    subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, p_0=p_0, method="FAGN")
-    assert subset.data["results"]["norm"] <= max_norm or subset.data["results"]["iterations"] < max_iterations
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, p_0=p_0, method="FAGN")
+    assert success == True
 
 def test_Subset_solve_ICGN_W2_precondition():
     """Integration test for Subset.solve() for second order ICGN with preconditioning."""
@@ -98,8 +98,8 @@ def test_Subset_solve_ICGN_W2_precondition():
     coord = np.asarray((200.43,200.76))
     p_0 = np.asarray([0.01, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
-    subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, p_0=p_0, method="ICGN")
-    assert subset.data["results"]["norm"] <= max_norm or subset.data["results"]["iterations"] < max_iterations
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, p_0=p_0, method="ICGN")
+    assert success == True
 
 def test_Subset_solve_FAGN_W2_precondition():
     """Integration test for Subset.solve() for second order FAGN with preconditioning."""
@@ -111,8 +111,8 @@ def test_Subset_solve_FAGN_W2_precondition():
     coord = np.asarray((200.43,200.76))
     p_0 = np.asarray([0.01, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
-    subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, p_0=p_0, method="FAGN")
-    assert subset.data["results"]["norm"] <= max_norm or subset.data["results"]["iterations"] < max_iterations
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, p_0=p_0, method="FAGN")
+    assert success == True
 
 def test_Subset_negative_max_norm():
     """Integration test for Subset.solve() for negative max_norm."""
@@ -184,4 +184,55 @@ def test_Subset_invalid_tolerance():
     coord = np.asarray((200.43,200.76))
     subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
     success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="ICGN")
+    assert success == False
+
+def test_Subset_invalid_order():
+    """Integration test for Subset.solve() for invalid max_norm."""
+    max_norm = 1e-3
+    max_iterations = 50
+    order = 3
+    tolerance = 0.7
+    template = Circle(25)
+    coord = np.asarray((200.43,200.76))
+    subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, tolerance=tolerance, method="ICGN")
+    assert success == False
+
+def test_Subset_invalid_p_0_shape_W1():
+    """Integration test for Subset.solve() for invalid max_norm."""
+    max_norm = 1e-3
+    max_iterations = 50
+    order = 1
+    tolerance = 0.7
+    template = Circle(25)
+    coord = np.asarray((200.43,200.76))
+    p_0 = np.asarray([0.01, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, p_0=p_0, tolerance=tolerance, method="ICGN")
+    assert success == False
+
+def test_Subset_invalid_p_0_shape_W2():
+    """Integration test for Subset.solve() for invalid max_norm."""
+    max_norm = 1e-3
+    max_iterations = 50
+    order = 2
+    tolerance = 0.7
+    template = Circle(25)
+    coord = np.asarray((200.43,200.76))
+    p_0 = np.asarray([0.01, 0.02, 0, 0, 0, 0])
+    subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, p_0=p_0, tolerance=tolerance, method="ICGN")
+    assert success == False
+
+def test_Subset_invalid_p_0_type():
+    """Integration test for Subset.solve() for invalid max_norm."""
+    max_norm = 1e-3
+    max_iterations = 50
+    order = 2
+    tolerance = 0.7
+    template = Circle(25)
+    coord = np.asarray((200.43,200.76))
+    p_0 = [0.01, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
+    success = subset.solve(max_norm=max_norm, max_iterations=max_iterations, order=order, p_0=p_0, tolerance=tolerance, method="ICGN")
     assert success == False

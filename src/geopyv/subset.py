@@ -40,8 +40,8 @@ class SubsetBase:
 
         .. note::
             * The figure and axes objects can be returned allowing standard
-            matplotlib functionality to be used to augment the plot generated.
-            See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
+              matplotlib functionality to be used to augment the plot generated.
+              See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
 
         .. seealso::
             :meth:`~geopyv.plots.inspect_subset`
@@ -78,12 +78,12 @@ class SubsetBase:
 
         .. note::
             * The figure and axes objects can be returned allowing standard
-            matplotlib functionality to be used to augment the plot generated.
-            See the :ref:plots tutorial <`Plots Tutorial>` for guidance.
+              matplotlib functionality to be used to augment the plot generated.
+              See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
 
         .. warning::
             * Can only be used once the subset has been solved using the
-            :meth:`~geopyv.subset.Subset.solve` method.
+              :meth:`~geopyv.subset.Subset.solve` method.
 
         .. seealso::
             :meth:`~geopyv.plots.convergence_subset`
@@ -327,13 +327,13 @@ class Subset(SubsetBase):
 
         .. note::
             * The warp function parameter array can be used to precondition
-            the computation if passed non-zero values.
+              the computation if passed non-zero values.
             * Otherwise, the initial guess at the subset displacement is
-            performed by :meth:`~_get_initial_guess`.
+              performed by :meth:`~_get_initial_guess`.
             * If not specified, the solver defaults to a first order warp
-            function.
-            * For guidance on how to use this class see the subset tutorial
-            :ref:`here <Subset Tutorial>`.
+              function.
+            * For guidance on how to use this class see the
+              :ref:`subset tutorial <Subset Tutorial>`.
 
 
         .. seealso::
@@ -601,15 +601,15 @@ class SubsetResults(SubsetBase):
 
         .. note::
             * Contains all of the plot functionality provied by
-            :class:`~geopyv.subset.SubsetBase` but none of the algorithms
-            provided by :class:`~geopyv.subset.Subset` (i.e. you can't use
-            this to re-analyse images). Purely used to store data and
-            interrogate results.
+              :class:`~geopyv.subset.SubsetBase` but none of the algorithms
+              provided by :class:`~geopyv.subset.Subset` (i.e. you can't use
+              this to re-analyse images). Purely used to store data and
+              interrogate results.
 
         .. warning::
             * To re-analyse data instantiate a new object using
-            :class:`~geopyv.subset.Subset` and use the
-            :class:`~geopyv.subset.Subset.solve` method.
+              :class:`~geopyv.subset.Subset` and use the
+              :class:`~geopyv.subset.Subset.solve` method.
 
         """
         self.data = data

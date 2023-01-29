@@ -63,7 +63,8 @@ def initialise(level):
     Parameters
     ----------
     level : logging.level
-        Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
+        Log level. Options include: logging.VERBOSE, logging.DEBUG, logging.INFO, 
+        logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
 
     """
     # Get platform and define destination for the logging file.
@@ -124,7 +125,8 @@ def set_level(level):
     Parameters
     ----------
     level : logging.level
-        Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
+        Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO, 
+        logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
     
     """
     log = logging.getLogger(__name__)

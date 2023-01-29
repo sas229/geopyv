@@ -12,7 +12,9 @@ log = logging.getLogger(__name__)
 def load(filename=None):
     """
 
-    Function to load a geopyv data object into the workspace. If no filename is provided, the host OS default file browser will be used to allow the user to select a geopyv data file with .pyv extension.
+    Function to load a geopyv data object into the workspace. If no filename
+     is provided, the host OS default file browser will be used to allow the
+      user to select a geopyv data file with .pyv extension.
 
 
     Parameters
@@ -29,10 +31,12 @@ def load(filename=None):
 
     .. note::
         * Any .pyv object can be loaded with this function.
-        * The data object will be loaded into a `ObjectResults` instance where `Object` represents the instance type that generated the data. For example, data from a `Subset` instance will be loaded into a `SubsetResults` instance.
+        * The data object will be loaded into a `ObjectResults` instance where
+          `Object` represents the instance type that generated the data. For example,
+          data from a `Subset` instance will be loaded into a `SubsetResults` instance.
 
     """
-    if filename == None:
+    if filename is None:
         directory = os.getcwd()
         dialog = gp.gui.selectors.file.FileSelector()
         filepath = dialog.get_path("Select geopyv data file", directory)
@@ -59,7 +63,7 @@ def load(filename=None):
                 return gp.subset.SubsetResults(data)
             elif data["type"] == "Mesh":
                 return gp.mesh.MeshResults(data)
-    except:
+    except Exception:
         log.error("File not found.")
         return None
 
@@ -67,7 +71,9 @@ def load(filename=None):
 def save(object, filename=None):
     """
 
-    Function to save data from a geopyv object. If no filename is provided, the host OS default file browser will be used to allow the user to choose a filename and storage location.
+    Function to save data from a geopyv object. If no filename is
+    provided, the host OS default file browser will be used to allow
+    the user to choose a filename and storage location.
 
 
     Parameters
@@ -84,7 +90,7 @@ def save(object, filename=None):
 
     """
     directory = os.getcwd()
-    if filename == None:
+    if filename is None:
         log.error(
             "No filename provided."
         )  # Add a method to select the filename here...
@@ -102,7 +108,7 @@ def save(object, filename=None):
         or type(object == gp.particle.Particle)
     ):
         solved = object.data["solved"]
-        if solved == True:
+        if solved is True:
             ext = ".pyv"
             filepath = directory + "/" + filename + ext
             with open(filepath, "w") as outfile:

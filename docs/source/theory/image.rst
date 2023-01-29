@@ -55,7 +55,7 @@ after which the inverse FFT is taken for each column to yield the final matrix o
     
     \mathbf{C}_{\left( :, j \right)} = F^{-1}\left[ \frac{ F\left[ \mathbf{C}_{\left( :, j \right)} \right] }{ F\left[ \mathbf{b}_{y} \right] } \right]
 
-This array of coefficients is computed by :py:meth:`geopyv.image.Image._get_C`. The same technique is used to calculate the B-spline coefficients for the target image :math:`g`. 
+This array of coefficients is computed by :py:meth:`~geopyv.image.Image._get_C`. The same technique is used to calculate the B-spline coefficients for the target image :math:`g`. 
 
 .. warning::
     
@@ -80,7 +80,7 @@ The bi-quintic B-spline kernel :math:`\mathbf{Q}` is:
                     
 and :math:`\mathbf{Q}^T` is its transpose. 
 
-The :math:`\mathbf{C}_\left(i-2:i+3, j-2:j+3\right)` matrix is a subset of the B-spline coefficient matrix :math:`\mathbf{C}` computed by :py:meth:`geopyv.image.Image._get_C`, where :math:`i` and :math:`j` are the image coordinates:
+The :math:`\mathbf{C}_\left(i-2:i+3, j-2:j+3\right)` matrix is a subset of the B-spline coefficient matrix :math:`\mathbf{C}` computed by :py:meth:`~geopyv.image.Image._get_C`, where :math:`i` and :math:`j` are the image coordinates:
     
 .. math::
     :label: C
@@ -94,7 +94,7 @@ The :math:`\mathbf{C}_\left(i-2:i+3, j-2:j+3\right)` matrix is a subset of the B
                     \mathbf{C}_\left(i-2,j+3 \right) &  \mathbf{C}_\left(i-1,j+3 \right) & \mathbf{C}_\left(i,j+3 \right) & \mathbf{C}_\left(i+1,j+3 \right) & \mathbf{C}_\left(i+2,j+3 \right) & \mathbf{C}_\left(i+3,j+3 \right) 
                 \end{bmatrix} 
 
-The following matrix is pre-computed from these quantities for all pixels in the image by :py:meth:`geopyv.image.Image._get_QCQT`:
+The following matrix is pre-computed from these quantities for all pixels in the image by :py:meth:`~geopyv.image.Image._get_QCQT`:
 
 .. math::
     :label: QCQT
@@ -134,4 +134,4 @@ where :math:`\lfloor x\rfloor` and :math:`\lfloor y\rfloor` are the floor of the
     \delta x^{5}
     \end{array}\right]
 
-where :math:`\mathbf{Q} \cdot \mathbf{C}_{f} \cdot \mathbf{Q}^T` is precomputed for the entirety of image :math:`f` by :py:meth:`geopyv.image.Image._get_QCQT`. The same method is used to interpolate pixel intensitites for both the reference image :math:`f` and the target image :math:`g`.
+where :math:`\mathbf{Q} \cdot \mathbf{C}_{f} \cdot \mathbf{Q}^T` is precomputed for the entirety of image :math:`f` by :py:meth:`~geopyv.image.Image._get_QCQT`. The same method is used to interpolate pixel intensitites for both the reference image :math:`f` and the target image :math:`g`.

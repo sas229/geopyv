@@ -9,11 +9,6 @@ import PIL.Image as ImagePIL
 import PIL.ImageDraw as ImageDrawPIL
 from alive_progress import alive_bar
 
-import faulthandler
-import traceback
-
-faulthandler.enable()
-
 log = logging.getLogger(__name__)
 
 
@@ -290,7 +285,7 @@ class Mesh(MeshBase):
         .. note::
             * This method can be used to update the number of target nodes.
             * It will generate a new initial mesh with the specified target
-            number of nodes.
+              number of nodes.
 
         """
         self._target_nodes = target_nodes
@@ -604,15 +599,10 @@ class Mesh(MeshBase):
             self._areas *= (
                 np.clip(D / D_b, self._alpha, self._beta)
             ) ** -2  # Target element areas calculated.
-
-            def f(scale):
-                return self._adaptive_remesh(
-                    scale, self._target_nodes, self._nodes, self._elements, self._areas
-                )
-
-            # f = lambda scale: self._adaptive_remesh(
-            #     scale, self._target_nodes, self._nodes, self._elements, self._areas
-            # )
+            
+            def f(scale): return self._adaptive_remesh(
+                scale, self._target_nodes, self._nodes, self._elements, self._areas
+            )
             minimize_scalar(f)
             bar()
 

@@ -67,9 +67,11 @@ Attributes
 
    Mesh class for geopyv.
 
-   :param f_img: Reference image of geopyv.image.Image class, instantiated by :mod:`~geopyv.image.Image`.
+   :param f_img: Reference image of geopyv.image.Image class, instantiated
+                 by :mod:`~geopyv.image.Image`.
    :type f_img: geopyv.image.Image, optional
-   :param g_img: Target image of geopyv.imageImage class, instantiated by :mod:`~geopyv.image.Image`.
+   :param g_img: Target image of geopyv.imageImage class, instantiated by
+                 :mod:`~geopyv.image.Image`.
    :type g_img: geopyv.image.Image, optional
    :param target_nodes: Target number of nodes.
    :type target_nodes: int, optional
@@ -84,7 +86,8 @@ Attributes
 
    .. attribute:: data
 
-      Data object containing all settings and results. See the data structure :ref:`here <mesh_data_structure>`.
+      Data object containing all settings and results.
+      See the data structure :ref:`here <mesh_data_structure>`.
 
       :type: dict
 
@@ -103,7 +106,8 @@ Attributes
 
       .. note::
           * This method can be used to update the number of target nodes.
-          * It will generate a new initial mesh with the specified target number of nodes.
+          * It will generate a new initial mesh with the specified target
+            number of nodes.
 
 
 
@@ -121,7 +125,8 @@ Attributes
       :type order: int
       :param tolerance: Correlation coefficient tolerance. Defaults to a value of 0.7.
       :type tolerance: float, optional
-      :param method: Solution method. Options are FAGN and ICGN. Default is ICGN since it is faster.
+      :param method: Solution method. Options are FAGN and ICGN.
+                     Default is ICGN since it is faster.
       :type method: str
       :param adaptive_iterations: Number of mesh adaptivity iterations to perform. Defaults to a value of 0.
       :type adaptive_iterations: int, optional

@@ -12,6 +12,9 @@ pyside6 = "*"
 alive-progress = "*"
 opencv-python = "*"
 numpyencoder = "*"
+flake8 = "*"
+black = "*"
+sphinx-autoapi = "*"
 
 [dev-packages]
 ipykernel = "*"

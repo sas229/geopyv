@@ -47,8 +47,8 @@ Attributes
 
    .. attribute:: QCQT
 
-      2D array containing precomputed bi-quintic B-spline interpolation matrices of
-      type `float`, computed by :meth:`~_get_QCQT`.
+      2D array containing precomputed bi-quintic B-spline interpolation matrices
+      of type `float`, computed by :meth:`~_get_QCQT`.
 
       :type: `numpy.ndarray` (6*Nx, 6*Ny)
 

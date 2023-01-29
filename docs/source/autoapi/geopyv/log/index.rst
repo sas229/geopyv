@@ -51,7 +51,8 @@ Functions
 
    Function to initialise the log file.
 
-   :param level: Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
+   :param level: Log level. Options include: logging.VERBOSE, logging.DEBUG, logging.INFO,
+                 logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
    :type level: logging.level
 
 
@@ -59,7 +60,8 @@ Functions
 
    Function to set the log level after initialisation.
 
-   :param level: Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
+   :param level: Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO,
+                 logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
    :type level: logging.level
 
 

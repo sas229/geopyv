@@ -12,7 +12,6 @@ subset.inspect()
 subset.solve()
 subset.convergence()
 gp.io.save(subset, "test")
-gp.io.save(subset)
 del(subset)
 
 # Load subset test.

@@ -206,7 +206,7 @@ class Mesh(MeshBase):
         gmsh.finalize()        
 
     def solve(self, *, seed_coord=None, template=None, max_norm=1e-3, max_iterations=15, order=1, tolerance=0.7, method="ICGN", adaptive_iterations=0, alpha=0.5, beta=2):
-        """
+        r"""
         
         Method to solve for the mesh.
 

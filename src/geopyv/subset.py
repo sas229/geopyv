@@ -249,7 +249,7 @@ class Subset(SubsetBase):
         }
 
     def solve(self, *, max_norm=1e-3, max_iterations=15, order=1, p_0=None, tolerance=0.7, method="ICGN"):
-        """
+        r"""
         
         Method to solve for the subset displacements using the various methods.
 
@@ -293,17 +293,23 @@ class Subset(SubsetBase):
         """
         # Check other control parameters.
         if max_norm < 1e-10:
-            raise ValueError("Maximum norm value too small. Suggested default is 1e-3.")
+            log.error("Maximum norm value too small. Suggested default is 1e-3.")
+            return False
         elif type(max_iterations) != int:
-            raise TypeError("Maximum number of iterations of invalid type. Must be positive integer.")
+            log.error("Maximum number of iterations of invalid type. Must be positive integer.")
+            return False
         elif max_iterations <= 0:
-            raise ValueError("Invalid maximum number of iterations specified. Must be positive integer.") 
+            log.error("Invalid maximum number of iterations specified. Must be positive integer.")
+            return False
         elif type(tolerance) != float:
-            raise TypeError("Tolerance of invalid type. Must be float greater than zero and less than one.")
+            log.error("Tolerance of invalid type. Must be float greater than zero and less than one.")
+            return False
         elif tolerance < 0:
-            raise ValueError("Tolerance must be greater than or equal to zero. Suggested default is 0.75.")
+            log.error("Tolerance must be greater than or equal to zero. Suggested default is 0.75.")
+            return False
         elif tolerance > 1:
-            raise ValueError("Tolerance must be less than one. Suggested default is 0.75.")
+            log.error("Tolerance must be less than one. Suggested default is 0.75.")
+            return False
 
         # Check warp function order and type.
         if type(p_0) == type(None):
@@ -312,10 +318,12 @@ class Subset(SubsetBase):
             elif order == 2:
                 p_0 = np.zeros(12)
             else:
-                raise ValueError("Invalid warp function order.")
+                log.error("Invalid warp function order.")
+                return False
         else:
             if type(p_0) != np.ndarray:
-                raise TypeError("Warp function of incorrect type.")
+                log.error("Warp function of incorrect type.")
+                return False
 
         # Store settings.
         self._method = method

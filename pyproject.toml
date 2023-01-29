@@ -24,6 +24,18 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 
+dependencies = [
+    "numpy==1.23.3",
+    "opencv-python==4.7.0.68",
+    "opencv-contrib-python==4.7.0.68",
+    "matplotlib==3.6.0",
+    "alive-progress==3.0.1",
+    "scipy==1.10.0",
+    "gmsh==4.11.1",
+    "numpyencoder==0.3.0",
+    "pyside6==6.4.2",
+]
+
 [project.urls]
 "Homepage" = "https://github.com/sas229/geopyv"
 "Bug Tracker" = "https://github.com/sas229/geopyv/issues"

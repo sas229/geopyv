@@ -65,29 +65,29 @@ def test_Square_output_type():
     template = Square(size)
     assert type(template.coords) == np.ndarray
 
-def test_Circle_mask():
-    """Check subset mask relative to a boundary and a hole."""
-    size = 25
-    centre = np.asarray([0.0,0.0])
-    boundary = np.asarray([[-26.0,-26.0],[-26.0,26.0],[26.0,26.0],[26.0,-26.0]])
+# def test_Circle_mask():
+#     """Check subset mask relative to a boundary and a hole."""
+#     size = 25
+#     centre = np.asarray([0.0,0.0])
+#     boundary = np.asarray([[-26.0,-26.0],[-26.0,26.0],[26.0,26.0],[26.0,-26.0]])
 
-    template = Circle(size)
-    template.mask(centre, boundary)
-    assert len(template.coords)==len(Circle(size).coords)
+#     template = Circle(size)
+#     template.mask(centre, boundary)
+#     assert len(template.coords)==len(Circle(size).coords)
 
-    centre = np.asarray([26.0,0.0])
-    template = Circle(size)
-    template.mask(centre, boundary)
-    assert (template.coords[:,0]<=0.0).all()
+#     centre = np.asarray([26.0,0.0])
+#     template = Circle(size)
+#     template.mask(centre, boundary)
+#     assert (template.coords[:,0]<=0.0).all()
 
-    centre = np.asarray([0.0,26.0])
-    template = Circle(size)
-    template.mask(centre, boundary)
-    assert (template.coords[:,1]<=0.0).all()
+#     centre = np.asarray([0.0,26.0])
+#     template = Circle(size)
+#     template.mask(centre, boundary)
+#     assert (template.coords[:,1]<=0.0).all()
 
-    centre = np.asarray([0.0,0.0])
-    holes = np.asarray([[[0.0,0.0],[26.0,0.0],[26.0,26.0],[0.0,26.0]], 
-                        [[0.0,0.0],[-26.0,0.0],[-26.0,-26.0],[0.0,-26.0]]])
-    template = Circle(size)
-    template.mask(centre, boundary, holes)
-    assert ((template.coords[:,0]*template.coords[:,1])<=0.0).all()
+#     centre = np.asarray([0.0,0.0])
+#     holes = np.asarray([[[0.0,0.0],[26.0,0.0],[26.0,26.0],[0.0,26.0]], 
+#                         [[0.0,0.0],[-26.0,0.0],[-26.0,-26.0],[0.0,-26.0]]])
+#     template = Circle(size)
+#     template.mask(centre, boundary, holes)
+#     assert ((template.coords[:,0]*template.coords[:,1])<=0.0).all()

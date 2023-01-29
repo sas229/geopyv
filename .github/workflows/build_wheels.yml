@@ -22,6 +22,7 @@ jobs:
           package-dir: .
           output-dir: wheelhouse
           config-file: "{package}/pyproject.toml"
+          submodules: recursive
 
       - uses: actions/upload-artifact@v3
         with:

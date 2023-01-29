@@ -2,14 +2,13 @@ name: Build
 
 on: [push, pull_request]
 
-jobs:
-
-  black_check:
-    uses: RojerGS/python-black-check@master
+uses: RojerGS/python-black-check@master
     with:
       line-length: '88'
       path: './src/geopyv/'
       exclude: '(/*.html|/*.mo|/*.po|/*.png|/*.rst)'
+
+jobs:
 
   build_wheels:
     name: Build wheels on ${{ matrix.os }}

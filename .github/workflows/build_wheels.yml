@@ -2,12 +2,6 @@ name: Build
 
 on: [push, pull_request]
 
-uses: RojerGS/python-black-check@master
-    with:
-      line-length: '88'
-      path: './src/geopyv/'
-      exclude: '(/*.html|/*.mo|/*.po|/*.png|/*.rst)'
-
 jobs:
 
   build_wheels:
@@ -18,6 +12,12 @@ jobs:
         os: [ubuntu-latest]
 
     steps:
+      - uses: RojerGS/python-black-check@master
+        with:
+          line-length: '88'
+          path: './src/geopyv/'
+          exclude: '(/*.html|/*.mo|/*.po|/*.png|/*.rst)'
+          
       - uses: actions/checkout@v3
         with:
           submodules: recursive

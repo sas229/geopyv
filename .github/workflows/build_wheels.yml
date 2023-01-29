@@ -15,7 +15,7 @@ jobs:
       - uses: RojerGS/python-black-check@master
         with:
           line-length: '88'
-          path: '.'
+          path: './src/geopyv'
           exclude: '(/*.html|/*.mo|/*.po|/*.png|/*.rst)'
 
       - uses: actions/checkout@v3

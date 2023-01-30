@@ -3,6 +3,11 @@
 
 .. py:module:: geopyv.io
 
+.. autoapi-nested-parse::
+
+   IO module for geopyv.
+
+
 
 Module Contents
 ---------------
@@ -17,18 +22,6 @@ Functions
    geopyv.io.save
 
 
-
-Attributes
-~~~~~~~~~~
-
-.. autoapisummary::
-
-   geopyv.io.log
-
-
-.. py:data:: log
-
-   
 
 .. py:function:: load(filename=None)
 

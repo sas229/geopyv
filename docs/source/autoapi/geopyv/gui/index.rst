@@ -3,6 +3,11 @@
 
 .. py:module:: geopyv.gui
 
+.. autoapi-nested-parse::
+
+   GUI module for geopyv.
+
+
 
 Subpackages
 -----------
@@ -11,14 +16,5 @@ Subpackages
    :maxdepth: 3
 
    selectors/index.rst
-
-
-Submodules
-----------
-.. toctree::
-   :titlesonly:
-   :maxdepth: 1
-
-   Gui/index.rst
 
 

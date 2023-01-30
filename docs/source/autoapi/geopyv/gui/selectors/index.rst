@@ -3,16 +3,10 @@
 
 .. py:module:: geopyv.gui.selectors
 
+.. autoapi-nested-parse::
 
-Submodules
-----------
-.. toctree::
-   :titlesonly:
-   :maxdepth: 1
+   Selectors module for geopyv.
 
-   coordinate/index.rst
-   file/index.rst
-   image/index.rst
 
 
 Package Contents
@@ -23,16 +17,15 @@ Classes
 
 .. autoapisummary::
 
-   geopyv.gui.selectors.ImageSelector
-   geopyv.gui.selectors.CoordinateSelector
    geopyv.gui.selectors.FileSelector
+   geopyv.gui.selectors.ImageSelector
 
 
 
 
-.. py:class:: ImageSelector
+.. py:class:: FileSelector
 
-   Graphical user interface to allow the user to select an image using the native file browser on the host OS.
+   Graphical user interface to allow the user to select a results file using the native file browser on the host OS.
 
 
    .. py:method:: get_path(message, directory)
@@ -49,27 +42,9 @@ Classes
 
 
 
-.. py:class:: CoordinateSelector
+.. py:class:: ImageSelector
 
-   .. py:method:: select(f_img, template)
-
-      Method to select f_coord if not supplied by the user.
-
-
-   .. py:method:: on_click(event)
-
-      Method to store and plot the currently selected coordinate in self.f_coord.
-
-
-   .. py:method:: selected(event)
-
-      Method to print the selected coordinates.
-
-
-
-.. py:class:: FileSelector
-
-   Graphical user interface to allow the user to select a results file using the native file browser on the host OS.
+   Graphical user interface to allow the user to select an image using the native file browser on the host OS.
 
 
    .. py:method:: get_path(message, directory)

@@ -3,6 +3,11 @@
 
 .. py:module:: geopyv.particle
 
+.. autoapi-nested-parse::
+
+   Particle module for geopyv.
+
+
 
 Module Contents
 ---------------

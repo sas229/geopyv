@@ -3,6 +3,11 @@
 
 .. py:module:: geopyv.geometry.exclusions
 
+.. autoapi-nested-parse::
+
+   Exclusions module for geopyv.
+
+
 
 Module Contents
 ---------------

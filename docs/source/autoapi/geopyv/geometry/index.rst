@@ -3,6 +3,11 @@
 
 .. py:module:: geopyv.geometry
 
+.. autoapi-nested-parse::
+
+   Geometry module for geopyv.
+
+
 
 Submodules
 ----------

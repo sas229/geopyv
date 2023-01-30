@@ -3,6 +3,11 @@
 
 .. py:module:: geopyv.mesh
 
+.. autoapi-nested-parse::
+
+   Mesh module for geopyv.
+
+
 
 Module Contents
 ---------------
@@ -12,51 +17,9 @@ Classes
 
 .. autoapisummary::
 
-   geopyv.mesh.MeshBase
    geopyv.mesh.Mesh
+   geopyv.mesh.MeshBase
    geopyv.mesh.MeshResults
-
-
-
-
-Attributes
-~~~~~~~~~~
-
-.. autoapisummary::
-
-   geopyv.mesh.log
-
-
-.. py:data:: log
-
-   
-
-.. py:class:: MeshBase
-
-   Mesh base class to be used as a mixin.
-
-
-   .. py:method:: inspect(subset=None, show=True, block=True, save=None)
-
-      Method to show the mesh and associated subset quality metrics.
-
-
-
-   .. py:method:: convergence(subset=None, quantity=None, show=True, block=True, save=None)
-
-      Method to plot the rate of convergence for the mesh.
-
-
-
-   .. py:method:: contour(quantity='C_ZNCC', imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None)
-
-      Method to plot the contours of a given measure.
-
-
-
-   .. py:method:: quiver(scale=1, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None)
-
-      Method to plot a quiver plot of the displacements.
 
 
 
@@ -137,6 +100,36 @@ Attributes
 
       :returns: **solved** -- Boolean to indicate if the subset instance has been solved.
       :rtype: bool
+
+
+
+.. py:class:: MeshBase
+
+   Mesh base class to be used as a mixin.
+
+
+   .. py:method:: contour(quantity='C_ZNCC', imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None)
+
+      Method to plot the contours of a given measure.
+
+
+
+   .. py:method:: convergence(subset=None, quantity=None, show=True, block=True, save=None)
+
+      Method to plot the rate of convergence for the mesh.
+
+
+
+   .. py:method:: inspect(subset=None, show=True, block=True, save=None)
+
+      Method to show the mesh and associated subset quality metrics.
+
+
+
+   .. py:method:: quiver(scale=1, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None)
+
+      Method to plot a quiver plot of the displacements.
+
 
 
 

@@ -3,6 +3,11 @@
 
 .. py:module:: geopyv.log
 
+.. autoapi-nested-parse::
+
+   Log module for geopyv.
+
+
 
 Module Contents
 ---------------

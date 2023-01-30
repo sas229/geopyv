@@ -20,7 +20,7 @@ project = 'geopyv'
 copyright = '2023, Sam Stanier'
 author = 'Sam Stanier'
 
-# The full version, including alpha/beta/rc tags
+# The full version, including alpha/beta/rc tags.
 release = '0.0.1'
 
 
@@ -76,9 +76,9 @@ math_number_all = False
 autoapi_dirs = ['../../src/geopyv']
 autoapi_options = [
     'members',
-    'undoc-members',
     'show-inheritance',
     'show-module-summary',
+    # 'private-members',
     'special-members',
     'imported-members'
 ]
@@ -87,6 +87,7 @@ suppress_warnings = ['autoapi']
 autoapi_add_toctree_entry = False
 autoapi_python_class_content = "init"
 autoapi_template_dir = '_templates/autoapi'
+autoapi_member_order = 'groupwise'
 
 # References.
 bibtex_bibfiles = ['refs.bib']

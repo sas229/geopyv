@@ -1,3 +1,5 @@
+:orphan:
+
 :py:mod:`geopyv`
 ================
 
@@ -30,15 +32,4 @@ Submodules
    subset/index.rst
    templates/index.rst
 
-
-Package Contents
-----------------
-
-.. py:data:: level
-
-   
-
-.. py:data:: log
-
-   
 

@@ -3,6 +3,11 @@
 
 .. py:module:: geopyv.image
 
+.. autoapi-nested-parse::
+
+   Image module for geopyv.
+
+
 
 Module Contents
 ---------------
@@ -16,18 +21,6 @@ Classes
 
 
 
-
-Attributes
-~~~~~~~~~~
-
-.. autoapisummary::
-
-   geopyv.image.log
-
-
-.. py:data:: log
-
-   
 
 .. py:class:: Image(filepath=None, border=20)
 

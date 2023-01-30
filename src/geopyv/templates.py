@@ -1,3 +1,8 @@
+"""
+
+Templates module for geopyv.
+
+"""
 import logging
 import numpy as np
 

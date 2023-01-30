@@ -1,3 +1,8 @@
+"""
+
+Particle module for geopyv.
+
+"""
 import numpy as np
 import matplotlib.path as path
 # from geopyv.umats import umat_mc

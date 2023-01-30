@@ -1,3 +1,8 @@
+"""
+
+Subset module for geopyv.
+
+"""
 import logging
 import cv2
 import os

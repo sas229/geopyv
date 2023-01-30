@@ -23,7 +23,7 @@ Functions
 
 
 
-.. py:function:: load(filename=None)
+.. py:function:: load(*, filename=None)
 
    Function to load a geopyv data object into the workspace. If no filename
     is provided, the host OS default file browser will be used to allow the
@@ -44,7 +44,7 @@ Functions
 
 
 
-.. py:function:: save(object, filename=None)
+.. py:function:: save(*, object, filename=None)
 
    Function to save data from a geopyv object. If no filename is
    provided, the host OS default file browser will be used to allow

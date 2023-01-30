@@ -1,3 +1,8 @@
+"""
+
+Mesh module for geopyv.
+
+"""
 import logging
 import numpy as np
 import scipy as sp
@@ -599,10 +604,12 @@ class Mesh(MeshBase):
             self._areas *= (
                 np.clip(D / D_b, self._alpha, self._beta)
             ) ** -2  # Target element areas calculated.
-            
-            def f(scale): return self._adaptive_remesh(
-                scale, self._target_nodes, self._nodes, self._elements, self._areas
-            )
+
+            def f(scale):
+                return self._adaptive_remesh(
+                    scale, self._target_nodes, self._nodes, self._elements, self._areas
+                )
+
             minimize_scalar(f)
             bar()
 
@@ -747,7 +754,10 @@ class Mesh(MeshBase):
     def _adaptive_subset(self):
         """
 
-        Private method to compute adaptive subset size. Implementation not yet complete.
+        Private method to compute adaptive subset size.
+
+        .. warning::
+            * Implementation not yet complete.
 
         """
         subset_bgf = sp.interpolate.RBFInterpolator(

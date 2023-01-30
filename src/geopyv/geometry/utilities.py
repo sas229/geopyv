@@ -1,3 +1,8 @@
+"""
+
+Utilities module for geopyv.
+
+"""
 import numpy as np
 
 def area_to_length(area):

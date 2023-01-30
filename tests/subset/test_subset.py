@@ -441,3 +441,51 @@ def test_Subset_invalid_p_0_type():
         method="ICGN",
     )
     assert success is False
+
+def test_Subset_failed_solve_iterations():
+    """
+
+    Integration test for Subset.solve() for invalid max_norm.
+
+    """
+    max_norm = 1e-3
+    max_iterations = 1
+    order = 2
+    tolerance = 0.7
+    template = Circle(25)
+    coord = np.asarray((200.43, 200.76))
+    p_0 = [0.01, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
+    success = subset.solve(
+        max_norm=max_norm,
+        max_iterations=max_iterations,
+        order=order,
+        p_0=p_0,
+        tolerance=tolerance,
+        method="ICGN",
+    )
+    assert success is False
+
+def test_Subset_failed_solve_correlation():
+    """
+
+    Integration test for Subset.solve() for invalid max_norm.
+
+    """
+    max_norm = 1e-3
+    max_iterations = 15
+    order = 2
+    tolerance = 0.99
+    template = Circle(25)
+    coord = np.asarray((200.43, 200.76))
+    p_0 = [0.01, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    subset = Subset(f_coord=coord, f_img=ref, g_img=tar, template=template)
+    success = subset.solve(
+        max_norm=max_norm,
+        max_iterations=max_iterations,
+        order=order,
+        p_0=p_0,
+        tolerance=tolerance,
+        method="ICGN",
+    )
+    assert success is False

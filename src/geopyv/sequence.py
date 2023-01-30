@@ -1,3 +1,8 @@
+"""
+
+Sequence module for geopyv.
+
+"""
 import logging
 import numpy as np
 import scipy as sp
@@ -114,7 +119,7 @@ class Sequence(SequenceBase):
                 del(_f_img)
                 _f_img = gp.image.Image(self._image_folder+"/"+self._common_file_name+str(self._image_indices[_f_index])+self._image_file_type)
             else:
-                gp.io.save(mesh, "mesh_"+str(self._image_indices[_f_index])+"_"+str(self._image_indices[_g_index]))
+                gp.io.save(object=mesh, filename="mesh_"+str(self._image_indices[_f_index])+"_"+str(self._image_indices[_g_index]))
                 del(mesh)
                 _g_index += 1 # Iterate the target image index. 
                 del(_g_img)
@@ -125,7 +130,7 @@ class Sequence(SequenceBase):
     
     def _trace(self, _f_index, _g_index):
         log.message("Tracing exclusion displacement.")
-        mesh = gp.io.load("mesh_"+str(self._image_indices[_f_index])+"_"+str(self._image_indices[_g_index-1]))
+        mesh = gp.io.load(filename="mesh_"+str(self._image_indices[_f_index])+"_"+str(self._image_indices[_g_index-1]))
         i = len(self._boundary)
         for exclusion in self._exclusions:
             j = len(exclusion)

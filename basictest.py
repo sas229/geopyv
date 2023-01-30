@@ -11,11 +11,11 @@ subset = gp.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000,1000]),
 subset.inspect()
 subset.solve()
 subset.convergence()
-gp.io.save(subset, "test")
+gp.io.save(object=subset, filename="test")
 del(subset)
 
 # Load subset test.
-subset = gp.io.load("test")
+subset = gp.io.load(filename="test")
 subset.inspect(show=False)
 subset.convergence(show=False)
 
@@ -32,14 +32,14 @@ exclusions.append(gp.geometry.exclusions.circular_exclusion(np.asarray([1925, 14
 seed = np.asarray([400, 400.0])
 mesh = gp.mesh.Mesh(f_img=ref, g_img=tar, target_nodes=2000, boundary=boundary, exclusions=exclusions)
 mesh.inspect()
-gp.io.save(mesh, "mesh")
+gp.io.save(object=mesh, filename="mesh")
 beta = 5.0
 alpha = 1/beta
 mesh.solve(seed_coord=seed, template=template, adaptive_iterations=0, method="ICGN", alpha=alpha, beta=beta, tolerance=0.7)
-gp.io.save(mesh, "mesh")
+gp.io.save(object=mesh, filename="mesh")
 del(mesh)
 
-mesh = gp.io.load("mesh")
+mesh = gp.io.load(filename="mesh")
 
 # The commands are basically standard matplotlib...
 mesh.convergence()

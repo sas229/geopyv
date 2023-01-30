@@ -1,3 +1,8 @@
+"""
+
+Image module for geopyv.
+
+"""
 import logging
 import cv2
 import numpy as np

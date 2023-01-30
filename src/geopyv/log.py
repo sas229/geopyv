@@ -1,3 +1,8 @@
+"""
+
+Log module for geopyv.
+
+"""
 import logging
 import os
 import sys

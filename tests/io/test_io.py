@@ -40,7 +40,7 @@ def test_io_save():
     Integration test for geopy.io.save.
 
     """
-    success = save(subset, "test")
+    success = save(object=subset, filename="test")
     assert success is True
 
 
@@ -50,7 +50,7 @@ def test_io_save_wrong_type():
     Integration test for geopy.io.save wrong type.
 
     """
-    success = save(None, "test")
+    success = save(object=None, filename="test")
     assert success is False
 
 
@@ -60,7 +60,7 @@ def test_io_load():
     Integration test for geopy.io.load.
 
     """
-    object = load("test")
+    object = load(filename="test")
     assert object is not None
 
 
@@ -70,5 +70,5 @@ def test_io_load_file_not_found():
     Integration test for geopy.io.load file not found.
 
     """
-    object = load("")
+    object = load(filename="")
     assert object is None

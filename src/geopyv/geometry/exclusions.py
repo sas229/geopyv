@@ -1,3 +1,8 @@
+"""
+
+Exclusions module for geopyv.
+
+"""
 from matplotlib.axis import YTick
 import numpy as np
 

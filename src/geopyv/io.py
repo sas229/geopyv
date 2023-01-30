@@ -1,3 +1,8 @@
+"""
+
+IO module for geopyv.
+
+"""
 import logging
 import json
 import os
@@ -9,7 +14,7 @@ from alive_progress import alive_bar
 log = logging.getLogger(__name__)
 
 
-def load(filename=None):
+def load(*, filename=None):
     """
 
     Function to load a geopyv data object into the workspace. If no filename
@@ -68,7 +73,7 @@ def load(filename=None):
         return None
 
 
-def save(object, filename=None):
+def save(*, object, filename=None):
     """
 
     Function to save data from a geopyv object. If no filename is

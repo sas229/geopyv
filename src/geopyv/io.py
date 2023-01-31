@@ -31,7 +31,7 @@ def load(*, filename=None):
 
     Returns
     -------
-    object : geopyv.object
+    object : geopyv.object.Object
         The geopyv data object loaded.
 
 
@@ -84,7 +84,7 @@ def save(*, object, filename=None):
 
     Parameters
     ----------
-    object : geopyv.object
+    object : geopyv.object.Object
         The object to be saved.
     filename : str, optional
         The filename to give to the saved data file.

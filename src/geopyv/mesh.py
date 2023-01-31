@@ -24,9 +24,14 @@ class MeshBase(Object):
     Mesh base class to be used as a mixin.
 
     """
+
     def __init__(self):
         super().__init__(object_type="Mesh")
-        """Mesh base class initialiser"""
+        """
+
+        Mesh base class initialiser
+
+        """
 
     def inspect(self, subset=None, show=True, block=True, save=None):
         """

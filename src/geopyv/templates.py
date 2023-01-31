@@ -8,15 +8,17 @@ import numpy as np
 
 log = logging.getLogger(__name__)
 
+
 class Template:
     """
-    
+
     Template base class.
-    
+
     """
+
     def __init__(self, size):
         """
-        
+
         Base class for geopyv subset template.
 
         Parameters
@@ -47,58 +49,63 @@ class Template:
         self.coords = []
         self.shape = "None"
         self.dimension = "None"
-        self.subset_mask = np.zeros(((2*self.size)+1, (2*self.size)+1)).astype(np.intc)
+        self.subset_mask = np.zeros(((2 * self.size) + 1, (2 * self.size) + 1)).astype(
+            np.intc
+        )
 
     def _check_size_and_type(self):
         """
-        
+
         Private method to check if size is a positive integer, and if not convert to
         a positive integer.
-        
+
         """
         # Check size.
         if self.size < 0:
             self.size = int(np.abs(self.size))
             log.warning(
-                "Negative subset size specified. Converted to an absolute value of {} pixels.".format(self.size)
+                "Negative subset size specified. "
+                "Converted to an absolute value of {} pixels.".format(self.size)
             )
         # Check type of size.
         if isinstance(self.size, int) is False:
             self.size = int(self.size)
             log.warning(
-                "Subset size not specified as an integer. Converted to an integer of {} pixels.".format(self.size)
+                "Subset size not specified as an integer. "
+                "Converted to an integer of {} pixels.".format(self.size)
             )
         return
-    
+
     def mask(self, centre, mask):
         """
-        
+
         Method to mask subset based on binary mask from mesh.
-        
+
         Parameters
         ----------
         centre : `numpy.ndarray` (x,y)
             Centre of subset.
         mask : `numpy.ndarray` (Nx,Ny)
-            Mask to be applied to the mesh. Value of 0 indicates pixels to mask in template.
+            Mask to be applied to the mesh.
+            Value of 0 indicates pixels to mask in template.
 
         """
-        x_coords = (self.coords[:,0] + centre[0]).astype(np.intc)
-        y_coords = (self.coords[:,1] + centre[1]).astype(np.intc)
-        masked_coords = np.zeros((1,2))
+        x_coords = (self.coords[:, 0] + centre[0]).astype(np.intc)
+        y_coords = (self.coords[:, 1] + centre[1]).astype(np.intc)
+        masked_coords = np.zeros((1, 2))
         count = 0
         for i in range(np.shape(self.coords)[0]):
             x = x_coords[i]
             y = y_coords[i]
             if mask[y, x] == 1:
                 if count == 0:
-                    masked_coords = self.coords[i,:]
+                    masked_coords = self.coords[i, :]
                 else:
-                    masked_coords = np.row_stack((masked_coords, self.coords[i,:]))
+                    masked_coords = np.row_stack((masked_coords, self.coords[i, :]))
                 count += 1
             else:
-                x_s = int(self.coords[i,0]+self.size)
-                y_s = int(self.coords[i,1]+self.size)
+                x_s = int(self.coords[i, 0] + self.size)
+                y_s = int(self.coords[i, 1] + self.size)
                 self.subset_mask[x_s, y_s] = 1
         self.coords = masked_coords
         self.n_px = np.shape(self.coords)[0]
@@ -106,13 +113,14 @@ class Template:
 
 class Circle(Template):
     """
-    
+
     Circular subset template class.
 
     """
+
     def __init__(self, radius=25):
         """
-        
+
         Class for circular subset template. Subclassed from Template.
 
         Parameters
@@ -135,7 +143,7 @@ class Circle(Template):
             2D array of subset template coordinates of type `float`.
         subset_mask : `numpy.ndarray` (Nx, 2)
             2D array of coordinates to mask of type `float`.
-        
+
         """
         super().__init__(radius)
         self.shape = "circle"
@@ -147,7 +155,7 @@ class Circle(Template):
             np.arange(-self.size, self.size + 1, 1),
             np.arange(-self.size, self.size + 1, 1),
         )
-        dist = np.sqrt(x ** 2 + y ** 2)
+        dist = np.sqrt(x**2 + y**2)
         x_s, y_s = np.where(dist <= self.size)
 
         # Create template coordinates array.
@@ -167,13 +175,14 @@ class Circle(Template):
 
 class Square(Template):
     """
-    
+
     Square subset template class.
 
     """
+
     def __init__(self, length=25):
         """
-        
+
         Class for square subset template. Subclassed from Template.
 
         Parameters
@@ -196,7 +205,7 @@ class Square(Template):
             2D array of subset template coordinates of type `float`.
         subset_mask : `numpy.ndarray` (Nx, 2)
             2D array of coordinates to mask of type `float`.
-        
+
         """
         super().__init__(length)
         self.shape = "square"
@@ -204,12 +213,12 @@ class Square(Template):
 
         # Create template for square subset.
         x_s, y_s = np.meshgrid(
-            np.arange(-self.size, self.size+1, 1),
-            np.arange(-self.size, self.size+1, 1),
+            np.arange(-self.size, self.size + 1, 1),
+            np.arange(-self.size, self.size + 1, 1),
         )
 
         # Create template coordinates array.
-        self.n_px = (2*self.size+1)**2
+        self.n_px = (2 * self.size + 1) ** 2
         self.coords = np.empty((self.n_px, 2), order="F")
         self.coords[:, 0] = np.ravel(x_s)
         self.coords[:, 1] = np.ravel(y_s)

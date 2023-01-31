@@ -3,4 +3,4 @@
 GUI module for geopyv.
 
 """
-from . import selectors
+# from . import selectors

@@ -3,7 +3,7 @@
 Subset
 ------
 
-A subset is a small region within an image defined via a coordinate and a template. Localised warp between an image pair is considered by applying warp to a subset iteratively according to a particular PIV algorithm. 
+A subset is a small region within an image defined via a coordinate and a template. Localised warp between an image pair is considered by applying warp to a subset iteratively according to a particular PIV algorithm.
 
 Templates
 ^^^^^^^^^
@@ -100,7 +100,7 @@ for which the warp parameter vector is:
 Throughout the remainder of this documentation :math:`f(\mathbf{W}{(x, y; \mathbf{p})})` represents the intensity of the coordinate :math:`(x, y)` in the image :math:`f` when a warp function :math:`\mathbf{W}` is applied, with parameters defined by the warp parameter vector :math:`\mathbf{p}`.
 
 .. todo::
-    
+
     - Add examples of first and second order warp functions applied to a subset.
 
 Subset quality metrics
@@ -149,37 +149,37 @@ The directional gradients :math:`\nabla f_{x}` and :math:`\nabla f_{y}` can be c
     \end{array}\right]
 
 In this implementation an estimate of :math:`SSSIG` is computed by averaging the horizontal and vertical image intensity gradients:
-    
+
 .. math::
     :label: SSSIG
-    
+
     SSSIG \approx \sum_{(x, y) \in n} \frac{1}{2}\left[\left(\nabla f_{x}\right)^{2}+\left(\nabla f_{y}\right)^{2}\right]
 
 where :math:`n` is the set of coordinates that comprise the subset.
 
 .. note::
-            
+
     Values of :math:`SSSIG > 1 \cdot 10^5` are indicative of sufficient subset size and contrast according to :cite:t:`stanier2016vermiculate`.
 
 Standard deviation of subset pixel intensities
 """"""""""""""""""""""""""""""""""""""""""""""
 
 The standard deviation of the subset pixel intensities, :math:`\sigma_{s}`, after :cite:t:`stanier2013improved`, is calculated as follows:
-            
+
 .. math::
     :label: sigma_s
-    
+
     \sigma_{s} = \sqrt{\sum_{(x, y) \in n} \frac{\left(f(\mathbf{W}(x, y; \mathbf{0}))-\bar{f}\right)^{2}}{|n|}}
 
 where :math:`f{(\mathbf{W}(x, y; \mathbf{0}))}` is the intensity of the coordinate :math:`(x, y)` after application of a null warp function for each of the set of :math:`n` coordinates that comprise the subset, and :math:`\bar{f}` is the mean subset pixel intensity:
 
 .. math::
     :label: bar_f
-    
+
     \bar{f} = \sum_{(x, y) \in n} \frac{f(\mathbf{W}(x, y; \mathbf{0}))}{|n|}\\
 
 .. note::
-    
+
     Values of :math:`\sigma_{s} > 15` are indicative of optimal seeding according to  :cite:t:`stanier2016vermiculate`.
 
 Correlation coefficient
@@ -191,10 +191,10 @@ Normalised Cross-Correlation
 """"""""""""""""""""""""""""
 
 The Normalised Cross-Correlation (NCC) criteria :math:`C_{NCC}` is defined as:
-           
+
 .. math::
     :label: C_NCC
-    
+
     C_{NCC} = \frac{\sum_{(x, y) \in n} \left( f{(\mathbf{W}(x, y; \mathbf{0}))} \cdot g{(\mathbf{W}(x, y; \mathbf{p}))} \right)}{\sqrt{\sum_{(x, y) \in n} f{(\mathbf{W}(x, y; \mathbf{0}))}^{2} \cdot \sum_{(x, y) \in n} g{(\mathbf{W}(x, y; \mathbf{p}))}^{2}}}
 
 where :math:`f_{(x, y; \mathbf{0})}` and :math:`g_{(x, y; \mathbf{p})}` are the image intensity at the coordinate :math:`(x,y)` for the reference subset and the target subset after application of a warp function :math:`\mathbf{W}` with deformation parameters as defined by the vector :math:`\mathbf{p}`. Values of :math:`C_{NCC}` fall in the range of 0 (no correlation) to 1 (perfect correlation).
@@ -203,14 +203,14 @@ Zero-Normalised Sum of Squared Differences
 """"""""""""""""""""""""""""""""""""""""""
 
 The Normalised Cross-Correlation coefficient :math:`C_{NCC}` is computationally expensive to determine and sensitive to mean changes in image brightness. The zero-normalised sum of squared differences :math:`C_{ZNSSD}` is more robust to mean changes in image brightness and is considerably cheaper to compute. It is defined as follows:
-            
+
 .. math::
     :label: C_ZNSSD
 
     C_{ZNSSD} = \sum_{(x, y) \in n} \left[ \frac{f{(\mathbf{W}(x, y; \mathbf{0}))}-\bar{f}}{\Delta f} - \frac{g{(\mathbf{W}(x, y; \mathbf{p}))}-\bar{g}}{\Delta g} \right]^2
 
 where :math:`f{(\mathbf{W}(x, y; \mathbf{0}))}` and :math:`g{(\mathbf{W}(x, y; \mathbf{p}))}` are the image intensity in the reference image :math:`f` and the target image :math:`g`, for a coordinate :math:`(x, y)` in the set of :math:`n` coordinates that comprise the subset, when the warp function :math:`\mathbf{W}` is applied with deformation parameters as defined by the vector :math:`\mathbf{p}`. The quantities :math:`\bar{f}` and :math:`\bar{g}`, are the mean subset pixel intensities:
-            
+
 .. math::
     :label: bar_f_g
 
@@ -218,47 +218,47 @@ where :math:`f{(\mathbf{W}(x, y; \mathbf{0}))}` and :math:`g{(\mathbf{W}(x, y; \
     \bar{g} = \sum_{(x^{\prime}, y^{\prime}) \in n} \frac{g{(\mathbf{W}(x, y; \mathbf{p}))}}{|n|}
 
 The quantities :math:`\Delta f` and :math:`\Delta g` are calculated as follows:
-            
-.. math:: 
+
+.. math::
     :label: Delta_f_g
-    
+
     \Delta f = \sqrt{ \sum_{(x, y) \in n} \left( f{(\mathbf{W}(x, y; \mathbf{0}))} - \bar{f} \right)^2}\\
     \Delta g = \sqrt{ \sum_{(x, y) \in n} \left( g{(\mathbf{W}(x, y; \mathbf{p}))} - \bar{g} \right)^2}
 
-Values for the zero-normalised sum of squared differences :math:`C_{ZNSSD}` fall in the range of 2 (no correlation) to 0 (perfect correlation). 
+Values for the zero-normalised sum of squared differences :math:`C_{ZNSSD}` fall in the range of 2 (no correlation) to 0 (perfect correlation).
 
 Zero-Normlised Cross-Correlation
 """"""""""""""""""""""""""""""""
 
-The zero-normalised cross-correlation coefficient :math:`C_{ZNCC}` can be determined from the zero-normalised sum of squared differences 
+The zero-normalised cross-correlation coefficient :math:`C_{ZNCC}` can be determined from the zero-normalised sum of squared differences
 :math:`C_{ZNSSD}` as follows:
 
 .. math::
     :label: C_ZNCC
-    
+
     C_{ZNCC} = 1 - \left( \frac{C_{ZNSSD}}{2} \right)
 
-as proven analytically by :cite:t:`pan2010equivalence`. The values of the zero-normalised cross-correlation coefficient :math:`C_{ZNCC}` 
+as proven analytically by :cite:t:`pan2010equivalence`. The values of the zero-normalised cross-correlation coefficient :math:`C_{ZNCC}`
 fall in the range of 0 (no correlation) to 1 (perfect correlation).
 
 .. todo::
-    
-    - Add example illustrating robustness of zero-normalised methods to global lighting shifts. 
+
+    - Add example illustrating robustness of zero-normalised methods to global lighting shifts.
 
 Initial guess
 ^^^^^^^^^^^^^
-      
+
 The initial guess subset size is a square of side length :math:`s` such that:
-    
+
 .. math::
     :label: initial_s
-    
+
     s = \sqrt{n}
-    
-where :math:`n` is the set of pixels that comprise the subset template. The position of the subset in the target image is computed to the 
-nearest ineteger pixel using the Normalised Cross-Correlation (NCC) criteria, :math:`C_{NCC}`. The initial guess method is a zero'th order 
-technique (i.e. rigid body translation), therefore the difference between the reference subset coordinates :math:`(x, y)` and the target 
-subset coordinates :math:`(x^{\prime}, y^{\prime})` that produces the maximum value of :math:`C_{NCC}` denotes the initial guess of the warp 
+
+where :math:`n` is the set of pixels that comprise the subset template. The position of the subset in the target image is computed to the
+nearest ineteger pixel using the Normalised Cross-Correlation (NCC) criteria, :math:`C_{NCC}`. The initial guess method is a zero'th order
+technique (i.e. rigid body translation), therefore the difference between the reference subset coordinates :math:`(x, y)` and the target
+subset coordinates :math:`(x^{\prime}, y^{\prime})` that produces the maximum value of :math:`C_{NCC}` denotes the initial guess of the warp
 function parameters :math:`u` and :math:`v`.
 
 Iterative Solution Methods
@@ -267,9 +267,9 @@ Iterative Solution Methods
 Inverse Compositional Gauss-Newton (ICGN) Method
 """"""""""""""""""""""""""""""""""""""""""""""""
 
-The Inverse Compositional Gauss-Newton method is the default approach used in `geopyv`, primarily because the majority of computational 
+The Inverse Compositional Gauss-Newton method is the default approach used in `geopyv`, primarily because the majority of computational
 operations are performed on the reference subset, remain constant through the iterative solution process, and so can be precomputed.
-The incremental warp :math:`\Delta \mathbf{p}` is applied to the reference subset, hence the Zero Normalised Sum of Square Differences 
+The incremental warp :math:`\Delta \mathbf{p}` is applied to the reference subset, hence the Zero Normalised Sum of Square Differences
 (ZNSSD) correlation coefficient can be defined as:
 
 .. math::
@@ -281,9 +281,9 @@ A first-order Taylor series expansion yields:
 
 .. math::
     :label: ICGN_Taylor
-    
+
     C_{ZNSSD}(\Delta \mathbf{p}) = \sum_{(x, y) \in n} \left[\frac{f(\mathbf{W}(x, y ; 0))+\nabla f(\frac{\partial \mathbf{W}}{\partial \mathbf{p}}) \Delta \mathbf{p}-\bar{f}}{\Delta f}-\frac{g(\mathbf{W}(x, y ; \mathbf{p}))-\bar{g}}{\Delta g}\right]^{2}
-    
+
 where :math:`\nabla f` is the intensity gradient in the :math:`x` and :math:`y` directions:
 
 .. math::
@@ -308,7 +308,7 @@ For a second order subset:
 
     \frac{\partial \mathbf{W}_{2}}{\partial \mathbf{p}_{2}}=\left[\begin{array}{cccccccccccc}
     1 & 0 & \Delta x & 0 & \Delta x & 0 & \frac{1}{2} \Delta x^{2} & 0 & \Delta x \Delta y & 0 & \frac{1}{2} \Delta y^{2} & 0 \\
-    0 & 1 & 0 & \Delta y & 0 & \Delta y & 0 & \frac{1}{2} \Delta x^{2} & 0 & \Delta x \Delta y & 0 & \frac{1}{2} \Delta y^{2} 
+    0 & 1 & 0 & \Delta y & 0 & \Delta y & 0 & \frac{1}{2} \Delta x^{2} & 0 & \Delta x \Delta y & 0 & \frac{1}{2} \Delta y^{2}
     \end{array}\right]
 
 The magnitude of :math:`\Delta \mathbf{p}` can then be solved via the least squares method:
@@ -387,9 +387,9 @@ A first-order Taylor series expansion yields:
 
 .. math::
     :label: FAGN_Taylor
-    
+
     C_{ZNSSD}(\Delta \mathbf{p}) = \sum_{(x, y) \in n} \left[\frac{f(\mathbf{W}(x, y ; \mathbf{0}))-\bar{f}}{\Delta f} - \frac{g(\mathbf{W}(x, y ; \mathbf{p}))+\nabla g\left(\frac{\partial \mathbf{W}}{\partial \mathbf{p}}\right) \Delta \mathbf{p}-\bar{g}}{\Delta g}\right]^{2}
-    
+
 where :math:`\nabla g` is the intensity gradient in the :math:`x` and :math:`y` directions:
 
 .. math::
@@ -414,7 +414,7 @@ For a second order subset:
 
     \frac{\partial \mathbf{W}_{2}}{\partial \mathbf{p}_{2}}=\left[\begin{array}{cccccccccccc}
     1 & 0 & \Delta x & 0 & \Delta x & 0 & \frac{1}{2} \Delta x^{2} & 0 & \Delta x \Delta y & 0 & \frac{1}{2} \Delta y^{2} & 0 \\
-    0 & 1 & 0 & \Delta y & 0 & \Delta y & 0 & \frac{1}{2} \Delta x^{2} & 0 & \Delta x \Delta y & 0 & \frac{1}{2} \Delta y^{2} 
+    0 & 1 & 0 & \Delta y & 0 & \Delta y & 0 & \frac{1}{2} \Delta x^{2} & 0 & \Delta x \Delta y & 0 & \frac{1}{2} \Delta y^{2}
     \end{array}\right]
 
 The magnitude of :math:`\Delta \mathbf{p}` can then be solved via the least squares method:
@@ -442,14 +442,14 @@ Exit criteria
 """""""""""""
 
 For a first order subset warp function the norm is:
-            
+
 .. math::
     :label: norm_1
-    
+
     \|\Delta p\| = \left[ \Delta u^2 + \Delta v^2 + \left( \Delta u_{x}  s \right)^2 + \left( \Delta u_{y} s \right)^2 + \left( \Delta v_{x} s \right)^2 + \left( \Delta v_{y} s \right)^2 \right]^{1/2}
-    
+
 For a second order subset warp function the norm is:
-    
+
 .. math::
     :label: norm_2
 
@@ -458,8 +458,8 @@ For a second order subset warp function the norm is:
     + \left(0.5 \Delta u_{xx} s^2 \right)^2 + \left(0.5 \Delta u_{xy} s^2 \right)^2 + \left(0.5 \Delta u_{yy} s^2 \right)^2 + \left(0.5 \Delta v_{xx} s^2 \right)^2 + \left(0.5 \Delta v_{xy} s^2 \right)^2 + \left(0.5 \Delta v_{yy} s^2 \right)^2 \Bigr]^{1/2}
     \end{multline*}
 
-where :math:`s` is the size of the subset (approximated generally as the square root of the number of pixels in the template). The iterative solution process is classed as convergent when the norm is less than a user-defined limit, otherwise the iterative solver is stopped if the number of iterations exceeds a user-defined limit. 
+where :math:`s` is the size of the subset (approximated generally as the square root of the number of pixels in the template). The iterative solution process is classed as convergent when the norm is less than a user-defined limit, otherwise the iterative solver is stopped if the number of iterations exceeds a user-defined limit.
 
 .. note::
-    
+
     A typical exit criteria for the norm used in the iterative computations is :math:`\|\Delta p\|_{max} = 1 \cdot 10^{-3}` and the  maximum number of iterations is :math:`15` and are the default arguments for all solve methods.

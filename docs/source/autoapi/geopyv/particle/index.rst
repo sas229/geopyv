@@ -43,6 +43,3 @@ Classes
 
       Method to calculate the strain path of the particle from the mesh sequence and optionally the stress path
       employing the model specified by the input parameters.
-
-
-

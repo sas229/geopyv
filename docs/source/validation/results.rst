@@ -5,7 +5,7 @@ Results
 
 Validation results to go here...
 
-.. toctree:: 
+.. toctree::
 
     meanbiaserror
     rotation

@@ -39,7 +39,7 @@ A DIC/PIV code for Python (with C++ extensions) using the Inverse-Compositional 
 
    /validation/overview
    /validation/results
-   
+
 Indices and tables
 ==================
 

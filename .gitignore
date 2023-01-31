@@ -139,3 +139,6 @@ test_triangle.py
 main.py
 *.pyv
 .pypirc
+
+# Draft folder
+/draft

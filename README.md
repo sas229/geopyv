@@ -57,4 +57,3 @@ Don't forget the --pre or it will cause problems!
 
 ### PEP8 compliance
 Check PEP8 compliance using flake8: pipenv install flake8
-

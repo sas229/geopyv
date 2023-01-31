@@ -66,10 +66,10 @@ MatrixXd _grad(
     typedef Matrix<double, 6, 1> Vector6d;
     Vector6d delta_x_vec(6), delta_y_vec(6);
     MatrixXd grad(n,2);
-    
+
     // Compute interpolated intensities.
     for(int i = 0; i < n;  i++)
-    {   
+    {
         // Calculate floor and sub-pixel components.
         x_floor = std::floor(coords(i,0));
         y_floor = std::floor(coords(i,1));
@@ -105,7 +105,7 @@ MatrixXd _grad(
         delta_y_vec(4) = zero;
         delta_y_vec(5) = zero;
         grad(i,1) = (delta_y_vec.transpose()*QCQT.block(y_floor*6, x_floor*6, 6, 6))*delta_x_vec;
-        
+
     }
     return grad;
 }
@@ -177,7 +177,7 @@ VectorXd _g_coord(
     // Compute g coordinate.
     g_coord(0) = f_coord(0) + p(0);
     g_coord(1) = f_coord(1) + p(1);
-    
+
     return g_coord;
 }
 
@@ -214,7 +214,7 @@ MatrixXd _g_coords(
 
     // Compute the target coordinates using the reference coordinates and the warp vector.
     for(int i = 0; i < n;  i++)
-    {   
+    {
         x = f_coords(i,0);
         y = f_coords(i,1);
         Delta_x = x - x_c;
@@ -227,12 +227,12 @@ MatrixXd _g_coords(
         else if (m > 7){
             double u = p(0), v = p(1), u_x = p(2), v_x = p(3), u_y = p(4), v_y = p(5);
             double u_xx = p(6), v_xx = p(7), u_xy = p(8), v_xy = p(9), u_yy = p(10), v_yy = p(11);
-            g_coords(i,0) = x + u + u_x*Delta_x + u_y*Delta_y + 0.5*u_xx*pow(Delta_x,2) 
-                + u_xy*Delta_x*Delta_y + 0.5*u_yy*pow(Delta_y,2); 
+            g_coords(i,0) = x + u + u_x*Delta_x + u_y*Delta_y + 0.5*u_xx*pow(Delta_x,2)
+                + u_xy*Delta_x*Delta_y + 0.5*u_yy*pow(Delta_y,2);
             g_coords(i,1) = y + v + v_x*Delta_x + v_y*Delta_y + 0.5*v_xx*pow(Delta_x,2)
-                + v_xy*Delta_x*Delta_y + 0.5*v_yy*pow(Delta_y,2); 
+                + v_xy*Delta_x*Delta_y + 0.5*v_yy*pow(Delta_y,2);
         }
-        
+
     }
     return g_coords;
 }
@@ -278,7 +278,7 @@ MatrixXd _sdi(
     {
         m = 12;
     }
-    
+
     // Define variables.
     int n = coords.rows();
     double Delta_x, Delta_y;
@@ -350,7 +350,7 @@ VectorXd _Delta_p_ICGN(
     VectorXd grad_znssd = VectorXd::Zero(m);
     MatrixXd inv_hessian(m,m);
     VectorXd Delta_p(m);
-    
+
     // Compute gradient of correlation coefficient.
     for(int j = 0; j < m;  j++)
     {
@@ -383,7 +383,7 @@ VectorXd _Delta_p_FAGN(
     VectorXd grad_znssd = VectorXd::Zero(m);
     MatrixXd inv_hessian(m,m);
     VectorXd Delta_p(m);
-    
+
     // Compute gradient of correlation coefficient.
     for(int j = 0; j < m;  j++)
     {
@@ -442,7 +442,7 @@ VectorXd _p_new_ICGN(
         double Delta_u = Delta_p(0), Delta_v = Delta_p(1), Delta_u_x = Delta_p(2);
         double Delta_v_x = Delta_p(3), Delta_u_y = Delta_p(4), Delta_v_y = Delta_p(5);
         double Delta_u_xx = Delta_p(6), Delta_v_xx = Delta_p(7), Delta_u_xy = Delta_p(8);
-        double Delta_v_xy = Delta_p(9), Delta_u_yy = Delta_p(10), Delta_v_yy = Delta_p(11); 
+        double Delta_v_xy = Delta_p(9), Delta_u_yy = Delta_p(10), Delta_v_yy = Delta_p(11);
         double S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17, S18;
         double Delta_S1, Delta_S2, Delta_S3, Delta_S4, Delta_S5, Delta_S6, Delta_S7, Delta_S8, Delta_S9;
         double Delta_S10, Delta_S11, Delta_S12, Delta_S13, Delta_S14, Delta_S15, Delta_S16, Delta_S17, Delta_S18;
@@ -466,7 +466,7 @@ VectorXd _p_new_ICGN(
         S16 = 2*v*v_x;
         S17 = 2*v*(1+v_y);
         S18 = v*v;
-        
+
         // Calculate the homogenous warp function increment terms.
         Delta_S1 = (2*Delta_u_x) + (Delta_u_x*Delta_u_x) + (Delta_u*Delta_u_xx);
         Delta_S2 = (2*Delta_u*Delta_u_xy) + (2*(1+Delta_u_x)*Delta_u_y);
@@ -486,11 +486,11 @@ VectorXd _p_new_ICGN(
         Delta_S16 = 2*Delta_v*Delta_v_x;
         Delta_S17 = 2*Delta_v*(1+Delta_v_y);
         Delta_S18 = Delta_v*Delta_v;
-        
+
         // Assemble homogenous warp function and warp function increment.
         W_old << 1+S1, S2, S3, S4, S5, S6, S7, 1+S8, S9, S10, S11, S12, S13, S14, 1+S15, S16, S17, S18, 0.5*u_xx, u_xy, 0.5*u_yy, 1+u_x, u_y, u, 0.5*v_xx, v_xy, 0.5*v_yy, v_x, 1+v_y, v, 0, 0, 0, 0, 0, 1;
         W_delta << 1+Delta_S1, Delta_S2, Delta_S3, Delta_S4, Delta_S5, Delta_S6, Delta_S7, 1+Delta_S8, Delta_S9, Delta_S10, Delta_S11, Delta_S12, Delta_S13, Delta_S14, 1+Delta_S15, Delta_S16, Delta_S17, Delta_S18, 0.5*Delta_u_xx, Delta_u_xy, 0.5*Delta_u_yy, 1+Delta_u_x, Delta_u_y, Delta_u, 0.5*Delta_v_xx, Delta_v_xy, 0.5*Delta_v_yy, Delta_v_x, 1+Delta_v_y, Delta_v, 0, 0, 0, 0, 0, 1;
-        
+
         // Compute new warp function.
         inv_W_delta = W_delta.inverse();
         W_new = W_old*inv_W_delta;
@@ -509,7 +509,7 @@ VectorXd _p_new_ICGN(
         p_new(10) = W_new(3,2)*2;
         p_new(11) = W_new(4,2)*2;
     }
-        
+
     return p_new;
 }
 
@@ -521,18 +521,18 @@ double _norm(
     // Define variables.
     int n = Delta_p.size();
     double norm;
-    
+
     // Compute norm after Gao et al. (2015) where size is a representative dimension for the subset size.
     if (n <= 7)
     {
-        norm = pow((pow(Delta_p(0),2) + pow(Delta_p(1),2) + 
-        pow((Delta_p(2)*size),2) + pow((Delta_p(3)*size),2) + 
+        norm = pow((pow(Delta_p(0),2) + pow(Delta_p(1),2) +
+        pow((Delta_p(2)*size),2) + pow((Delta_p(3)*size),2) +
         pow((Delta_p(4)*size),2) + pow((Delta_p(5)*size),2)), 0.5);
-    } 
+    }
     else if (n > 7)
     {
-        norm = pow((pow(Delta_p(0),2) + pow(Delta_p(1),2) + 
-        pow((Delta_p(2)*size),2) + pow((Delta_p(3)*size),2) + 
+        norm = pow((pow(Delta_p(0),2) + pow(Delta_p(1),2) +
+        pow((Delta_p(2)*size),2) + pow((Delta_p(3)*size),2) +
         pow((Delta_p(4)*size),2) + pow((Delta_p(5)*size),2) +
         pow((0.5*Delta_p(6)*pow(size,2)),2) +
         pow((0.5*Delta_p(7)*pow(size,2)),2) +
@@ -588,14 +588,14 @@ std::vector<MatrixXd> _init_reference(
     sigma = _sigma_intensity(f, f_m);
     constants << f_m, Delta_f;
     quality << SSSIG, sigma;
-    
+
     // Generate output container.
     std::vector<Eigen::MatrixXd> output;
     output.push_back(f_coords);
     output.push_back(f);
     output.push_back(constants);
     output.push_back(grad_f);
-    output.push_back(quality);   
+    output.push_back(quality);
 
     return output;
 }
@@ -663,7 +663,7 @@ std::vector<MatrixXd> _solve_ICGN(
     output.push_back(g);
     output.push_back(constants);
     output.push_back(convergence);
-    output.push_back(p); 
+    output.push_back(p);
 
     return output;
 }
@@ -730,7 +730,7 @@ std::vector<MatrixXd> _solve_FAGN(
     output.push_back(g);
     output.push_back(constants);
     output.push_back(convergence);
-    output.push_back(p); 
+    output.push_back(p);
 
     return output;
 }

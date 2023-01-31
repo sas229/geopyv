@@ -4,5 +4,3 @@
 ========================
 
 .. py:module:: geopyv.gui.Gui
-
-

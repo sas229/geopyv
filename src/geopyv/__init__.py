@@ -19,4 +19,3 @@ level = logging.INFO
 geopyv.log.initialise(level)
 log = logging.getLogger(__name__)
 log.debug("Initialised geopyv log.")
-

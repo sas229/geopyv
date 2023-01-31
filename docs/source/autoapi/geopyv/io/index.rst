@@ -59,6 +59,3 @@ Functions
    .. note::
        * Any geopyv object can be passed to this function.
        * Do not include the .pyv extension in the `filename` argument.
-
-
-

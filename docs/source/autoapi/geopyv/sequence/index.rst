@@ -42,6 +42,3 @@ Classes
    .. py:method:: inspect(mesh=None, show=True, block=True, save=None)
 
       Method to show the sequence and associated mesh properties.
-
-
-

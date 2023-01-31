@@ -31,5 +31,3 @@ Submodules
    sequence/index.rst
    subset/index.rst
    templates/index.rst
-
-

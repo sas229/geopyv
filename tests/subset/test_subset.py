@@ -442,6 +442,7 @@ def test_Subset_invalid_p_0_type():
     )
     assert success is False
 
+
 def test_Subset_failed_solve_iterations():
     """
 
@@ -465,6 +466,7 @@ def test_Subset_failed_solve_iterations():
         method="ICGN",
     )
     assert success is False
+
 
 def test_Subset_failed_solve_correlation():
     """

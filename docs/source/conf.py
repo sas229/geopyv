@@ -12,16 +12,17 @@
 #
 import os
 import sys
-sys.path.append(os.path.abspath('../../src/geopyv/'))
+
+sys.path.append(os.path.abspath("../../src/geopyv/"))
 
 # -- Project information -----------------------------------------------------
 
-project = 'geopyv'
-copyright = '2023, Sam Stanier'
-author = 'Sam Stanier'
+project = "geopyv"
+copyright = "2023, Sam Stanier"
+author = "Sam Stanier"
 
 # The full version, including alpha/beta/rc tags.
-release = '0.0.1'
+release = "0.0.1"
 
 
 # -- General configuration ---------------------------------------------------
@@ -30,13 +31,13 @@ release = '0.0.1'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'autoapi.extension',
-    'sphinx.ext.coverage',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.mathjax',
-    'sphinx_copybutton',
-    'sphinxcontrib.bibtex',
-    'sphinx.ext.todo',
+    "autoapi.extension",
+    "sphinx.ext.coverage",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.mathjax",
+    "sphinx_copybutton",
+    "sphinxcontrib.bibtex",
+    "sphinx.ext.todo",
     "sphinx.ext.intersphinx",
 ]
 
@@ -44,7 +45,7 @@ extensions = [
 napoleon_include_private_with_doc = True
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -55,16 +56,16 @@ exclude_patterns = []
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'sphinx_rtd_theme'
+html_theme = "sphinx_rtd_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 html_theme_options = {
-    'body_max_width': '100%',
-    'includehidden': True,
-    'collapse_navigation': True,
+    "body_max_width": "100%",
+    "includehidden": True,
+    "collapse_navigation": True,
 }
 html_show_sourcelink = False
 
@@ -73,27 +74,27 @@ html_show_sourcelink = False
 autodoc_typehints = "signature"
 add_module_names = True
 math_number_all = False
-autoapi_dirs = ['../../src/geopyv']
+autoapi_dirs = ["../../src/geopyv"]
 autoapi_options = [
-    'members',
-    'show-inheritance',
-    'show-module-summary',
+    "members",
+    "show-inheritance",
+    "show-module-summary",
     # 'private-members',
-    'special-members',
-    'imported-members'
+    "special-members",
+    "imported-members",
 ]
 autoapi_keep_files = True
-suppress_warnings = ['autoapi']
+suppress_warnings = ["autoapi"]
 autoapi_add_toctree_entry = False
 autoapi_python_class_content = "init"
-autoapi_template_dir = '_templates/autoapi'
-autoapi_member_order = 'groupwise'
+autoapi_template_dir = "_templates/autoapi"
+autoapi_member_order = "groupwise"
 
 # References.
-bibtex_bibfiles = ['refs.bib']
-bibtex_default_style = 'plain'
+bibtex_bibfiles = ["refs.bib"]
+bibtex_default_style = "plain"
 
-# To do. 
+# To do.
 todo_include_todos = True
 
 # Figure numbering.
@@ -104,4 +105,7 @@ intersphinx_mapping = {
     "matplotlib": ("https://matplotlib.org/stable/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
 }
-myst_url_schemes = ["http", "https", ]
+myst_url_schemes = [
+    "http",
+    "https",
+]

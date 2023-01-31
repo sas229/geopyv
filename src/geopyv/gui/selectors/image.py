@@ -1,23 +1,24 @@
 from PySide6.QtWidgets import QApplication, QFileDialog, QWidget
 
-class ImageSelector:
 
+class ImageSelector:
     def __init__(self):
         """
-        
-        Graphical user interface to allow the user to select an image using the native file browser on the host OS.
-        
+
+        Graphical user interface to allow the user to select an image
+        using the native file browser on the host OS.
+
         """
         app = QApplication.instance()
-        if app is None: 
+        if app is None:
             app = QApplication()
         self.widget = QWidget()
-        
+
     def get_path(self, message, directory):
         """
-        
+
         Method to get the path of the selected file.
-        
+
         Parameters
         ----------
         message : str
@@ -29,7 +30,9 @@ class ImageSelector:
         -------
         path : str
             Path to selected image file.
-            
+
         """
-        path, _ = QFileDialog.getOpenFileName(self.widget, directory, message, "Image files (*.png *.bmp *.jpg)")
+        path, _ = QFileDialog.getOpenFileName(
+            self.widget, directory, message, "Image files (*.png *.bmp *.jpg)"
+        )
         return path

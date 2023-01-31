@@ -3,6 +3,7 @@
 IO module for geopyv.
 
 """
+import importlib
 import logging
 import json
 import os
@@ -64,10 +65,10 @@ def load(*, filename=None):
                     object_type=object_type, filepath=filepath
                 )
             )
-            if data["type"] == "Subset":
-                return gp.subset.SubsetResults(data)
-            elif data["type"] == "Mesh":
-                return gp.mesh.MeshResults(data)
+            class_name = data["type"] + "Results"
+            module = importlib.import_module("geopyv." + object_type.lower())
+            results_instance = getattr(module, class_name)
+            return results_instance(data)
     except Exception:
         log.error("File not found.")
         return None
@@ -100,18 +101,7 @@ def save(*, object, filename=None):
             "No filename provided."
         )  # Add a method to select the filename here...
         return False
-    if (
-        type(object) != gp.subset.Subset
-        and type(object) != gp.mesh.Mesh
-        and type(object != gp.particle.Particle)
-    ):
-        log.error("Nothing saved. Object supplied not a valid geopyv type.")
-        return False
-    if (
-        type(object) == gp.subset.Subset
-        or type(object) == gp.mesh.Mesh
-        or type(object == gp.particle.Particle)
-    ):
+    if isinstance(object, gp.object.Object):
         solved = object.data["solved"]
         if solved is True:
             ext = ".pyv"
@@ -134,6 +124,9 @@ def save(*, object, filename=None):
         else:
             log.warn("Object not solved therefore no data to save.")
             return False
+    else:
+        log.error("Nothing saved. Object supplied not a valid geopyv type.")
+        return False
 
 
 def _convert_list_to_ndarray(data):

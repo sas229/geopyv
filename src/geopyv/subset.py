@@ -8,16 +8,24 @@ import cv2
 import os
 import numpy as np
 import geopyv as gp
+from geopyv.object import Object
 
 log = logging.getLogger(__name__)
 
 
-class SubsetBase:
+class SubsetBase(Object):
     """
 
     Subset base class to be used as a mixin. Contains plot functionality.
 
     """
+    def __init__(self):
+        super().__init__(object_type="Subset")
+        """
+        
+        Subset base class initialiser
+        
+        """
 
     def inspect(self, show=True, block=True, save=None):
         """

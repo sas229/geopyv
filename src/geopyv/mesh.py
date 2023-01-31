@@ -7,6 +7,7 @@ import logging
 import numpy as np
 import scipy as sp
 import geopyv as gp
+from geopyv.object import Object
 import gmsh
 from copy import deepcopy
 from scipy.optimize import minimize_scalar
@@ -17,12 +18,15 @@ from alive_progress import alive_bar
 log = logging.getLogger(__name__)
 
 
-class MeshBase:
+class MeshBase(Object):
     """
 
     Mesh base class to be used as a mixin.
 
     """
+    def __init__(self):
+        super().__init__(object_type="Mesh")
+        """Mesh base class initialiser"""
 
     def inspect(self, subset=None, show=True, block=True, save=None):
         """

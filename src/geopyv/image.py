@@ -8,12 +8,14 @@ import cv2
 import numpy as np
 import geopyv as gp
 import os
+from geopyv.object import Object
 
 log = logging.getLogger(__name__)
 
 
-class Image:
+class Image(Object):
     def __init__(self, filepath=None, border=20):
+        super().__init__(object_type="Image")
         """
 
         Image class for geopyv Image object.

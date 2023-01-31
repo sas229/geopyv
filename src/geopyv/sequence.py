@@ -6,14 +6,27 @@ Sequence module for geopyv.
 import logging
 import numpy as np
 import scipy as sp
-import geopyv as gp 
+import geopyv as gp
+from geopyv.object import Object
 import re
 import os
 
 log = logging.getLogger(__name__)
 
-class SequenceBase:
-    """Sequence base class to be used as a mixin."""
+class SequenceBase(Object):
+    """
+    
+    Sequence base class to be used as a mixin.
+    
+    """
+    def __init__(self):
+        super().__init__(object_type="Mesh")
+        """
+        
+        Sequence base class initialiser
+        
+        """
+        
     def inspect(self, mesh=None, show=True, block=True, save=None):
         """Method to show the sequence and associated mesh properties."""
         # If a mesh index is given, inspect the mesh.

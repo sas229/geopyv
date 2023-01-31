@@ -5,6 +5,7 @@ import geopyv.image
 import geopyv._image_extensions
 import geopyv.io
 import geopyv.mesh
+import geopyv.object
 import geopyv.particle
 import geopyv.plots
 import geopyv.sequence

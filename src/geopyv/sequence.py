@@ -119,8 +119,7 @@ class Sequence(SequenceBase):
         method="ICGN",
         order=1,
         tolerance=0.7,
-        alpha=0.5,
-        beta=2
+        alpha=0.5
     ):
         # Check inputs.
         if type(seed_coord) != np.ndarray:
@@ -157,7 +156,6 @@ class Sequence(SequenceBase):
         self._order = order
         self._tolerance = tolerance
         self._alpha = alpha
-        self._beta = beta
         self._p_0 = np.zeros(6 * self._order)
 
         # Prepare output.
@@ -210,7 +208,6 @@ class Sequence(SequenceBase):
                 order=self._order,
                 tolerance=self._tolerance,
                 alpha=self._alpha,
-                beta=self._beta,
             )  # Solve mesh.
             if (
                 mesh._update and self.update_register[_g_index - 1] == 0

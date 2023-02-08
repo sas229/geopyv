@@ -24,7 +24,7 @@ class SubsetBase(Object):
         super().__init__(object_type="Subset")
         """
 
-        Subset base class initialiser
+        Subset base class initialiser.
 
         """
 

@@ -34,7 +34,7 @@ exclusions.append(
 )
 seed = np.asarray([400, 400.0])
 mesh = gp.mesh.Mesh(
-    f_img=ref, g_img=tar, target_nodes=2000, boundary=boundary, exclusions=exclusions
+    f_img=ref, g_img=tar, target_nodes=1000, boundary=boundary, exclusions=exclusions
 )
 mesh.inspect()
 gp.io.save(object=mesh, filename="mesh")
@@ -92,6 +92,7 @@ mesh.convergence(subset=0)
 mesh.convergence(subset=4000)
 
 # Sequence test.
+#
 template = gp.templates.Circle(50)
 boundary = np.asarray(
     [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
@@ -103,8 +104,10 @@ exclusions.append(
     )
 )
 seed = np.asarray([400, 400.0])
+
+#
 sequence = gp.sequence.Sequence(
-    image_folder="./images/T-Bar",
+    image_folder="./images/T-bar",
     target_nodes=1000,
     boundary=boundary,
     exclusions=exclusions,
@@ -120,3 +123,23 @@ sequence.solve(
     alpha=alpha,
     tolerance=0.7,
 )
+
+gp.io.save(object=sequence, filename="sequence")
+del sequence
+
+seq = gp.io.load(filename="sequence")
+print(type(seq.data["meshes"][0]["mask"]))
+print(len(seq.data["meshes"]))
+# seq.inspect(mesh = 0, subset = 0)
+# seq.inspect(mesh = 0, subset = 3000)
+seq.inspect(mesh=0)
+seq.inspect(mesh=10)
+seq.inspect()
+seq.convergence(mesh=0, subset=0)
+seq.convergence(mesh=0, subset=3000)
+seq.convergence(mesh=0)
+seq.convergence(mesh=10)
+seq.convergence()
+
+# print(seq.data.keys())
+# print(seq.data["meshes"][0]["results"].keys())

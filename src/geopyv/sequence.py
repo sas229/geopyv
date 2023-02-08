@@ -16,23 +16,199 @@ log = logging.getLogger(__name__)
 class SequenceBase(Object):
     """
 
-    Sequence base class to be used as a mixin.
+    Sequence base class to be used as a mixin. Contains plot functionality.
 
     """
 
     def __init__(self):
-        super().__init__(object_type="Mesh")
+        super().__init__(object_type="Sequence")
         """
 
-        Sequence base class initialiser
+        Sequence base class initialiser.
 
         """
 
-    def inspect(self, mesh=None, show=True, block=True, save=None):
-        """Method to show the sequence and associated mesh properties."""
+    def inspect(self, mesh=None, subset=None, show=True, block=True, save=None):
+        """Method to show the sequence and associated mesh and subset properties."""
+
         # If a mesh index is given, inspect the mesh.
-        # if mesh != None:
-        #    if mesh >= 0 and mesh < len(self.data[])
+        if mesh is not None:
+            if mesh >= 0 and mesh < len(self.data["meshes"]):
+                print(mesh)
+                # If a subset index is given, inspect the subset of the mesh.
+                if subset is not None:
+                    if subset >= 0 and subset < len(
+                        self.data["meshes"][mesh]["results"]["subsets"]
+                    ):
+                        subset_data = self.data["meshes"][mesh]["results"]["subsets"][
+                            subset
+                        ]
+                        mask = np.asarray(self.data["meshes"][mesh]["mask"])
+
+                        fig, ax = gp.plots.inspect_subset(
+                            data=subset_data,
+                            mask=mask,
+                            show=show,
+                            block=block,
+                            save=save,
+                        )
+                        return fig, ax
+                    else:
+                        log.error(
+                            "Subset index is out of the range of the mesh object contents."
+                        )
+                # Otherwise inspect the mesh.
+                else:
+                    fig, ax = gp.plots.inspect_mesh(
+                        data=self.data["meshes"][mesh],
+                        show=show,
+                        block=block,
+                        save=save,
+                    )
+                    return fig, ax
+            else:
+                log.error(
+                    "Mesh index is out of the range of the sequence object contents."
+                )
+        # Otherwise inspect the sequence.
+        else:
+            log.error("No mesh or subset index provided.")
+            # fig, ax = gp.plots.inspect_sequence(
+            #    data=self.data, show=show, block=block, save=save
+            # )
+            # return fig, ax
+
+    def convergence(
+        self, mesh=None, subset=None, quantity=None, show=True, block=True, save=None
+    ):
+        """
+        Method to plot the rate of convergence for a mesh or subset.
+        """
+        # If a mesh index is given, inspect the mesh.
+        if mesh is not None:
+            if mesh >= 0 and mesh < len(self.data["meshes"]):
+                if subset is not None:
+                    if subset >= 0 and subset < len(
+                        self.data["meshes"][mesh]["results"]["subsets"]
+                    ):
+                        fig, ax = gp.plots.convergence_subset(
+                            self.data["meshes"][mesh]["results"]["subsets"][subset],
+                            show=show,
+                            block=block,
+                            save=save,
+                        )
+                        return fig, ax
+                    else:
+                        log.error(
+                            "Subset index is out of the range of the mesh object contents."
+                        )
+                # Otherwise inspect mesh.
+                else:
+                    if quantity is None:
+                        quantity = "C_ZNCC"
+                    fig, ax = gp.plots.convergence_mesh(
+                        data=self.data["meshes"][mesh],
+                        quantity=quantity,
+                        show=show,
+                        block=block,
+                        save=save,
+                    )
+                    return fig, ax
+            else:
+                log.error(
+                    "Mesh index is out of the range of the sequence object contents."
+                )
+        else:
+            log.error("No mesh or subset index provided.")
+
+    def contour(
+        self,
+        mesh=None,
+        quantity="C_ZNCC",
+        imshow=True,
+        colorbar=True,
+        ticks=None,
+        mesh=False,
+        alpha=0.75,
+        levels=None,
+        axis=None,
+        xlim=None,
+        ylim=None,
+        show=True,
+        block=True,
+        save=None,
+    ):
+        """
+
+        Method to plot the contours of a given measure.
+
+        """
+        if mesh is not None:
+            if mesh >= 0 and mesh < len(self.data["meshes"]):
+                if quantity is not None:
+                    fig, ax = gp.plots.contour_mesh(
+                        data=self.data["meshes"][mesh],
+                        imshow=imshow,
+                        quantity=quantity,
+                        colorbar=colorbar,
+                        ticks=ticks,
+                        mesh=mesh,
+                        alpha=alpha,
+                        levels=levels,
+                        axis=axis,
+                        xlim=xlim,
+                        ylim=ylim,
+                        show=show,
+                        block=block,
+                        save=save,
+                    )
+                    return fig, ax
+            else:
+                log.error(
+                    "Mesh index is out of the range of the sequence object contents."
+                )
+        else:
+            log.error("No mesh index provided.")
+
+    def quiver(
+        self,
+        mesh=None,
+        scale=1,
+        imshow=True,
+        mesh=False,
+        axis=None,
+        xlim=None,
+        ylim=None,
+        show=True,
+        block=True,
+        save=None,
+    ):
+        """
+
+        Method to plot a quiver plot of the displacements.
+
+        """
+        if mesh is not None:
+            if mesh >= 0 and mesh < len(self.data["meshes"]):
+                fig, ax = gp.plots.quiver_mesh(
+                    data=self.data["meshes"][mesh],
+                    scale=scale,
+                    imshow=imshow,
+                    mesh=mesh,
+                    axis=axis,
+                    xlim=xlim,
+                    ylim=ylim,
+                    show=show,
+                    block=block,
+                    save=save,
+                )
+                return fig, ax
+            else:
+                log.error(
+                    "Mesh index is out of the range of the sequence object contents."
+                )
+        else:
+            log.error("No mesh index provided.")
 
 
 class Sequence(SequenceBase):
@@ -106,6 +282,26 @@ class Sequence(SequenceBase):
         self._exclusions = exclusions
         self._size_lower_bound = size_lower_bound
         self._size_upper_bound = size_upper_bound
+        self.solved = False
+        self._unsolvable = False
+
+        # Data.
+        self.data = {
+            "type": "Sequence",
+            "solved": self.solved,
+            "unsolvable": self._unsolvable,
+            "meshes": np.empty(self._number_images - 1, dtype=dict),
+            "image_folder": self._image_folder,
+            "common_file_name": self._common_file_name,
+            "image_indices": self._image_indices,
+            "number_images": self._number_images,
+            "image_file_type": self._image_file_type,
+            "target_nodes": self._target_nodes,
+            "boundary": self._boundary,
+            "exclusions": self._exclusions,
+            "size_lower_bound": self._size_lower_bound,
+            "size_upper_bound": self._size_upper_bound,
+        }
 
     def solve(
         self,
@@ -119,7 +315,8 @@ class Sequence(SequenceBase):
         method="ICGN",
         order=1,
         tolerance=0.7,
-        alpha=0.5
+        alpha=0.5,
+        mesh_save=False
     ):
         # Check inputs.
         if type(seed_coord) != np.ndarray:
@@ -159,10 +356,7 @@ class Sequence(SequenceBase):
         self._p_0 = np.zeros(6 * self._order)
 
         # Prepare output.
-        self.meshes = np.empty(
-            len(self._image_indices) - 1, dtype=object
-        )  # Adapted meshes.
-        self.update_register = np.zeros(
+        self._update_register = np.zeros(
             len(self._image_indices) - 1, dtype=int
         )  # Mesh-image reference.
 
@@ -209,13 +403,33 @@ class Sequence(SequenceBase):
                 tolerance=self._tolerance,
                 alpha=self._alpha,
             )  # Solve mesh.
-            if (
-                mesh._update and self.update_register[_g_index - 1] == 0
-            ):  # Correlation coefficient thresholds not met hence no mesh generated.
+            if mesh.solved:
+                self.data["meshes"][_g_index - 1] = mesh.data
+                if mesh_save:
+                    gp.io.save(
+                        object=mesh,
+                        filename="mesh_"
+                        + str(self._image_indices[_f_index])
+                        + "_"
+                        + str(self._image_indices[_g_index]),
+                    )
+                _g_index += 1  # Iterate the target image index.
+                del _g_img
+                if _g_index != len(self._image_indices - 1):
+                    _g_img = gp.image.Image(
+                        self._image_folder
+                        + "/"
+                        + self._common_file_name
+                        + str(self._image_indices[_g_index])
+                        + self._image_file_type
+                    )
+                else:
+                    self.solved = True
+            elif _f_index + 1 < _g_index:
                 if trace:
                     self._trace(_f_index, _g_index)
                 _f_index = _g_index - 1
-                self.update_register[
+                self._update_register[
                     _f_index
                 ] = 1  # Update recorded reference image for future meshes.
                 del _f_img
@@ -227,25 +441,31 @@ class Sequence(SequenceBase):
                     + self._image_file_type
                 )
             else:
-                gp.io.save(
-                    object=mesh,
-                    filename="mesh_"
-                    + str(self._image_indices[_f_index])
-                    + "_"
-                    + str(self._image_indices[_g_index]),
-                )
-                del mesh
-                _g_index += 1  # Iterate the target image index.
-                del _g_img
-                if _g_index != len(self._image_indices - 1):
-                    _g_img = gp.image.Image(
-                        self._image_folder
-                        + "/"
-                        + self._common_file_name
-                        + str(self._image_indices[_g_index])
-                        + self._image_file_type
+                log.error(
+                    "Mesh for consecutive image pair {a}-{b} is unsolvable. Sequence curtailed.".format(
+                        a=self._image_indices[_f_index], b=self._image_indices[_g_index]
                     )
+                )
+                self._unsolvable = True
+                del mesh
+                return self.solved
+            del mesh
         del _f_img
+
+        # Pack data.
+        self.data["solved"] = self.solved
+        self.data["unsolvable"] = self._unsolvable
+        self._settings = {
+            "max_iterations": self._max_iterations,
+            "max_norm": self._max_norm,
+            "adaptive_iterations": self._adaptive_iterations,
+            "method": self._method,
+            "order": self._order,
+            "tolerance": self._tolerance,
+        }
+        self.data.update({"settings": self._settings})
+        self.data.update({"update_register": self._update_register})
+        return self.solved
 
     def _trace(self, _f_index, _g_index):
         log.message("Tracing exclusion displacement.")
@@ -263,7 +483,7 @@ class Sequence(SequenceBase):
 
     def particle(self, coords, vols):
         """
-
+        OBSOLETE
         A method to propagate "particles" across the domain upon which
         strain path interpolation is performed.
 
@@ -272,8 +492,30 @@ class Sequence(SequenceBase):
         for i in range(len(self.particles)):
             self.particles[i] = gp.particle.Particle(
                 coord=coords[i],
-                meshes=self.meshes,
-                update_register=self.update_register,
+                meshes=self._meshes,
+                update_register=self._update_register,
                 vol=vols[i],
             )
             self.particles[i].solve()
+
+
+class SequenceResults(SequenceBase):
+    """
+    SequenceResults class for geopyv.
+
+    Parameters
+    ----------
+    data : dict
+        geopyv data dict from Sequence object.
+
+
+    Attributes
+    ----------
+    data : dict
+        geopyv data dict from Sequence object.
+
+    """
+
+    def __init__(self, data):
+        """Initialisation of geopyv SequenceResults class."""
+        self.data = data

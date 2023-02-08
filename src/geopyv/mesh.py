@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 class MeshBase(Object):
     """
 
-    Mesh base class to be used as a mixin.
+    Mesh base class to be used as a mixin. Contains plot functionality.
 
     """
 
@@ -29,7 +29,7 @@ class MeshBase(Object):
         super().__init__(object_type="Mesh")
         """
 
-        Mesh base class initialiser
+        Mesh base class initialiser.
 
         """
 
@@ -43,8 +43,7 @@ class MeshBase(Object):
         if subset is not None:
             if subset >= 0 and subset < len(self.data["results"]["subsets"]):
                 subset_data = self.data["results"]["subsets"][subset]
-                if self.data["type"] == "Mesh":
-                    mask = self.data["mask"]
+                mask = self.data["mask"]
                 fig, ax = gp.plots.inspect_subset(
                     data=subset_data, mask=mask, show=show, block=block, save=save
                 )
@@ -63,7 +62,7 @@ class MeshBase(Object):
     def convergence(self, subset=None, quantity=None, show=True, block=True, save=None):
         """
 
-        Method to plot the rate of convergence for the mesh.
+        Method to plot the rate of convergence for the mesh or subset.
 
         """
         # If a subset index is given, inspect the subset.
@@ -423,7 +422,14 @@ class Mesh(MeshBase):
         try:
             self._reliability_guided()
             if self._unsolvable:
-                log.error("Specified correlation coefficient tolerance not met.")
+                log.error(
+                    "Specified correlation coefficient tolerance not met. "
+                    "Minimum correlation coefficient: "
+                    "{min_C:.2f}; tolerance: {tolerance:.2f}.".format(
+                        min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]),
+                        tolerance=self._tolerance,
+                    )
+                )
                 return self.solved
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations + 1):
@@ -484,6 +490,7 @@ class Mesh(MeshBase):
             self.data.update({"results": self._results})
 
         except Exception:
+            log.info("exception")
             self._update = True
             self.solved = False
             self._unsolvable = True
@@ -1095,7 +1102,7 @@ class Mesh(MeshBase):
                             + 0.5 * p[6] * diff[0] ** 2
                             + p[7] * diff[0] * diff[1]
                             + 0.5 * p[8] * diff[1] ** 2
-                        )  # CHECK!!
+                        )
                         p_0[1] = (
                             p[1]
                             + p[4] * diff[0]
@@ -1103,7 +1110,7 @@ class Mesh(MeshBase):
                             + 0.5 * p[9] * diff[0] ** 2
                             + p[10] * diff[0] * diff[1]
                             + 0.5 * p[11] * diff[1] ** 2
-                        )  # CHECK!!
+                        )
                     self._subsets[idx].solve(
                         max_norm=self._max_norm,
                         max_iterations=self._max_iterations,

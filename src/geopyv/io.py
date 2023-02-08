@@ -149,14 +149,20 @@ def _convert_list_to_ndarray(data):
 
     """
     for key, value in data.items():
+        # print()
+        # print(key)
+        # print(type(value))
         # If not a list of subsets, convert to numpy ndarray.
-        if type(value) == list and key != "subsets":
+        if type(value) == list and key != "subsets" and key != "meshes":
+            # print("A")
             data[key] = np.asarray(value)
         # If a dict convert recursively.
         elif type(value) == dict:
+            # print("B")
             _convert_list_to_ndarray(data[key])
         # If a list of subsets convert recursively.
-        elif key == "subsets":
+        elif key == "subsets" or key == "meshes":
+            # print("C")
             for subset in value:
                 _convert_list_to_ndarray(subset)
     return data

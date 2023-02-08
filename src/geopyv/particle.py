@@ -6,53 +6,59 @@ Particle module for geopyv.
 import numpy as np
 import matplotlib.path as path
 
+log = logging.getLogger(__name__)
 
-class Particle:
+class ParticleBase(Object):
+    """
+    Particle base class to be used as a mixin. 
+    """
+
+    def __init__(self):
+        super().__init__(object_type="Particle")
+        """
+
+        Particle base class initialiser
+
+        """
+
+class Particle(ParticleBase):
     """Particle class for geopyv.
 
-    Attributes
+    Parameters
     ----------
-    coord : `numpy.ndarray` (2)
-        1D array of the particle coordinates (x,y).
-    strain : `numpy.ndarray` (3)
-        1D array of the particle total strain (du/dx, dv/dy, du/dy+dv/dx).
-    vol : `float`
-        Volume represented by the particle.
-    coord_ref : `numpy.ndarray` (2)
-        1D array of the particle coordinates (x,y) at an updatable
-        reference time.
-    strain_ref : `numpy.ndarray` (3)
-        1D array of the particle total strain
-        (du/dx, dv/dy, du/dy+dv/dx) at an updatable reference time.
-    vol_ref : `float`
-        Volume represented by the particle at an updatable reference time.
+    
+    
+    
+    vol : float
+        Particle representative volume. 
     """
 
     def __init__(
-        self,
+        self, 
+        *,
         meshes,
         update_register=None,
         coord=np.zeros(2),
         p_init=np.zeros(12),
         vol=None,
+        fixed = False
     ):
         """Initialisation of geopyv particle object.
 
         Parameters
         ----------
+        meshes : `numpy.ndarray` of geopyv.mesh.Mesh objects
+            Sequence for the particle object to track. 
+        update_register : `numpy.ndarray` (N)
+            Record of reference image updates.
         coord : numpy.ndarray (2)
-            1D array of the particle coordinates (x,y).
-        strain : numpy.ndarray (3)
-            1D array of the particle total strain (du/dx, dv/dy, du/dy+dv/dx).
+            Initial particle coordinate (x,y)
+        p_init : `numpy.ndarray` (12), optional
+            Initial warp vector.
         vol : float
             Volume represented by the particle.
-        ref_coord_ref : numpy.ndarray (2)
-            1D array of the particle coordinates (x,y) at an updatable reference time.
-        ref_strain_ref : numpy.ndarray (3)
-            1D array of the particle total strain (du/dx, dv/dy, du/dy+dv/dx)
-            at an updatable reference time.
-        ref_vol : float
-            Volume represented by the particle at an updatable reference time.
+        fixed : bool
+            Boolean for Lagrangian (False) or Eulerian (True) specification. Defaults to False.
         """
 
         self.meshes = meshes
@@ -235,9 +241,10 @@ class Particle:
                 m
             )  # Identify the relevant element of the mesh.
             self._p_inc(m, tri_idx)  # Calculate the nodal weightings.
-            self.coords[m + 1] = (
-                self.ref_coord + self.p_inc[:2]
-            )  # Update the particle positional coordinate.
+            if not self._fixed:
+                self.coords[m + 1] = (
+                    self.ref_coord + self.p_inc[:2]
+                )  # Update the particle positional coordinate.
             # i.e. (reference + mesh interpolation).
             self.ps[m + 1] = self.ref_p + self.p_inc
             self.vols[m + 1] = self.ref_vol * (

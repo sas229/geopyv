@@ -38,15 +38,13 @@ mesh = gp.mesh.Mesh(
 )
 mesh.inspect()
 gp.io.save(object=mesh, filename="mesh")
-beta = 5.0
-alpha = 1 / beta
+alpha = 0.2
 mesh.solve(
     seed_coord=seed,
     template=template,
     adaptive_iterations=0,
     method="ICGN",
     alpha=alpha,
-    beta=beta,
     tolerance=0.7,
 )
 gp.io.save(object=mesh, filename="mesh")
@@ -112,8 +110,7 @@ sequence = gp.sequence.Sequence(
     exclusions=exclusions,
 )
 
-beta = 5.0
-alpha = 1 / beta
+alpha = 0.2
 sequence.solve(
     trace=False,
     seed_coord=seed,
@@ -121,6 +118,5 @@ sequence.solve(
     adaptive_iterations=0,
     method="ICGN",
     alpha=alpha,
-    beta=beta,
     tolerance=0.7,
 )

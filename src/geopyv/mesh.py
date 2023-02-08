@@ -334,8 +334,7 @@ class Mesh(MeshBase):
         tolerance=0.7,
         method="ICGN",
         adaptive_iterations=0,
-        alpha=0.5,
-        beta=2
+        alpha=0.5
     ):
         r"""
 
@@ -360,8 +359,6 @@ class Mesh(MeshBase):
             Number of mesh adaptivity iterations to perform. Defaults to a value of 0.
         alpha : float, optional
             Mesh adaptivity control parameter. Defaults to a value of 0.5.
-        beta : float, optional
-            Mesh adaptivity control parameter. Defaults to a value of 2.0.
 
 
         Returns
@@ -398,7 +395,6 @@ class Mesh(MeshBase):
         self._order = order
         self._tolerance = tolerance
         self._alpha = alpha
-        self._beta = beta
         self._subset_bgf_nodes = None
         self._subset_bgf_values = None
         self._update = False
@@ -611,7 +607,7 @@ class Mesh(MeshBase):
             )  # Elemental shear strain-area products.
             D_b = np.mean(D)  # Mean elemental shear strain-area product.
             self._areas *= (
-                np.clip(D / D_b, self._alpha, self._beta)
+                np.clip(D / D_b, self._alpha, 1 / self._alpha)
             ) ** -2  # Target element areas calculated.
 
             def f(scale):

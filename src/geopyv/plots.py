@@ -7,6 +7,10 @@ import sys
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
+#import matplotlib.collections.LineCollection as LineCollection
+from matplotlib.collections import LineCollection
+from matplotlib import cm
+#import matplotlib.cm as cm
 import numpy as np
 import re
 import geopyv as gp
@@ -612,3 +616,65 @@ def inspect_mesh(data, show, block, save):
         plt.close(fig)
 
     return fig, ax
+
+def plot_particle(
+    data,
+    quantity,
+    component,
+    start_frame,
+    end_frame,
+    imshow,
+    colorbar,
+    ticks,
+    alpha,
+    axis,
+    xlim,
+    ylim,
+    show,
+    block,
+    save
+    ):
+
+    title = "Path; variable = {variable}".format(variable = quantity)
+    fig, ax = plt.subplots(num=title)
+
+    #quantity = data["results"][quantity][component]
+    points = data["results"]["coordinates"].reshape(-1,1,2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    colors = cm.viridis((data["results"][quantity][:, component]-np.amin(data["results"][quantity][:, component]))/(np.amax(data["results"][quantity][:, component])-np.amin(data["results"][quantity][:, component])))
+    lc = LineCollection(segments, colors = colors)
+    ax.add_collection(lc)
+
+    # Show image in background.
+    if imshow is True:
+        image = cv2.imread(data["image_0"], cv2.IMREAD_COLOR)
+        image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+        plt.imshow(image_gs, cmap="gray")
+    else:
+        ax.set_aspect("equal", "box")
+
+    #if colorbar is True:
+    #    label = "Quantity"
+    #    fig.colorbar(colors, label=label, ticks=ticks)
+
+        # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    # Save.
+    if save is not None:
+        plt.savefig(save)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+        

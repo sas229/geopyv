@@ -456,6 +456,7 @@ class Mesh(MeshBase):
             self.solved = True
             self.data["nodes"] = self._nodes
             self.data["elements"] = self._elements
+            self.data["areas"] = self._areas
             self.data["solved"] = self.solved
             self.data["unsolvable"] = self._unsolvable
 

@@ -123,7 +123,7 @@ class SequenceBase(Object):
 
     def contour(
         self,
-        mesh=None,
+        mesh_index=None,
         quantity="C_ZNCC",
         imshow=True,
         colorbar=True,
@@ -143,11 +143,11 @@ class SequenceBase(Object):
         Method to plot the contours of a given measure.
 
         """
-        if mesh is not None:
-            if mesh >= 0 and mesh < len(self.data["meshes"]):
+        if mesh_index is not None:
+            if mesh_index >= 0 and mesh_index < len(self.data["meshes"]):
                 if quantity is not None:
                     fig, ax = gp.plots.contour_mesh(
-                        data=self.data["meshes"][mesh],
+                        data=self.data["meshes"][mesh_index],
                         imshow=imshow,
                         quantity=quantity,
                         colorbar=colorbar,
@@ -172,7 +172,7 @@ class SequenceBase(Object):
 
     def quiver(
         self,
-        mesh=None,
+        mesh_index=None,
         scale=1,
         imshow=True,
         mesh=False,
@@ -188,10 +188,10 @@ class SequenceBase(Object):
         Method to plot a quiver plot of the displacements.
 
         """
-        if mesh is not None:
-            if mesh >= 0 and mesh < len(self.data["meshes"]):
+        if mesh_index is not None:
+            if mesh_index >= 0 and mesh_index < len(self.data["meshes"]):
                 fig, ax = gp.plots.quiver_mesh(
-                    data=self.data["meshes"][mesh],
+                    data=self.data["meshes"][mesh_index],
                     scale=scale,
                     imshow=imshow,
                     mesh=mesh,
@@ -228,22 +228,22 @@ class Sequence(SequenceBase):
         # Check types.
         if type(image_folder) != str:
             log.error("image_folder type not recognised. " "Expected a string.")
-            return False
+            #return False
         elif os.path.isdir(image_folder) is False:
             log.error("image_folder does not exist.")
-            return False
+            #return False
         if type(image_file_type) != str:
             log.error("image_file_type type not recognised. " "Expected a string.")
-            return False
+            #return False
         elif image_file_type not in [".jpg", ".png", ".bmp"]:
             log.error(
                 "image_file_type not recognised. "
                 "Expected: '.jpg', '.png', or '.bmp'."
             )
-            return False
+            #return False
         if type(target_nodes) != int:
             log.error("Target nodes not of integer type.")
-            return False
+            #return False
         if type(boundary) != np.ndarray:
             log.error(
                 "Boundary coordinate array of invalid type. " "Cannot initialise mesh."
@@ -253,19 +253,19 @@ class Sequence(SequenceBase):
                 "Boundary coordinate array of invalid shape. "
                 "Must be numpy.ndarray of size (n, 2)."
             )
-            return False
+            #return False
         if type(exclusions) != list:
             log.error(
                 "Exclusion coordinate array of invalid type. " "Cannot initialise mesh."
             )
-            return False
+            #return False
         for exclusion in exclusions:
             if np.shape(exclusion)[1] != 2:
                 log.error(
                     "Exclusion coordinate array of invalid shape. "
                     "Must be numpy.ndarray of size (n, 2)."
                 )
-                return False
+                #return False
 
         # Store variables.
         self._image_folder = image_folder
@@ -302,6 +302,8 @@ class Sequence(SequenceBase):
             "size_lower_bound": self._size_lower_bound,
             "size_upper_bound": self._size_upper_bound,
         }
+
+        self._initialised = True
 
     def solve(
         self,
@@ -455,15 +457,6 @@ class Sequence(SequenceBase):
         # Pack data.
         self.data["solved"] = self.solved
         self.data["unsolvable"] = self._unsolvable
-        self._settings = {
-            "max_iterations": self._max_iterations,
-            "max_norm": self._max_norm,
-            "adaptive_iterations": self._adaptive_iterations,
-            "method": self._method,
-            "order": self._order,
-            "tolerance": self._tolerance,
-        }
-        self.data.update({"settings": self._settings})
         self.data.update({"update_register": self._update_register})
         return self.solved
 
@@ -480,24 +473,6 @@ class Sequence(SequenceBase):
             j = len(exclusion)
             exclusion += mesh.data["results"]["displacements"][i + j]
         del mesh
-
-    def particle(self, coords, vols):
-        """
-        OBSOLETE
-        A method to propagate "particles" across the domain upon which
-        strain path interpolation is performed.
-
-        """
-        self.particles = np.empty(len(coords), dtype=object)
-        for i in range(len(self.particles)):
-            self.particles[i] = gp.particle.Particle(
-                coord=coords[i],
-                meshes=self._meshes,
-                update_register=self._update_register,
-                vol=vols[i],
-            )
-            self.particles[i].solve()
-
 
 class SequenceResults(SequenceBase):
     """

@@ -242,10 +242,11 @@ def convergence_mesh(data, quantity, show, block, save):
     """
     # Get image names.
     platform = sys.platform
+    print()
     if platform == "linux" or platform == "linux2" or platform == "darwin":
         split = "/"
     elif platform == "win32":
-        split = "\\"
+        split = r"\\"
     f_img = data["images"]["f_img"][
         ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
     ]
@@ -655,6 +656,7 @@ def trace_particle(
     if data["type"] == "Particle":
         points = data["results"]["coordinates"].reshape(-1,1,2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        print(segments)
         values= np.diff(data["results"][quantity][:, component], axis = 0)
         norm = plt.Normalize(values.min(), values.max())
         lc = LineCollection(segments, cmap="viridis", norm=norm)
@@ -664,14 +666,13 @@ def trace_particle(
 
     elif data["type"] == "Field":
         values = np.empty((len(data["particles"]), len(data["particles"][0][quantity])-1))
+        segments = np.empty((len(data["particles"]), 2))
         for i in range(len(data["particles"])):
-            
             values[i] = np.diff(data["particles"][i][quantity][:, component], axis = 0)
-        norm = plt.Normalize(values.min(), values.max())
-        for i in range(len(data["particles"])):
             points = data["particles"][i]["coordinates"].reshape(-1,1,2)
-            segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        lc = LineCollection(segments, cmap="viridis", norm=norm)
+            segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
+        norm = plt.Normalize(values.min(), values.max())
+        lc = LineCollection(segments.flatten(), cmap="viridis", norm=norm)
         lc.set_array(values.flatten())
         lines = ax.add_collection(lc)
 

@@ -355,7 +355,7 @@ def contour_mesh(
     if platform == "linux" or platform == "linux2" or platform == "darwin":
         split = "/"
     elif platform == "win32":
-        split = "\\"
+        split = r"\\"
     f_img = data["images"]["f_img"][
         ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
     ]
@@ -469,7 +469,7 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
     if platform == "linux" or platform == "linux2" or platform == "darwin":
         split = "/"
     elif platform == "win32":
-        split = "\\"
+        split = r"\\"
     f_img = data["images"]["f_img"][
         ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
     ]
@@ -582,7 +582,7 @@ def inspect_mesh(data, show, block, save):
     if platform == "linux" or platform == "linux2" or platform == "darwin":
         split = "/"
     elif platform == "win32":
-        split = "\\"
+        split = r"\\"
     f_img = data["images"]["f_img"][
         ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
     ]
@@ -656,7 +656,7 @@ def trace_particle(
     if data["type"] == "Particle":
         points = data["results"]["coordinates"].reshape(-1,1,2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        print(segments)
+        print(np.shape(segments))
         values= np.diff(data["results"][quantity][:, component], axis = 0)
         norm = plt.Normalize(values.min(), values.max())
         lc = LineCollection(segments, cmap="viridis", norm=norm)
@@ -666,12 +666,15 @@ def trace_particle(
 
     elif data["type"] == "Field":
         values = np.empty((len(data["particles"]), len(data["particles"][0][quantity])-1))
-        segments = np.empty((len(data["particles"]), 2))
+        segments = np.empty((len(data["particles"]), 2, 2))
         for i in range(len(data["particles"])):
             values[i] = np.diff(data["particles"][i][quantity][:, component], axis = 0)
             points = data["particles"][i]["coordinates"].reshape(-1,1,2)
             segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
         norm = plt.Normalize(values.min(), values.max())
+        print(np.shape(segments))
+        print(np.shape(segments.reshape((-1,2,2))))
+        print(np.shape(segments.flatten()))
         lc = LineCollection(segments.flatten(), cmap="viridis", norm=norm)
         lc.set_array(values.flatten())
         lines = ax.add_collection(lc)
@@ -688,7 +691,6 @@ def trace_particle(
 
     if colorbar is True:
         label = labels[component]
-        print("here")
         print(type(lines))
         fig.colorbar(lines, label = labels[component])
         #fig.colorbar(sm, label=label, ticks=ticks)#, boundaries = (np.amin(values), np.amax(values)))

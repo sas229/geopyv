@@ -656,7 +656,6 @@ def trace_particle(
     if data["type"] == "Particle":
         points = data["results"]["coordinates"].reshape(-1,1,2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        print(np.shape(segments))
         values= np.diff(data["results"][quantity][:, component], axis = 0)
         norm = plt.Normalize(values.min(), values.max())
         lc = LineCollection(segments, cmap="viridis", norm=norm)
@@ -666,20 +665,20 @@ def trace_particle(
 
     elif data["type"] == "Field":
         values = np.empty((len(data["particles"]), len(data["particles"][0][quantity])-1))
-        segments = np.empty((len(data["particles"]), 2, 2))
+        if data["number_images"] > 1:
+            segments = np.empty((len(data["particles"]), data["number_images"]-1, 2, 2))
+        else:
+            segments = np.empty((len(data["particles"]), 2, 2))
         for i in range(len(data["particles"])):
             values[i] = np.diff(data["particles"][i][quantity][:, component], axis = 0)
             points = data["particles"][i]["coordinates"].reshape(-1,1,2)
             segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
+        values = values.flatten()
         norm = plt.Normalize(values.min(), values.max())
-        print(np.shape(segments))
-        print(np.shape(segments.reshape((-1,2,2))))
-        print(np.shape(segments.flatten()))
-        lc = LineCollection(segments.flatten(), cmap="viridis", norm=norm)
+        lc = LineCollection(segments.reshape(-1,2,2), cmap="viridis", norm=norm)
         lc.set_array(values.flatten())
         lines = ax.add_collection(lc)
-
-            
+  
     # Show image in background.
     if imshow is True:
         image = cv2.imread(data["image_0"], cv2.IMREAD_COLOR)
@@ -691,10 +690,7 @@ def trace_particle(
 
     if colorbar is True:
         label = labels[component]
-        print(type(lines))
         fig.colorbar(lines, label = labels[component])
-        #fig.colorbar(sm, label=label, ticks=ticks)#, boundaries = (np.amin(values), np.amax(values)))
-        #plt.clim(np.amin(values), np.amax(values))
 
         # Limit control.
     if xlim is not None:

@@ -29,6 +29,7 @@ class FieldBase(Object):
         """
         Method to show the particles and associated representative areas. 
         """
+        log.info("Inspecting field...")
         fig,ax = gp.plots.inspect_field(self.data, mesh=mesh,show=show,block=block,save=save)
         return fig, ax
 
@@ -56,6 +57,7 @@ class FieldBase(Object):
 
         
         if quantity is not None:
+            log.info("Tracing field...")
             fig,ax = gp.plots.trace_particle(
                 data=self.data,
                 quantity=quantity,
@@ -145,6 +147,8 @@ class Field(FieldBase):
         }
         self._initial_mesh()
         self._distribute_particles()
+        log.info(
+            "Field generated with {p} particles.".format(p=len(self._coordinates)))
         self._mesh = {"nodes": self._nodes,
             "elements": self._elements, 
             "coordinates": self._coordinates}

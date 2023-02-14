@@ -4,11 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-matplotlib = "*"
+matplotlib = "3.6.3"
 gmsh = "*"
 scipy = "*"
 opencv-contrib-python = "*"
-pyside6 = "*"
+pyside6 = "6.4.2"
 alive-progress = "*"
 opencv-python = "*"
 numpyencoder = "*"
@@ -16,6 +16,8 @@ flake8 = "*"
 black = "*"
 sphinx-autoapi = "*"
 pre-commit = "*"
+numpy = "*"
+pip = "*"
 
 [dev-packages]
 ipykernel = "*"

@@ -4,6 +4,7 @@ import geopyv.gui
 import geopyv.image
 import geopyv._image_extensions
 import geopyv.io
+import geopyv.field
 import geopyv.mesh
 import geopyv.object
 import geopyv.particle

@@ -548,6 +548,7 @@ class Mesh(MeshBase):
         self._curves = [list(self._segments[:, 0])]  # Create curve list.
 
         # Add exclusions.
+        self._borders = self._boundary
         for exclusion in self._exclusions:
             ImageDrawPIL.Draw(binary_img).polygon(
                 exclusion.flatten().tolist(), outline=1, fill=0
@@ -564,8 +565,8 @@ class Mesh(MeshBase):
             exclusion_segment[:, 1] = np.roll(
                 exclusion_segment[:, 0], -1
             )  # Fill exclusion segment array.
-            self._boundary = np.append(
-                self._boundary, exclusion, axis=0
+            self._borders = np.append(
+                self._borders, exclusion, axis=0
             )  # Append exclusion to boundary array.
             self._segments = np.append(
                 self._segments, exclusion_segment, axis=0
@@ -590,13 +591,14 @@ class Mesh(MeshBase):
         def f(size):
             return self._uniform_remesh(
                 size,
-                self._boundary,
+                self._borders,
                 self._segments,
                 self._curves,
                 self._target_nodes,
                 self._size_lower_bound,
+                self._size_upper_bound, 
             )
-
+        
         minimize_scalar(
             f, bounds=(self._size_lower_bound, self._size_upper_bound), method="bounded"
         )
@@ -628,7 +630,7 @@ class Mesh(MeshBase):
 
     @staticmethod
     def _uniform_remesh(
-        size, boundary, segments, curves, target_nodes, size_lower_bound
+        size, boundary, segments, curves, target_nodes, size_lower_bound, size_upper_bound
     ):
         """
 
@@ -677,6 +679,7 @@ class Mesh(MeshBase):
 
         # Generate mesh.
         gmsh.option.setNumber("Mesh.MeshSizeMin", size_lower_bound)
+        gmsh.option.setNumber("Mesh.MeshSizeMax", size_upper_bound)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
         gmsh.model.mesh.optimize()
@@ -692,7 +695,8 @@ class Mesh(MeshBase):
         )  # Extracts: node tags, node coordinates, parametric coordinates.
         nodes = np.column_stack((nc[0::3], nc[1::3]))  # Nodal coordinate array (x,y).
         number_nodes = len(nodes)
-        error = abs(number_nodes - target_nodes)
+        #error = target_nodes - number_nodes
+        error = number_nodes - target_nodes
         return error
 
     @staticmethod
@@ -923,13 +927,13 @@ class Mesh(MeshBase):
             self._interior_node_tags = np.append(
                 self._interior_node_tags, tags.flatten()
             ).astype(int)
-        self._boundary_node_tags = (
+        self._borders_node_tags = (
             np.setdiff1d(self._node_tags, self._interior_node_tags).astype(int) - 1
         )
 
         # Template masking using binary mask.
         for tag in range(len(self._node_tags)):
-            if tag in self._boundary_node_tags:
+            if tag in self._borders_node_tags:
                 centre = self._nodes[tag]
                 template = deepcopy(self._template)
                 template.mask(centre, self._mask)
@@ -966,6 +970,7 @@ class Mesh(MeshBase):
             # the variables and solve neighbours.
             if not self._subsets[self._seed_node].data["solved"]:
                 self._update = True
+                #sprint(self._subsets[self._seed_node].data["C_ZNCC"])
                 log.error("Error! The seed subset correlation is below tolerance.")
             else:
                 self._store_variables(self._seed_node, seed=True)

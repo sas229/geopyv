@@ -25,7 +25,7 @@ class ParticleBase(Object):
 
         """
     
-    def plot(self, 
+    def trace(self, 
         quantity="warps", 
         component = 0,
         start_frame = None,
@@ -44,7 +44,7 @@ class ParticleBase(Object):
 
         
         if quantity is not None:
-            fig,ax = gp.plots.plot_particle(
+            fig,ax = gp.plots.trace_particle(
                 data=self.data,
                 quantity=quantity,
                 component = component,
@@ -81,7 +81,7 @@ class Particle(ParticleBase):
         series = None,
         coordinate_0 = np.zeros(2),
         warp_0= np.zeros(12),
-        vol_0 = 0.,
+        volume_0 = 0.,
         moving = True
     ):
         """Initialisation of geopyv particle object.
@@ -112,8 +112,8 @@ class Particle(ParticleBase):
             log.error("Invalid initial warp type. Must be numpy.ndarray.")
         elif np.shape(warp_0) != np.shape(np.empty(12)):
             log.error("Invalid initial warp shape. Must be (12).")
-        if type(vol_0) != float:
-            log.error("Invalid initial volume type. Must be a float.")
+        #if type(volume_0) != float or type(volume_0)!= np.float64:
+        #    log.error("Invalid initial volume type. Must be a float.")
         if type(moving) != bool:
             log.error("Invalid moving type. Must be a bool.")
             
@@ -125,7 +125,7 @@ class Particle(ParticleBase):
             self._series = np.asarray([series.data])
         self._moving = moving
 
-        if self._series[0]["mask"][int(coordinate_0[0]), int(coordinate_0[1])] == 0:
+        if self._series[0]["mask"][int(coordinate_0[1]), int(coordinate_0[0])] == 0:
             log.error("Particle coordinate lies outside the mesh.")
         
         
@@ -136,7 +136,7 @@ class Particle(ParticleBase):
 
         self._coordinates[0] = coordinate_0
         self._warps[0] = warp_0
-        self._volumes[0] = vol_0
+        self._volumes[0] = volume_0
 
         self._reference_index = 0
         self.solved = False

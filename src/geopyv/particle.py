@@ -12,9 +12,10 @@ import matplotlib.path as path
 
 log = logging.getLogger(__name__)
 
+
 class ParticleBase(Object):
     """
-    Particle base class to be used as a mixin. 
+    Particle base class to be used as a mixin.
     """
 
     def __init__(self):
@@ -24,14 +25,15 @@ class ParticleBase(Object):
         Particle base class initialiser
 
         """
-    
-    def trace(self, 
-        quantity="warps", 
-        component = 0,
-        start_frame = None,
-        end_frame = None,
-        imshow = True,
-        colorbar=True, 
+
+    def trace(
+        self,
+        quantity="warps",
+        component=0,
+        start_frame=None,
+        end_frame=None,
+        imshow=True,
+        colorbar=True,
         ticks=None,
         alpha=0.75,
         axis=None,
@@ -39,18 +41,16 @@ class ParticleBase(Object):
         ylim=None,
         show=True,
         block=True,
-        save=None
-        ):
-
-        
+        save=None,
+    ):
         if quantity is not None:
-            fig,ax = gp.plots.trace_particle(
+            fig, ax = gp.plots.trace_particle(
                 data=self.data,
                 quantity=quantity,
-                component = component,
-                start_frame = start_frame,
-                end_frame = end_frame,
-                imshow = imshow,
+                component=component,
+                start_frame=start_frame,
+                end_frame=end_frame,
+                imshow=imshow,
                 colorbar=True,
                 ticks=ticks,
                 alpha=alpha,
@@ -59,37 +59,38 @@ class ParticleBase(Object):
                 ylim=ylim,
                 show=show,
                 block=block,
-                save=save
+                save=save,
             )
             return fig, ax
+
 
 class Particle(ParticleBase):
     """Particle class for geopyv.
 
     Parameters
     ----------
-    
-    
-    
+
+
+
     vol : float
-        Particle representative volume. 
+        Particle representative volume.
     """
 
     def __init__(
-        self, 
+        self,
         *,
-        series = None,
-        coordinate_0 = np.zeros(2),
-        warp_0= np.zeros(12),
-        volume_0 = 0.,
-        moving = True
+        series=None,
+        coordinate_0=np.zeros(2),
+        warp_0=np.zeros(12),
+        volume_0=0.0,
+        moving=True,
     ):
         """Initialisation of geopyv particle object.
 
         Parameters
         ----------
         meshes : `numpy.ndarray` of geopyv.mesh.Mesh objects
-            Sequence for the particle object to track. 
+            Sequence for the particle object to track.
         coordinate_0 : numpy.ndarray (2)
             Initial particle coordinate (x,y)
         p_init : `numpy.ndarray` (12), optional
@@ -103,7 +104,9 @@ class Particle(ParticleBase):
         self._initialised = False
         # Check types.
         if series.data["type"] != "Sequence" and series.data["type"] != "Mesh":
-            log.error("Invalid series type. Must be gp.sequence.Sequence or gp.mesh.Mesh.")
+            log.error(
+                "Invalid series type. Must be gp.sequence.Sequence or gp.mesh.Mesh."
+            )
         if type(coordinate_0) != np.ndarray:
             log.error("Invalid coordinate type. Must be numpy.ndarray.")
         elif np.shape(coordinate_0) != np.shape(np.empty(2)):
@@ -112,12 +115,12 @@ class Particle(ParticleBase):
             log.error("Invalid initial warp type. Must be numpy.ndarray.")
         elif np.shape(warp_0) != np.shape(np.empty(12)):
             log.error("Invalid initial warp shape. Must be (12).")
-        #if type(volume_0) != float or type(volume_0)!= np.float64:
+        # if type(volume_0) != float or type(volume_0)!= np.float64:
         #    log.error("Invalid initial volume type. Must be a float.")
         if type(moving) != bool:
             log.error("Invalid moving type. Must be a bool.")
-            
-        if series.data["type"] == "Sequence": 
+
+        if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
             self._series = series.data["meshes"]
         else:
@@ -127,12 +130,11 @@ class Particle(ParticleBase):
 
         if self._series[0]["mask"][int(coordinate_0[1]), int(coordinate_0[0])] == 0:
             log.error("Particle coordinate lies outside the mesh.")
-        
-        
-        self._coordinates = np.zeros((len(self._series)+ 1, 2))
-        self._warps = np.zeros((len(self._series)+ 1, 12))
-        self._volumes = np.zeros(len(self._series)+ 1)
-        self._stresses = np.zeros((len(self._series)+ 1, 6))
+
+        self._coordinates = np.zeros((len(self._series) + 1, 2))
+        self._warps = np.zeros((len(self._series) + 1, 12))
+        self._volumes = np.zeros(len(self._series) + 1)
+        self._stresses = np.zeros((len(self._series) + 1, 6))
 
         self._coordinates[0] = coordinate_0
         self._warps[0] = warp_0
@@ -146,14 +148,13 @@ class Particle(ParticleBase):
             "type": "Particle",
             "solved": self.solved,
             "series_type": self._series_type,
-            "moving" : self._moving,
-            "coordinate_0" : self._coordinates[0],
+            "moving": self._moving,
+            "coordinate_0": self._coordinates[0],
             "warp_0": self._warps[0],
             "volume_0": self._volumes[0],
-            "image_0": self._series[0]["images"]["f_img"]
+            "image_0": self._series[0]["images"]["f_img"],
         }
-        #"series": self._series,
-        
+        # "series": self._series,
 
     def solve(self):  # model, statev, props):
         """
@@ -165,14 +166,14 @@ class Particle(ParticleBase):
         """
 
         self.solved += self._strain_path()
-        #self.solved += self._stress_path(model, statev, props)
+        # self.solved += self._stress_path(model, statev, props)
         self._results = {
-            "coordinates" : self._coordinates,
-            "warps" : self._warps,
-            "volumes" : self._volumes,
-            "stresses" : self._stresses
+            "coordinates": self._coordinates,
+            "warps": self._warps,
+            "volumes": self._volumes,
+            "stresses": self._stresses,
         }
-        self.data.update({"results" : self._results})
+        self.data.update({"results": self._results})
         self.data["solved"] = bool(self.solved)
         return self.solved
 
@@ -189,14 +190,16 @@ class Particle(ParticleBase):
             The relevant mesh.
 
         """
-        
+
         diff = (
             self._series[m]["nodes"] - self._coordinates[self._reference_index]
         )  # Particle-mesh node positional vector.
         dist = np.einsum(
             "ij,ij->i", diff, diff
         )  # Particle-mesh node "distances" (truly distance^2).
-        tri_idxs = np.argwhere(np.any(self._series[m]["elements"] == np.argmin(dist), axis=1)).flatten()  # Retrieve relevant element indices.
+        tri_idxs = np.argwhere(
+            np.any(self._series[m]["elements"] == np.argmin(dist), axis=1)
+        ).flatten()  # Retrieve relevant element indices.
         for i in range(len(tri_idxs)):
             if path.Path(
                 self._series[m]["nodes"][self._series[m]["elements"][tri_idxs[i]]]
@@ -235,7 +238,9 @@ class Particle(ParticleBase):
     def _warp_increment(self, m, tri_idx):
         self._warp_inc = np.zeros(12)
         element = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
-        displacements = self._series[m]["results"]["displacements"][self._series[m]["elements"][tri_idx]]
+        displacements = self._series[m]["results"]["displacements"][
+            self._series[m]["elements"][tri_idx]
+        ]
 
         # Local coordinates
         A = np.ones((3, 4))
@@ -318,14 +323,20 @@ class Particle(ParticleBase):
     def _strain_path(self):
         """Method to calculate and store stress path data for the particle object."""
         for m in range(len(self._series)):
-            if  int(re.findall(r"\d+", self._series[self._reference_index]["images"]["f_img"])[-1]) != int(re.findall(r"\d+", self._series[m]["images"]["f_img"])[-1]):
+            if int(
+                re.findall(
+                    r"\d+", self._series[self._reference_index]["images"]["f_img"]
+                )[-1]
+            ) != int(re.findall(r"\d+", self._series[m]["images"]["f_img"])[-1]):
                 self._reference_index = m
             tri_idx = self._triangulation_locator(
                 m
             )  # Identify the relevant element of the mesh.
             self._warp_increment(m, tri_idx)  # Calculate the nodal weightings.
-            self._coordinates[m + 1] = (
-                self._coordinates[self._reference_index] + self._warp_inc[:2]*int(self._moving)
+            self._coordinates[m + 1] = self._coordinates[
+                self._reference_index
+            ] + self._warp_inc[:2] * int(
+                self._moving
             )  # Update the particle positional coordinate.
             # i.e. (reference + mesh interpolation).
             self._warps[m + 1] = self._warps[self._reference_index] + self._warp_inc
@@ -335,9 +346,10 @@ class Particle(ParticleBase):
             # i.e. (reference*(1 + volume altering strain components)).
         return True
 
+
 class ParticleResults(ParticleBase):
     """
-    ParticleResults class for geopyv. 
+    ParticleResults class for geopyv.
 
     Parameters
     ----------

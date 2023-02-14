@@ -308,7 +308,7 @@ class Subset(SubsetBase):
         order=1,
         p_0=None,
         tolerance=0.7,
-        method="ICGN"
+        method="ICGN",
     ):
         r"""
 

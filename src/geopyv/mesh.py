@@ -170,7 +170,7 @@ class Mesh(MeshBase):
         boundary=None,
         exclusions=[],
         size_lower_bound=1,
-        size_upper_bound=1000
+        size_upper_bound=1000,
     ):
         """
 
@@ -333,7 +333,7 @@ class Mesh(MeshBase):
         tolerance=0.7,
         method="ICGN",
         adaptive_iterations=0,
-        alpha=0.5
+        alpha=0.5,
     ):
         r"""
 
@@ -596,9 +596,9 @@ class Mesh(MeshBase):
                 self._curves,
                 self._target_nodes,
                 self._size_lower_bound,
-                self._size_upper_bound, 
+                self._size_upper_bound,
             )
-        
+
         minimize_scalar(
             f, bounds=(self._size_lower_bound, self._size_upper_bound), method="bounded"
         )
@@ -630,7 +630,13 @@ class Mesh(MeshBase):
 
     @staticmethod
     def _uniform_remesh(
-        size, boundary, segments, curves, target_nodes, size_lower_bound, size_upper_bound
+        size,
+        boundary,
+        segments,
+        curves,
+        target_nodes,
+        size_lower_bound,
+        size_upper_bound,
     ):
         """
 
@@ -695,7 +701,7 @@ class Mesh(MeshBase):
         )  # Extracts: node tags, node coordinates, parametric coordinates.
         nodes = np.column_stack((nc[0::3], nc[1::3]))  # Nodal coordinate array (x,y).
         number_nodes = len(nodes)
-        #error = target_nodes - number_nodes
+        # error = target_nodes - number_nodes
         error = number_nodes - target_nodes
         return error
 
@@ -970,7 +976,7 @@ class Mesh(MeshBase):
             # the variables and solve neighbours.
             if not self._subsets[self._seed_node].data["solved"]:
                 self._update = True
-                #sprint(self._subsets[self._seed_node].data["C_ZNCC"])
+                # sprint(self._subsets[self._seed_node].data["C_ZNCC"])
                 log.error("Error! The seed subset correlation is below tolerance.")
             else:
                 self._store_variables(self._seed_node, seed=True)

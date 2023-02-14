@@ -617,7 +617,7 @@ def inspect_mesh(data, show, block, save):
 
     return fig, ax
 
-def plot_particle(
+def trace_particle(
     data,
     quantity,
     component,
@@ -636,15 +636,46 @@ def plot_particle(
     ):
 
     title = "Path; variable = {variable}".format(variable = quantity)
+    labels = [r"$u$ ($px$)",
+            r"$v$ ($px$)",
+            r"$du/dx$ ($-$)",
+            r"$dv/dx$ ($-$)",
+            r"$du/dy$ ($-$)",
+            r"$dv/dy$ ($-$)",
+            r"$d^2u/dx^2$ ($-$)",
+            r"$d^2v/dx^2$ ($-$)",
+            r"$d^2u/dxdy$ ($-$)",
+            r"$d^2v/dxdy$ ($-$)",
+            r"$d^2u/dy^2$ ($-$)",
+            r"$d^2v/dy^2$ ($-$)",]
+
+
     fig, ax = plt.subplots(num=title)
 
-    #quantity = data["results"][quantity][component]
-    points = data["results"]["coordinates"].reshape(-1,1,2)
-    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-    colors = cm.viridis((data["results"][quantity][:, component]-np.amin(data["results"][quantity][:, component]))/(np.amax(data["results"][quantity][:, component])-np.amin(data["results"][quantity][:, component])))
-    lc = LineCollection(segments, colors = colors)
-    ax.add_collection(lc)
+    if data["type"] == "Particle":
+        points = data["results"]["coordinates"].reshape(-1,1,2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        values= np.diff(data["results"][quantity][:, component], axis = 0)
+        norm = plt.Normalize(values.min(), values.max())
+        lc = LineCollection(segments, cmap="viridis", norm=norm)
+        lc.set_array(values)
+        lines = ax.add_collection(lc)
+        
 
+    elif data["type"] == "Field":
+        values = np.empty((len(data["particles"]), len(data["particles"][0][quantity])-1))
+        for i in range(len(data["particles"])):
+            
+            values[i] = np.diff(data["particles"][i][quantity][:, component], axis = 0)
+        norm = plt.Normalize(values.min(), values.max())
+        for i in range(len(data["particles"])):
+            points = data["particles"][i]["coordinates"].reshape(-1,1,2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        lc = LineCollection(segments, cmap="viridis", norm=norm)
+        lc.set_array(values.flatten())
+        lines = ax.add_collection(lc)
+
+            
     # Show image in background.
     if imshow is True:
         image = cv2.imread(data["image_0"], cv2.IMREAD_COLOR)
@@ -654,9 +685,13 @@ def plot_particle(
     else:
         ax.set_aspect("equal", "box")
 
-    #if colorbar is True:
-    #    label = "Quantity"
-    #    fig.colorbar(colors, label=label, ticks=ticks)
+    if colorbar is True:
+        label = labels[component]
+        print("here")
+        print(type(lines))
+        fig.colorbar(lines, label = labels[component])
+        #fig.colorbar(sm, label=label, ticks=ticks)#, boundaries = (np.amin(values), np.amax(values)))
+        #plt.clim(np.amin(values), np.amax(values))
 
         # Limit control.
     if xlim is not None:
@@ -675,6 +710,69 @@ def plot_particle(
         plt.close(fig)
 
     return fig, ax
+
+def inspect_field(data,mesh,show,block,save):
+
+    # Plot setup.
+    title = "Inspect particle field"
+    fig, ax = plt.subplots(num=title)
+
+    # Load image.
+    image_path = data["image_0"]
+    image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+
+    # Plot image.
+    ax.imshow(image, cmap="gist_gray", interpolation="nearest", aspect="equal")
+
+    if mesh:
+        # Load data.
+        nodes = data["mesh"]["nodes"]
+        elements = data["mesh"]["elements"]
+
+        # Extract variables from data.
+        x = []
+        y = []
+        value = []
+        for n in nodes:
+            x.append(n[0])
+            y.append(n[1])
+        x = np.asarray(x)
+        y = np.asarray(y)
+        value = np.asarray(value)
+
+        # Triangulation
+        _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
+
+        # Plot mesh.
+        for i in range(np.shape(x_p)[0]):
+            ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
+    
+    for i in range(len(data["mesh"]["coordinates"])):
+        ax.scatter(data["mesh"]["coordinates"][i,0], data["mesh"]["coordinates"][i,1], c = "r", marker = "o")
+    details = r"{elements} particles".format(elements=np.shape(elements)[0]
+    )
+    image_size = np.shape(image)
+    ax.text(
+        image_size[1] / 2, image_size[0] * 1.05, details, horizontalalignment="center"
+    )
+    ax.set_axis_off()
+    plt.tight_layout()
+
+    # Save
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+    
+
 
 
         

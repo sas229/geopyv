@@ -50,7 +50,7 @@ class Image(Object):
             self._get_QCQT()
             log.debug("Initialised geopyv Image object at {}.".format(filepath))
         else:
-            log.error("Image does not exist at the path supplied.")
+            log.error("Image does not exist at the path supplied:\n{}".format(filepath))
             raise FileExistsError("Image does not exist at the path supplied.")
 
     def _get_image_gs(self):

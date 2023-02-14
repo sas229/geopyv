@@ -22,6 +22,8 @@ subset.inspect(show=False)
 subset.convergence(show=False)
 
 # Mesh test.
+ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
+tar = gp.image.Image("./images/T-Bar/IMG_1064.jpg")
 template = gp.templates.Circle(50)
 boundary = np.asarray(
     [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
@@ -89,10 +91,8 @@ mesh.inspect(subset=0)
 mesh.convergence(subset=0)
 
 # If you supply a subset index that is out of range you get a ValueError.
-mesh.convergence(subset=4000)
-
+mesh.convergence(subset=4000
 # Sequence test.
-#
 template = gp.templates.Circle(50)
 boundary = np.asarray(
     [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
@@ -127,19 +127,22 @@ sequence.solve(
 gp.io.save(object=sequence, filename="sequence")
 del sequence
 
-seq = gp.io.load(filename="sequence")
-print(type(seq.data["meshes"][0]["mask"]))
-print(len(seq.data["meshes"]))
-# seq.inspect(mesh = 0, subset = 0)
-# seq.inspect(mesh = 0, subset = 3000)
-seq.inspect(mesh=0)
-seq.inspect(mesh=10)
-seq.inspect()
-seq.convergence(mesh=0, subset=0)
-seq.convergence(mesh=0, subset=3000)
-seq.convergence(mesh=0)
-seq.convergence(mesh=10)
-seq.convergence()
+sequence = gp.io.load(filename="sequence")
+field = gp.field.Field(series=sequence, target_particles = 500)
+field.solve()
+field.trace()
+field.inspect()
+particle = gp.particle.Particle(series=sequence, coordinate_0 = np.asarray([1600.,1900.]))
+particle.solve()
+particle.plot()
+field = gp.field.Field(series = sequence)
 
-# print(seq.data.keys())
-# print(seq.data["meshes"][0]["results"].keys())
+mesh = gp.io.load(filename="mesh")
+particle = gp.particle.Particle(series=mesh, coordinate_0 = np.asarray([1600.,1900.]))
+particle.solve()
+particle.trace()
+field = gp.field.Field(series=mesh)
+field.solve()
+field.trace()
+field.inspect()
+field = gp.field.Field(series = mesh)

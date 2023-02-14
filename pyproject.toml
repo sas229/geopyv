@@ -28,7 +28,7 @@ dependencies = [
     "numpy==1.23.3",
     "opencv-python==4.7.0.68",
     "opencv-contrib-python==4.7.0.68",
-    "matplotlib==3.6.0",
+    "matplotlib==3.6.3",
     "alive-progress==3.0.1",
     "scipy==1.10.0",
     "gmsh==4.11.1",

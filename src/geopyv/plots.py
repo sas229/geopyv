@@ -7,10 +7,12 @@ import sys
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
-#import matplotlib.collections.LineCollection as LineCollection
+
+# import matplotlib.collections.LineCollection as LineCollection
 from matplotlib.collections import LineCollection
 from matplotlib import cm
-#import matplotlib.cm as cm
+
+# import matplotlib.cm as cm
 import numpy as np
 import re
 import geopyv as gp
@@ -618,6 +620,7 @@ def inspect_mesh(data, show, block, save):
 
     return fig, ax
 
+
 def trace_particle(
     data,
     quantity,
@@ -633,52 +636,55 @@ def trace_particle(
     ylim,
     show,
     block,
-    save
-    ):
-
-    title = "Path; variable = {variable}".format(variable = quantity)
-    labels = [r"$u$ ($px$)",
-            r"$v$ ($px$)",
-            r"$du/dx$ ($-$)",
-            r"$dv/dx$ ($-$)",
-            r"$du/dy$ ($-$)",
-            r"$dv/dy$ ($-$)",
-            r"$d^2u/dx^2$ ($-$)",
-            r"$d^2v/dx^2$ ($-$)",
-            r"$d^2u/dxdy$ ($-$)",
-            r"$d^2v/dxdy$ ($-$)",
-            r"$d^2u/dy^2$ ($-$)",
-            r"$d^2v/dy^2$ ($-$)",]
-
+    save,
+):
+    title = "Path; variable = {variable}".format(variable=quantity)
+    labels = [
+        r"$u$ ($px$)",
+        r"$v$ ($px$)",
+        r"$du/dx$ ($-$)",
+        r"$dv/dx$ ($-$)",
+        r"$du/dy$ ($-$)",
+        r"$dv/dy$ ($-$)",
+        r"$d^2u/dx^2$ ($-$)",
+        r"$d^2v/dx^2$ ($-$)",
+        r"$d^2u/dxdy$ ($-$)",
+        r"$d^2v/dxdy$ ($-$)",
+        r"$d^2u/dy^2$ ($-$)",
+        r"$d^2v/dy^2$ ($-$)",
+    ]
 
     fig, ax = plt.subplots(num=title)
 
     if data["type"] == "Particle":
-        points = data["results"]["coordinates"].reshape(-1,1,2)
+        points = data["results"]["coordinates"].reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        values= np.diff(data["results"][quantity][:, component], axis = 0)
+        values = np.diff(data["results"][quantity][:, component], axis=0)
         norm = plt.Normalize(values.min(), values.max())
         lc = LineCollection(segments, cmap="viridis", norm=norm)
         lc.set_array(values)
         lines = ax.add_collection(lc)
-        
 
     elif data["type"] == "Field":
-        values = np.empty((len(data["particles"]), len(data["particles"][0][quantity])-1))
+        values = np.empty(
+            (len(data["particles"]), len(data["particles"][0][quantity]) - 1)
+        )
         if data["number_images"] > 1:
-            segments = np.empty((len(data["particles"]), data["number_images"]-1, 2, 2))
+            segments = np.empty(
+                (len(data["particles"]), data["number_images"] - 1, 2, 2)
+            )
         else:
             segments = np.empty((len(data["particles"]), 2, 2))
         for i in range(len(data["particles"])):
-            values[i] = np.diff(data["particles"][i][quantity][:, component], axis = 0)
-            points = data["particles"][i]["coordinates"].reshape(-1,1,2)
+            values[i] = np.diff(data["particles"][i][quantity][:, component], axis=0)
+            points = data["particles"][i]["coordinates"].reshape(-1, 1, 2)
             segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
         values = values.flatten()
         norm = plt.Normalize(values.min(), values.max())
-        lc = LineCollection(segments.reshape(-1,2,2), cmap="viridis", norm=norm)
+        lc = LineCollection(segments.reshape(-1, 2, 2), cmap="viridis", norm=norm)
         lc.set_array(values.flatten())
         lines = ax.add_collection(lc)
-  
+
     # Show image in background.
     if imshow is True:
         image = cv2.imread(data["image_0"], cv2.IMREAD_COLOR)
@@ -690,7 +696,7 @@ def trace_particle(
 
     if colorbar is True:
         label = labels[component]
-        fig.colorbar(lines, label = labels[component])
+        fig.colorbar(lines, label=labels[component])
 
         # Limit control.
     if xlim is not None:
@@ -710,8 +716,8 @@ def trace_particle(
 
     return fig, ax
 
-def inspect_field(data,mesh,show,block,save):
 
+def inspect_field(data, mesh, show, block, save):
     # Plot setup.
     title = "Inspect particle field"
     fig, ax = plt.subplots(num=title)
@@ -747,11 +753,15 @@ def inspect_field(data,mesh,show,block,save):
         # Plot mesh.
         for i in range(np.shape(x_p)[0]):
             ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
-    
+
     for i in range(len(data["mesh"]["coordinates"])):
-        ax.scatter(data["mesh"]["coordinates"][i,0], data["mesh"]["coordinates"][i,1], c = "r", marker = "o")
-    details = r"{elements} particles".format(elements=np.shape(elements)[0]
-    )
+        ax.scatter(
+            data["mesh"]["coordinates"][i, 0],
+            data["mesh"]["coordinates"][i, 1],
+            c="r",
+            marker="o",
+        )
+    details = r"{elements} particles".format(elements=np.shape(elements)[0])
     image_size = np.shape(image)
     ax.text(
         image_size[1] / 2, image_size[0] * 1.05, details, horizontalalignment="center"
@@ -770,8 +780,3 @@ def inspect_field(data,mesh,show,block,save):
         plt.close(fig)
 
     return fig, ax
-    
-
-
-
-        

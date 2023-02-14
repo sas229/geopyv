@@ -14,37 +14,43 @@ import PIL.ImageDraw as ImageDrawPIL
 
 log = logging.getLogger(__name__)
 
+
 class FieldBase(Object):
     """
     Field base class to be used as a mixin.
     """
+
     def __init__(self):
         super().__init__(object_type="Field")
         """
 
         Field base class initialiser.
 
-        """ 
-    def inspect(self, mesh = True, show=True, block=True, save=None):
         """
-        Method to show the particles and associated representative areas. 
+
+    def inspect(self, mesh=True, show=True, block=True, save=None):
+        """
+        Method to show the particles and associated representative areas.
         """
         log.info("Inspecting field...")
-        fig,ax = gp.plots.inspect_field(self.data, mesh=mesh,show=show,block=block,save=save)
+        fig, ax = gp.plots.inspect_field(
+            self.data, mesh=mesh, show=show, block=block, save=save
+        )
         return fig, ax
 
-    def volume_divergence(self, show = True, block=True, save=None):
+    def volume_divergence(self, show=True, block=True, save=None):
         """
-        Method to show the volumetric error in the particle field. 
+        Method to show the volumetric error in the particle field.
         """
 
-    def trace(self, 
-        quantity="warps", 
-        component = 0,
-        start_frame = None,
-        end_frame = None,
-        imshow = True,
-        colorbar=True, 
+    def trace(
+        self,
+        quantity="warps",
+        component=0,
+        start_frame=None,
+        end_frame=None,
+        imshow=True,
+        colorbar=True,
         ticks=None,
         alpha=0.75,
         axis=None,
@@ -52,19 +58,17 @@ class FieldBase(Object):
         ylim=None,
         show=True,
         block=True,
-        save=None
-        ):
-
-        
+        save=None,
+    ):
         if quantity is not None:
             log.info("Tracing field...")
-            fig,ax = gp.plots.trace_particle(
+            fig, ax = gp.plots.trace_particle(
                 data=self.data,
                 quantity=quantity,
-                component = component,
-                start_frame = start_frame,
-                end_frame = end_frame,
-                imshow = imshow,
+                component=component,
+                start_frame=start_frame,
+                end_frame=end_frame,
+                imshow=imshow,
                 colorbar=True,
                 ticks=ticks,
                 alpha=alpha,
@@ -73,37 +77,39 @@ class FieldBase(Object):
                 ylim=ylim,
                 show=show,
                 block=block,
-                save=save
+                save=save,
             )
             return fig, ax
+
 
 class Field(FieldBase):
     def __init__(
         self,
         *,
-        series = None,
-        target_particles = 1000,
-        moving = True,
-        boundary = None,
-        exclusions = []
+        series=None,
+        target_particles=1000,
+        moving=True,
+        boundary=None,
+        exclusions=[],
     ):
-
         self._initialised = False
         # Check types
         if series.data["type"] != "Sequence" and series.data["type"] != "Mesh":
-            log.error("Invalid series type. Must be gp.sequence.Sequence or gp.mesh.Mesh.")
+            log.error(
+                "Invalid series type. Must be gp.sequence.Sequence or gp.mesh.Mesh."
+            )
         if type(target_particles) != int:
             log.error("Maximum number of nodes not of integer type.")
         elif target_particles < 0:
             log.error("Target number of particles must be more than 0.")
         if type(moving) != bool:
             log.error("Invalid moving type. Must be a bool.")
-        
+
         self._target_particles = target_particles
         self._moving = moving
         self.solved = False
         self._series = series
-        if series.data["type"] == "Sequence": 
+        if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
             mesh_0 = series.data["meshes"][0]
             self._number_images = self._series.data["number_images"]
@@ -112,8 +118,7 @@ class Field(FieldBase):
             mesh_0 = series.data
             self._number_images = 1
         self._image_0 = mesh_0["images"]["f_img"]
-        
-        
+
         # Extract region of interest.
         if boundary is None:
             self._boundary = mesh_0["boundary"]
@@ -123,7 +128,14 @@ class Field(FieldBase):
         self._size_upper_bound = mesh_0["size_upper_bound"]
 
         # Define region of interest.
-        self._boundary, self._segments, self._curves, _  = gp.geometry.meshing._define_RoI(gp.image.Image(self._image_0),self._boundary, self._exclusions)
+        (
+            self._boundary,
+            self._segments,
+            self._curves,
+            _,
+        ) = gp.geometry.meshing._define_RoI(
+            gp.image.Image(self._image_0), self._boundary, self._exclusions
+        )
 
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
@@ -141,20 +153,20 @@ class Field(FieldBase):
             "solved": self.solved,
             "series_type": self._series_type,
             "number_images": self._number_images,
-            "moving":self._moving,
+            "moving": self._moving,
             "target_particles": self._target_particles,
             "image_0": self._image_0,
         }
         self._initial_mesh()
         self._distribute_particles()
-        log.info(
-            "Field generated with {p} particles.".format(p=len(self._coordinates)))
-        self._mesh = {"nodes": self._nodes,
-            "elements": self._elements, 
-            "coordinates": self._coordinates}
+        log.info("Field generated with {p} particles.".format(p=len(self._coordinates)))
+        self._mesh = {
+            "nodes": self._nodes,
+            "elements": self._elements,
+            "coordinates": self._coordinates,
+        }
         self.data.update({"mesh": self._mesh})
         self._initialised = True
-        
 
     def _initial_mesh(self):
         """
@@ -172,7 +184,7 @@ class Field(FieldBase):
                 self._curves,
                 self._target_particles,
                 self._size_lower_bound,
-                self._size_upper_bound
+                self._size_upper_bound,
             )
 
         minimize_scalar(
@@ -197,17 +209,21 @@ class Field(FieldBase):
         )  # Element connectivity array.
 
     def _distribute_particles(self):
-        
-        self._coordinates = np.mean(self._nodes[self._elements[:,:3]], axis = 1)
-        M = np.ones((len(self._elements[:,:3]),3,3))
-        M[:,1] = self._nodes[self._elements[:,:3]][:,:,0]
-        M[:,2] = self._nodes[self._elements[:,:3]][:,:,1]
-        self._volumes = abs(0.5*np.linalg.det(M))
+        self._coordinates = np.mean(self._nodes[self._elements[:, :3]], axis=1)
+        M = np.ones((len(self._elements[:, :3]), 3, 3))
+        M[:, 1] = self._nodes[self._elements[:, :3]][:, :, 0]
+        M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
+        self._volumes = abs(0.5 * np.linalg.det(M))
 
     def solve(self):
         self._particles = np.empty(len(self._coordinates), dtype=dict)
         for i in range(len(self._coordinates)):
-            particle = gp.particle.Particle(series = self._series, coordinate_0 = self._coordinates[i], volume_0 = self._volumes[i], moving = self._moving)
+            particle = gp.particle.Particle(
+                series=self._series,
+                coordinate_0=self._coordinates[i],
+                volume_0=self._volumes[i],
+                moving=self._moving,
+            )
             particle.solve()
             self._particles[i] = particle.data["results"]
             del particle
@@ -217,7 +233,13 @@ class Field(FieldBase):
 
     @staticmethod
     def _uniform_remesh(
-        size, boundary, segments, curves, target_particles, size_lower_bound, size_upper_bound
+        size,
+        boundary,
+        segments,
+        curves,
+        target_particles,
+        size_lower_bound,
+        size_upper_bound,
     ):
         """
 

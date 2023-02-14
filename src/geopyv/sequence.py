@@ -221,29 +221,29 @@ class Sequence(SequenceBase):
         boundary=None,
         exclusions=[],
         size_lower_bound=1,
-        size_upper_bound=1000
+        size_upper_bound=1000,
     ):
         """Initialisation of geopyv sequence object."""
         self.initialised = False
         # Check types.
         if type(image_folder) != str:
             log.error("image_folder type not recognised. " "Expected a string.")
-            #return False
+            # return False
         elif os.path.isdir(image_folder) is False:
             log.error("image_folder does not exist.")
-            #return False
+            # return False
         if type(image_file_type) != str:
             log.error("image_file_type type not recognised. " "Expected a string.")
-            #return False
+            # return False
         elif image_file_type not in [".jpg", ".png", ".bmp"]:
             log.error(
                 "image_file_type not recognised. "
                 "Expected: '.jpg', '.png', or '.bmp'."
             )
-            #return False
+            # return False
         if type(target_nodes) != int:
             log.error("Target nodes not of integer type.")
-            #return False
+            # return False
         if type(boundary) != np.ndarray:
             log.error(
                 "Boundary coordinate array of invalid type. " "Cannot initialise mesh."
@@ -253,19 +253,19 @@ class Sequence(SequenceBase):
                 "Boundary coordinate array of invalid shape. "
                 "Must be numpy.ndarray of size (n, 2)."
             )
-            #return False
+            # return False
         if type(exclusions) != list:
             log.error(
                 "Exclusion coordinate array of invalid type. " "Cannot initialise mesh."
             )
-            #return False
+            # return False
         for exclusion in exclusions:
             if np.shape(exclusion)[1] != 2:
                 log.error(
                     "Exclusion coordinate array of invalid shape. "
                     "Must be numpy.ndarray of size (n, 2)."
                 )
-                #return False
+                # return False
 
         # Store variables.
         self._image_folder = image_folder
@@ -318,7 +318,7 @@ class Sequence(SequenceBase):
         order=1,
         tolerance=0.7,
         alpha=0.5,
-        mesh_save=False
+        mesh_save=False,
     ):
         # Check inputs.
         if type(seed_coord) != np.ndarray:
@@ -473,6 +473,7 @@ class Sequence(SequenceBase):
             j = len(exclusion)
             exclusion += mesh.data["results"]["displacements"][i + j]
         del mesh
+
 
 class SequenceResults(SequenceBase):
     """

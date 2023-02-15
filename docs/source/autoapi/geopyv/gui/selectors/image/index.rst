@@ -21,7 +21,8 @@ Classes
 
 .. py:class:: ImageSelector
 
-   Graphical user interface to allow the user to select an image using the native file browser on the host OS.
+   Graphical user interface to allow the user to select an image
+   using the native file browser on the host OS.
 
 
    .. py:method:: get_path(message, directory)
@@ -35,3 +36,6 @@ Classes
 
       :returns: **path** -- Path to selected image file.
       :rtype: str
+
+
+

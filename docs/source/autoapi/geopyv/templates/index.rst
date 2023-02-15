@@ -165,5 +165,9 @@ Classes
 
       :param centre: Centre of subset.
       :type centre: `numpy.ndarray` (x,y)
-      :param mask: Mask to be applied to the mesh. Value of 0 indicates pixels to mask in template.
+      :param mask: Mask to be applied to the mesh.
+                   Value of 0 indicates pixels to mask in template.
       :type mask: `numpy.ndarray` (Nx,Ny)
+
+
+

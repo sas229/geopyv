@@ -98,8 +98,12 @@ Classes
 
 .. py:class:: SubsetBase
 
-   Subset base class to be used as a mixin. Contains plot functionality.
+   Bases: :py:obj:`geopyv.object.Object`
 
+   Base class object initialiser.
+
+   :param object_type: Object type.
+   :type object_type: str
 
    .. py:method:: convergence(show=True, block=True, save=None)
 
@@ -182,3 +186,6 @@ Classes
        * To re-analyse data instantiate a new object using
          :class:`~geopyv.subset.Subset` and use the
          :class:`~geopyv.subset.Subset.solve` method.
+
+
+

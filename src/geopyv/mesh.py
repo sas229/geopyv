@@ -164,8 +164,8 @@ class Mesh(MeshBase):
     def __init__(
         self,
         *,
-        f_img,
-        g_img,
+        f_img = None,
+        g_img = None,
         target_nodes=1000,
         boundary=None,
         exclusions=[],
@@ -205,30 +205,8 @@ class Mesh(MeshBase):
             Boolean to indicate if the mesh has been solved.
 
         """
+
         self._initialised = False
-        # Check types.
-        if type(f_img) != gp.image.Image:
-            raise TypeError("Reference image not geopyv.image.gp.image.Image type.")
-        elif type(g_img) != gp.image.Image:
-            raise TypeError("Target image not geopyv.image.Image type.")
-        elif type(target_nodes) != int:
-            raise TypeError("Maximum number of elements not of integer type.")
-        elif target_nodes <= 0:
-            raise ValueError("Invalid maximum number of elements.")
-        elif type(boundary) != np.ndarray:
-            raise TypeError(
-                "Boundary coordinate array of invalid type. Cannot initialise mesh."
-            )
-        elif type(exclusions) != list:
-            raise TypeError(
-                "Exclusion coordinate array of invalid type. Cannot initialise mesh."
-            )
-        for exclusion in exclusions:
-            if np.shape(exclusion)[1] != 2:
-                raise ValueError(
-                    "Exclusion coordinate array of invalid shape. "
-                    "Must be `numpy.ndarray` of size (n, 2)."
-                )
 
         # Store variables.
         self._f_img = f_img
@@ -240,6 +218,39 @@ class Mesh(MeshBase):
         self._size_upper_bound = size_upper_bound
         self.solved = False
         self._unsolvable = False
+        
+
+        # Check types.
+        # if type(f_img) != gp.image.Image:
+        #     self._f_img = gp.io._load_f_img()
+        # if type(g_img) != gp.image.Image:
+        #     self._g_img = gp.io._load_g_img()
+        if type(target_nodes) != int:
+            log.warn("Target node number not of integer type. Attempting integer conversion...")
+            try:
+                self._target_nodes = int(target_nodes)
+            except:
+                log.warn("Target node number conversion failed. Setting target nodes as 1000.")
+                self._target_nodes = 1000
+        elif target_nodes <= 0:
+            log.warn("Invalid target nodes number. Setting target nodes as 1000.")
+            self._target_nodes = 1000
+        if type(boundary) != np.ndarray:
+            # self._boundary
+            log.warn("Boundary coordinate array of invalid type. Cannot in")
+            raise TypeError(
+                "Boundary coordinate array of invalid type. Cannot initialise mesh."
+            )
+        if type(exclusions) != list:
+            raise TypeError(
+                "Exclusion coordinate array of invalid type. Cannot initialise mesh."
+            )
+        for exclusion in exclusions:
+            if np.shape(exclusion)[1] != 2:
+                raise ValueError(
+                    "Exclusion coordinate array of invalid shape. "
+                    "Must be `numpy.ndarray` of size (n, 2)."
+                )
 
         # Define region of interest.
         self._define_RoI()

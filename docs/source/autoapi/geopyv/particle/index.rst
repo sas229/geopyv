@@ -18,28 +18,52 @@ Classes
 .. autoapisummary::
 
    geopyv.particle.Particle
+   geopyv.particle.ParticleBase
+   geopyv.particle.ParticleResults
 
 
 
 
-.. py:class:: Particle(meshes, update_register=None, coord=np.zeros(2), p_init=np.zeros(12), vol=None)
+.. py:class:: Particle(*, series=None, coordinate_0=np.zeros(2), warp_0=np.zeros(12), volume_0=0.0, moving=True)
+
+   Bases: :py:obj:`ParticleBase`
 
    Initialisation of geopyv particle object.
 
-   :param coord: 1D array of the particle coordinates (x,y).
-   :type coord: numpy.ndarray (2)
-   :param strain: 1D array of the particle total strain (du/dx, dv/dy, du/dy+dv/dx).
-   :type strain: numpy.ndarray (3)
+   :param meshes: Sequence for the particle object to track.
+   :type meshes: `numpy.ndarray` of geopyv.mesh.Mesh objects
+   :param coordinate_0: Initial particle coordinate (x,y)
+   :type coordinate_0: numpy.ndarray (2)
+   :param p_init: Initial warp vector.
+   :type p_init: `numpy.ndarray` (12), optional
    :param vol: Volume represented by the particle.
    :type vol: float
-   :param ref_coord_ref: 1D array of the particle coordinates (x,y) at an updatable reference time.
-   :type ref_coord_ref: numpy.ndarray (2)
-   :param ref_strain_ref: 1D array of the particle total strain (du/dx, dv/dy, du/dy+dv/dx) at an updatable reference time.
-   :type ref_strain_ref: numpy.ndarray (3)
-   :param ref_vol: Volume represented by the particle at an updatable reference time.
-   :type ref_vol: float
+   :param moving: Boolean for Lagrangian (False) or Eulerian (True) specification. Defaults to False.
+   :type moving: bool
 
    .. py:method:: solve()
 
-      Method to calculate the strain path of the particle from the mesh sequence and optionally the stress path
-      employing the model specified by the input parameters.
+      Method to calculate the strain path of the particle from the
+      mesh sequence and optionally the stress path employing the
+      model specified by the input parameters.
+
+
+
+
+.. py:class:: ParticleBase
+
+   Bases: :py:obj:`geopyv.object.Object`
+
+   Base class object initialiser.
+
+   :param object_type: Object type.
+   :type object_type: str
+
+
+.. py:class:: ParticleResults(data)
+
+   Bases: :py:obj:`ParticleBase`
+
+   Initialisation of geopyv SequenceResults class.
+
+

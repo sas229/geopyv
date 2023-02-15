@@ -68,3 +68,5 @@ Functions
    :param level: Log level. Options include logging.VERBOSE, logging.DEBUG, logging.INFO,
                  logging.WARNING, logging.ERROR and logging.FATAL. Defaults to logging.INFO.
    :type level: logging.level
+
+

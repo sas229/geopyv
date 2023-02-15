@@ -52,3 +52,5 @@ Functions
 
    :returns: **exclusion** -- List of coordinates defining the exclusion.
    :rtype: list [np.ndarray (Nx, Ny)]
+
+

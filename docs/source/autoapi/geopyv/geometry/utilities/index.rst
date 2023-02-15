@@ -34,7 +34,8 @@ Functions
 
 .. py:function:: area_to_length(area)
 
-   Function that returns a characteristic length given an element area, based on an equilateral triangle.
+   Function that returns a characteristic length given
+   an element area, based on an equilateral triangle.
 
    :param area: Element area.
    :type area: float
@@ -45,7 +46,8 @@ Functions
 
 .. py:function:: plot_triangulation(elements, x, y)
 
-   Method to compute a first order triangulation from a second order element connectivity array and coordinates.
+   Method to compute a first order triangulation from a
+   second order element connectivity array and coordinates.
 
    :param elements: Element connectivity array.
    :type elements: np.ndarray (Nx, 6)
@@ -54,6 +56,9 @@ Functions
    :param y: Vertical coordinate array.
    :type y: np.ndarray (Nx, 1)
 
-   :returns: * **mesh_triangulation** (*np.ndarray (Nx, 7)*) -- Mesh triangulation array for plot purposes forming closed triangles.
+   :returns: * **mesh_triangulation** (*np.ndarray (Nx, 7)*) -- Mesh triangulation array for plot purposes forming
+               closed triangles.
              * **x_p** (*np.ndarray (Nx, 1)*) -- Horizontal coordinate of triangle vertices.
              * **y_p** (*np.ndarray (Nx, 1)*) -- Vertical coordinate of triangle vertices.
+
+

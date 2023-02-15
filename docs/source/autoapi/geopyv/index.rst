@@ -22,12 +22,16 @@ Submodules
    :titlesonly:
    :maxdepth: 1
 
+   field/index.rst
    image/index.rst
    io/index.rst
    log/index.rst
    mesh/index.rst
+   object/index.rst
    particle/index.rst
    plots/index.rst
    sequence/index.rst
    subset/index.rst
    templates/index.rst
+
+

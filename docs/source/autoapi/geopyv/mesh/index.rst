@@ -74,7 +74,7 @@ Classes
 
 
 
-   .. py:method:: solve(*, seed_coord=None, template=None, max_norm=0.001, max_iterations=15, order=1, tolerance=0.7, method='ICGN', adaptive_iterations=0, alpha=0.5, beta=2)
+   .. py:method:: solve(*, seed_coord=None, template=None, max_norm=0.001, max_iterations=15, order=1, tolerance=0.7, method='ICGN', adaptive_iterations=0, alpha=0.5)
 
       Method to solve for the mesh.
 
@@ -95,8 +95,6 @@ Classes
       :type adaptive_iterations: int, optional
       :param alpha: Mesh adaptivity control parameter. Defaults to a value of 0.5.
       :type alpha: float, optional
-      :param beta: Mesh adaptivity control parameter. Defaults to a value of 2.0.
-      :type beta: float, optional
 
       :returns: **solved** -- Boolean to indicate if the subset instance has been solved.
       :rtype: bool
@@ -105,8 +103,12 @@ Classes
 
 .. py:class:: MeshBase
 
-   Mesh base class to be used as a mixin.
+   Bases: :py:obj:`geopyv.object.Object`
 
+   Base class object initialiser.
+
+   :param object_type: Object type.
+   :type object_type: str
 
    .. py:method:: contour(quantity='C_ZNCC', imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None)
 
@@ -116,7 +118,7 @@ Classes
 
    .. py:method:: convergence(subset=None, quantity=None, show=True, block=True, save=None)
 
-      Method to plot the rate of convergence for the mesh.
+      Method to plot the rate of convergence for the mesh or subset.
 
 
 
@@ -138,3 +140,5 @@ Classes
    Bases: :py:obj:`MeshBase`
 
    Initialisation of geopyv MeshResults class.
+
+

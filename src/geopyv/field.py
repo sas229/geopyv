@@ -155,7 +155,7 @@ class Field(FieldBase):
             "number_images": self._number_images,
             "moving": self._moving,
             "target_particles": self._target_particles,
-            "image_0": self._image_0,
+            "image_0": self._image_0
         }
         self._initial_mesh()
         self._distribute_particles()
@@ -300,3 +300,25 @@ class Field(FieldBase):
         number_particles = len(elements)
         error = abs(number_particles - target_particles)
         return error
+
+class FieldResults(FieldBase):
+    """
+
+    FieldResults class for geopyv.
+
+    Parameters
+    ----------
+    data : dict
+        geopyv data dict from Field object.
+
+
+    Attributes
+    ----------
+    data : dict
+        geopyv data dict from Field object.
+
+    """
+
+    def __init__(self, data):
+        """Initialisation of geopyv FieldResults class."""
+        self.data = data   

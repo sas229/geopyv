@@ -218,9 +218,9 @@ class Subset(SubsetBase):
 
         # Check types.
         if type(self._f_img) != gp.image.Image:
-            self._f_img = self._load_f_img()
+            self._f_img = gp.io._load_f_img()
         if type(self._g_img) != gp.image.Image:
-            self._g_img = self._load_g_img()
+            self._g_img = gp.io._load_g_img()
         if type(self._f_coord) != np.ndarray:
             self._f_coord = np.empty(2)
             coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
@@ -527,36 +527,6 @@ class Subset(SubsetBase):
         except Exception:
             log.error("Subset not solved.")
             return False
-
-    def _load_img(self, message):
-        """
-
-        Private method to open a file dialog and select an image.
-
-        """
-        directory = os.getcwd()
-        dialog = gp.gui.selectors.image.ImageSelector()
-        imgpath = dialog.get_path(directory, message)
-        img = gp.image.Image(imgpath)
-        return img
-
-    def _load_f_img(self):
-        """
-
-        Private method to load the reference image.
-
-        """
-        log.warn("No reference image supplied. Please select the reference image.")
-        return self._load_img("Select reference image.")
-
-    def _load_g_img(self):
-        """
-
-        Private method to load the target image.
-
-        """
-        log.warn("No target image supplied. Please select the target image.")
-        return self._load_img("Select target image.")
 
     def _get_initial_guess_size(self):
         """

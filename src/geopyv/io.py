@@ -149,25 +149,47 @@ def _convert_list_to_ndarray(data):
 
     """
     for key, value in data.items():
-        # print()
-        # print(key)
-        # print(type(value))
+
         # If not a list of subsets, convert to numpy ndarray.
         if (
             type(value) == list
             and key != "subsets"
             and key != "meshes"
+            and key != "mesh"
             and key != "particles"
         ):
-            # print("A")
             data[key] = np.asarray(value)
         # If a dict convert recursively.
         elif type(value) == dict:
-            # print("B")
             _convert_list_to_ndarray(data[key])
         # If a list of subsets convert recursively.
-        elif key == "subsets" or key == "meshes" or key == "particles":
-            # print("C")
+        elif key == "subsets" or key == "meshes" or key == "mesh" or key == "particles":
             for subset in value:
                 _convert_list_to_ndarray(subset)
     return data
+
+def _load_img(message):
+        """
+
+        Private method to open a file dialog and select an image.
+
+        """
+        directory = os.getcwd()
+        dialog = gp.gui.selectors.image.ImageSelector()
+        imgpath = dialog.get_path(directory, message)
+        img = gp.image.Image(imgpath)
+        return img
+
+def _load_f_img():
+    """
+    Private method to load the reference image.
+    """
+    log.warn("No reference image supplied. Please select the reference image.")
+    return _load_img("Select reference image.")
+
+def _load_g_img():
+    """
+    Private method to load the target image.
+    """
+    log.warn("No target image supplied. Please select the target image.")
+    return _load_img("Select target image.")

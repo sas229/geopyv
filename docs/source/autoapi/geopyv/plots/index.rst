@@ -51,7 +51,9 @@ Functions
              * **ax** (*matplotlib.pyplot.axes*) -- Axes object.
 
    .. note::
-       * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
+       * The figure and axes objects can be returned allowing standard matplotlib
+         functionality to be used to augment the plot generated. See the
+         :ref:`plots tutorial <Plots Tutorial>` for guidance.
 
    .. seealso::
        :meth:`~geopyv.mesh.MeshBase.convergence`
@@ -75,7 +77,9 @@ Functions
              * **ax** (*matplotlib.pyplot.axes*) -- Axes object.
 
    .. note::
-       * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
+       * The figure and axes objects can be returned allowing standard matplotlib
+         functionality to be used to augment the plot generated. See the
+         :ref:`plots tutorial <Plots Tutorial>` for guidance.
 
    .. seealso::
        :meth:`~geopyv.subset.SubsetBase.convergence`
@@ -99,7 +103,9 @@ Functions
              * **ax** (*matplotlib.pyplot.axes*) -- Axes object.
 
    .. note::
-       * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
+       * The figure and axes objects can be returned allowing standard matplotlib
+         functionality to be used to augment the plot generated. See the
+         :ref:`plots tutorial <Plots Tutorial>` for guidance.
 
    .. seealso::
        :meth:`~geopyv.mesh.MeshBase.inspect`
@@ -125,7 +131,9 @@ Functions
              * **ax** (*matplotlib.pyplot.axes*) -- Axes object.
 
    .. note::
-       * The figure and axes objects can be returned allowing standard matplotlib functionality to be used to augment the plot generated. See the :ref:`plots tutorial <Plots Tutorial>` for guidance.
+       * The figure and axes objects can be returned allowing standard matplotlib
+         functionality to be used to augment the plot generated. See the
+         :ref:`plots tutorial <Plots Tutorial>` for guidance.
 
    .. seealso::
        :meth:`~geopyv.subset.SubsetBase.inspect`
@@ -135,3 +143,5 @@ Functions
 .. py:function:: quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save)
 
    Function to plot quiver plot of mesh data.
+
+

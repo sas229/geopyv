@@ -34,7 +34,7 @@ Functions
    :type filename: str, optional
 
    :returns: **object** -- The geopyv data object loaded.
-   :rtype: geopyv.object
+   :rtype: geopyv.object.Object
 
    .. note::
        * Any .pyv object can be loaded with this function.
@@ -52,10 +52,13 @@ Functions
 
 
    :param object: The object to be saved.
-   :type object: geopyv.object
+   :type object: geopyv.object.Object
    :param filename: The filename to give to the saved data file.
    :type filename: str, optional
 
    .. note::
        * Any geopyv object can be passed to this function.
        * Do not include the .pyv extension in the `filename` argument.
+
+
+

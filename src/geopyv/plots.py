@@ -243,21 +243,20 @@ def convergence_mesh(data, quantity, show, block, save):
 
     """
     # Get image names.
-    platform = sys.platform
-    print()
-    if platform == "linux" or platform == "linux2" or platform == "darwin":
-        split = "/"
-    elif platform == "win32":
-        split = r"\\"
-    f_img = data["images"]["f_img"][
-        ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
-    ]
-    g_img = data["images"]["g_img"][
-        ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
-    ]
-    title = "Convergence: f_img = {f_img}; g_img = {g_img}".format(
-        f_img=f_img, g_img=g_img
-    )
+    try:
+        platform = sys.platform
+        if platform == "linux" or platform == "linux2" or platform == "darwin":
+            split = "/"
+        elif platform == "win32":
+            split = r"\\"
+        f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]):]
+        g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]):]
+        title = "Convergence: f_img = {f_img}; g_img = {g_img}".format(
+            f_img=f_img, g_img=g_img
+        )
+    except:
+        log.warning("Could not extract image names for plot.")
+        title = "Convergence:"
 
     # Extract variables from data.
     subsets = data["results"]["subsets"]
@@ -353,20 +352,20 @@ def contour_mesh(
     value = np.asarray(value)
 
     # Plot setup.
-    platform = sys.platform
-    if platform == "linux" or platform == "linux2" or platform == "darwin":
-        split = "/"
-    elif platform == "win32":
-        split = r"\\"
-    f_img = data["images"]["f_img"][
-        ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
-    ]
-    g_img = data["images"]["g_img"][
-        ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
-    ]
-    title = "Contour: f_img = {f_img}; g_img = {g_img}; variable = {variable}".format(
-        f_img=f_img, g_img=g_img, variable=quantity
-    )
+    try:
+        platform = sys.platform
+        if platform == "linux" or platform == "linux2" or platform == "darwin":
+            split = "/"
+        elif platform == "win32":
+            split = r"\\"
+        f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :]
+        g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]) :]
+        title = "Contour: f_img = {f_img}; g_img = {g_img}; variable = {variable}".format(
+            f_img=f_img, g_img=g_img, variable=quantity
+        )
+    except:
+        log.warning("Could not extract image names for plot.")
+        title = "Contour: variable = {variable}".format(variable = quantity)
     fig, ax = plt.subplots(num=title)
 
     # Triangulation.
@@ -467,18 +466,18 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
     V1 = S * V * 1 / 2.54
 
     # Plot setup.
-    platform = sys.platform
-    if platform == "linux" or platform == "linux2" or platform == "darwin":
-        split = "/"
-    elif platform == "win32":
-        split = r"\\"
-    f_img = data["images"]["f_img"][
-        ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
-    ]
-    g_img = data["images"]["g_img"][
-        ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
-    ]
-    title = "Quiver: f_img = {f_img}; g_img = {g_img}".format(f_img=f_img, g_img=g_img)
+    try:
+        platform = sys.platform
+        if platform == "linux" or platform == "linux2" or platform == "darwin":
+            split = "/"
+        elif platform == "win32":
+            split = r"\\"
+        f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :]
+        g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]) :]
+        title = "Quiver: f_img = {f_img}; g_img = {g_img}".format(f_img=f_img, g_img=g_img)
+    except:
+        log.warning("Could not extract image names for plot.")
+        title = "Quiver:"
     fig, ax = plt.subplots(num=title)
 
     # Triangulation.
@@ -580,16 +579,18 @@ def inspect_mesh(data, show, block, save):
     value = np.asarray(value)
 
     # Plot setup.
-    platform = sys.platform
-    if platform == "linux" or platform == "linux2" or platform == "darwin":
-        split = "/"
-    elif platform == "win32":
-        split = r"\\"
-    f_img = data["images"]["f_img"][
-        ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
-    ]
-    title = "Inspect mesh: f_img = {f_img}".format(f_img=f_img)
-
+    try:
+        platform = sys.platform
+        if platform == "linux" or platform == "linux2" or platform == "darwin":
+            split = "/"
+        elif platform == "win32":
+            split = r"\\"
+        f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :]
+        title = "Inspect mesh: f_img = {f_img}".format(f_img=f_img)
+    except:
+        log.warning("Could not extract image names for plot.")
+        title = "Inspect mesh:"
+    
     # Triangulation.
     _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
 

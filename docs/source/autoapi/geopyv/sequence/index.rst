@@ -19,6 +19,7 @@ Classes
 
    geopyv.sequence.Sequence
    geopyv.sequence.SequenceBase
+   geopyv.sequence.SequenceResults
 
 
 
@@ -29,16 +30,43 @@ Classes
 
    Initialisation of geopyv sequence object.
 
-   .. py:method:: particle(coords, vols)
-
-      A method to propogate "particles" across the domain upon which strain path interpolation is performed.
-
-
 
 .. py:class:: SequenceBase
 
-   Sequence base class to be used as a mixin.
+   Bases: :py:obj:`geopyv.object.Object`
 
-   .. py:method:: inspect(mesh=None, show=True, block=True, save=None)
+   Base class object initialiser.
 
-      Method to show the sequence and associated mesh properties.
+   :param object_type: Object type.
+   :type object_type: str
+
+   .. py:method:: contour(mesh_index=None, quantity='C_ZNCC', imshow=True, colorbar=True, ticks=None, mesh=False, alpha=0.75, levels=None, axis=None, xlim=None, ylim=None, show=True, block=True, save=None)
+
+      Method to plot the contours of a given measure.
+
+
+
+   .. py:method:: convergence(mesh=None, subset=None, quantity=None, show=True, block=True, save=None)
+
+      Method to plot the rate of convergence for a mesh or subset.
+
+
+   .. py:method:: inspect(mesh=None, subset=None, show=True, block=True, save=None)
+
+      Method to show the sequence and associated mesh and subset properties.
+
+
+   .. py:method:: quiver(mesh_index=None, scale=1, imshow=True, mesh=False, axis=None, xlim=None, ylim=None, show=True, block=True, save=None)
+
+      Method to plot a quiver plot of the displacements.
+
+
+
+
+.. py:class:: SequenceResults(data)
+
+   Bases: :py:obj:`SequenceBase`
+
+   Initialisation of geopyv SequenceResults class.
+
+

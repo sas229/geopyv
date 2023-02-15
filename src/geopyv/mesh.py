@@ -519,6 +519,10 @@ class Mesh(MeshBase):
         self._elements = np.reshape(
             (np.asarray(ent) - 1).flatten(), (-1, 6)
         )  # Element connectivity array.
+        self._boundary_tags = gmsh.model.occ.getCurveLoops(0)[1][0]
+        self._exclusion_tags = []
+        for i in range(len(self._exclusions)):
+            self._exclusion_tags.append(gmsh.model.occ.getCurveLoops(0)[1][i+1])
 
     def _find_seed_node(self):
         """

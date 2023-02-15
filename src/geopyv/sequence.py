@@ -308,7 +308,7 @@ class Sequence(SequenceBase):
     def solve(
         self,
         *,
-        trace=False,
+        track=False,
         seed_coord=None,
         template=None,
         max_iterations=15,
@@ -356,11 +356,6 @@ class Sequence(SequenceBase):
         self._tolerance = tolerance
         self._alpha = alpha
         self._p_0 = np.zeros(6 * self._order)
-
-        # Prepare output.
-        self._update_register = np.zeros(
-            len(self._image_indices) - 1, dtype=int
-        )  # Mesh-image reference.
 
         # Solve.
         _f_index = 0
@@ -415,6 +410,8 @@ class Sequence(SequenceBase):
                         + "_"
                         + str(self._image_indices[_g_index]),
                     )
+                self._boundary_tags = mesh._boundary_tags
+                self._exclusion_tags = mesh._exclusion_tags
                 _g_index += 1  # Iterate the target image index.
                 del _g_img
                 if _g_index != len(self._image_indices - 1):
@@ -428,12 +425,9 @@ class Sequence(SequenceBase):
                 else:
                     self.solved = True
             elif _f_index + 1 < _g_index:
-                if trace:
-                    self._trace(_f_index, _g_index)
                 _f_index = _g_index - 1
-                self._update_register[
-                    _f_index
-                ] = 1  # Update recorded reference image for future meshes.
+                if track:
+                    self._track(_f_index)
                 del _f_img
                 _f_img = gp.image.Image(
                     self._image_folder
@@ -457,22 +451,19 @@ class Sequence(SequenceBase):
         # Pack data.
         self.data["solved"] = self.solved
         self.data["unsolvable"] = self._unsolvable
-        self.data.update({"update_register": self._update_register})
         return self.solved
 
-    def _trace(self, _f_index, _g_index):
-        log.message("Tracing exclusion displacement.")
-        mesh = gp.io.load(
-            filename="mesh_"
-            + str(self._image_indices[_f_index])
-            + "_"
-            + str(self._image_indices[_g_index - 1])
-        )
-        i = len(self._boundary)
-        for exclusion in self._exclusions:
-            j = len(exclusion)
-            exclusion += mesh.data["results"]["displacements"][i + j]
-        del mesh
+    def _track(self, _f_index):
+        """
+        Private method for tracking the movement of the mesh boundary and exclusions upon reference image updates.
+        """
+
+        log.info("Tracing boundary and exclusion displacements.")
+        self._boundary = self.data["meshes"][_f_index-1]["nodes"][self._boundary_tags] + self.data["meshes"][_f_index-1]["results"]["displacements"][self._boundary_tags]
+        _exclusions = []
+        for i in range(len(self._exclusions)):
+            _exclusions.append(self.data["meshes"][_f_index-1]["nodes"][self._exclusion_tags[i]] + self.data["meshes"][_f_index-1]["results"]["displacements"][self._exclusion_tags[i]])
+        self._exclusions = _exclusions
 
 
 class SequenceResults(SequenceBase):

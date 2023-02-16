@@ -64,7 +64,6 @@ mesh.solve(
     alpha=alpha,
     tolerance=0.7,
 )
-
 # Mesh saving.
 gp.io.save(object=mesh, filename="mesh")
 del mesh
@@ -137,7 +136,7 @@ sequence = gp.sequence.Sequence(
 
 # Sequence solving.
 sequence.solve(
-    track=True,
+    track="move",
     seed_coord=seed,
     template=template,
     adaptive_iterations=0,

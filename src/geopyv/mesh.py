@@ -164,8 +164,8 @@ class Mesh(MeshBase):
     def __init__(
         self,
         *,
-        f_img = None,
-        g_img = None,
+        f_img=None,
+        g_img=None,
         target_nodes=1000,
         boundary=None,
         exclusions=[],
@@ -218,7 +218,6 @@ class Mesh(MeshBase):
         self._size_upper_bound = size_upper_bound
         self.solved = False
         self._unsolvable = False
-        
 
         # Check types.
         # if type(f_img) != gp.image.Image:
@@ -226,11 +225,15 @@ class Mesh(MeshBase):
         # if type(g_img) != gp.image.Image:
         #     self._g_img = gp.io._load_g_img()
         if type(target_nodes) != int:
-            log.warn("Target node number not of integer type. Attempting integer conversion...")
+            log.warn(
+                "Target node number not of integer type. Attempting integer conversion..."
+            )
             try:
                 self._target_nodes = int(target_nodes)
             except:
-                log.warn("Target node number conversion failed. Setting target nodes as 1000.")
+                log.warn(
+                    "Target node number conversion failed. Setting target nodes as 1000."
+                )
                 self._target_nodes = 1000
         elif target_nodes <= 0:
             log.warn("Invalid target nodes number. Setting target nodes as 1000.")
@@ -519,10 +522,41 @@ class Mesh(MeshBase):
         self._elements = np.reshape(
             (np.asarray(ent) - 1).flatten(), (-1, 6)
         )  # Element connectivity array.
-        self._boundary_tags = gmsh.model.occ.getCurveLoops(0)[1][0]
-        self._exclusion_tags = []
+
+        # If track "add".
+        _boundary_tags = []
+        for i in gmsh.model.getEntitiesForPhysicalGroup(1, 0):
+            _boundary_tags.append(
+                np.roll(
+                    np.asarray(
+                        (gmsh.model.mesh.getNodes(1, i, includeBoundary=True)[0] - 1)
+                    )[:-1],
+                    1,
+                )
+            )
+        self._boundary_add_tags = np.concatenate(_boundary_tags).ravel()
+        self._exclusions_add_tags = []
+        for i in range(np.shape(self._exclusions)[0]):
+            _exclusion_tags = []
+            for j in gmsh.model.getEntitiesForPhysicalGroup(1, i + 1):
+                _exclusion_tags.append(
+                    np.roll(
+                        np.asarray(
+                            (
+                                gmsh.model.mesh.getNodes(1, j, includeBoundary=True)[0]
+                                - 1
+                            )
+                        )[:-1],
+                        1,
+                    )
+                )
+            self._exclusions_add_tags.append(np.concatenate(_exclusion_tags).ravel())
+
+        # If track "move".
+        self._boundary_move_tags = gmsh.model.occ.getCurveLoops(0)[1][0]
+        self._exclusions_move_tags = []
         for i in range(len(self._exclusions)):
-            self._exclusion_tags.append(gmsh.model.occ.getCurveLoops(0)[1][i+1])
+            self._exclusions_move_tags.append(gmsh.model.occ.getCurveLoops(0)[1][i + 1])
 
     def _find_seed_node(self):
         """
@@ -702,6 +736,12 @@ class Mesh(MeshBase):
         gmsh.option.setNumber("Mesh.MeshSizeMin", size_lower_bound)
         gmsh.option.setNumber("Mesh.MeshSizeMax", size_upper_bound)
         gmsh.model.occ.synchronize()
+
+        # Add physical groups.
+        for i in range(len(curves)):
+            gmsh.model.addPhysicalGroup(1, curves[i], i)
+
+        # Mesh.
         gmsh.model.mesh.generate(2)
         gmsh.model.mesh.optimize()
         gmsh.model.mesh.setOrder(2)

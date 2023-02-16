@@ -3,6 +3,7 @@
 Plots module for geopyv.
 
 """
+import logging
 import sys
 import cv2
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ import numpy as np
 import re
 import geopyv as gp
 
+log = logging.getLogger(__name__)
 
 def inspect_subset(data, mask, show, block, save):
     """

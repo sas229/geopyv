@@ -149,7 +149,6 @@ def _convert_list_to_ndarray(data):
 
     """
     for key, value in data.items():
-
         # If not a list of subsets, convert to numpy ndarray.
         if (
             type(value) == list
@@ -168,17 +167,19 @@ def _convert_list_to_ndarray(data):
                 _convert_list_to_ndarray(subset)
     return data
 
+
 def _load_img(message):
-        """
+    """
 
-        Private method to open a file dialog and select an image.
+    Private method to open a file dialog and select an image.
 
-        """
-        directory = os.getcwd()
-        dialog = gp.gui.selectors.image.ImageSelector()
-        imgpath = dialog.get_path(directory, message)
-        img = gp.image.Image(imgpath)
-        return img
+    """
+    directory = os.getcwd()
+    dialog = gp.gui.selectors.image.ImageSelector()
+    imgpath = dialog.get_path(directory, message)
+    img = gp.image.Image(imgpath)
+    return img
+
 
 def _load_f_img():
     """
@@ -186,6 +187,7 @@ def _load_f_img():
     """
     log.warn("No reference image supplied. Please select the reference image.")
     return _load_img("Select reference image.")
+
 
 def _load_g_img():
     """

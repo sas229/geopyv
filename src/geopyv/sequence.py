@@ -9,6 +9,7 @@ import geopyv as gp
 from geopyv.object import Object
 import re
 import os
+import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -308,7 +309,7 @@ class Sequence(SequenceBase):
     def solve(
         self,
         *,
-        track=False,
+        track="fixed",
         seed_coord=None,
         template=None,
         max_iterations=15,
@@ -355,6 +356,7 @@ class Sequence(SequenceBase):
         self._order = order
         self._tolerance = tolerance
         self._alpha = alpha
+        self._track = track
         self._p_0 = np.zeros(6 * self._order)
 
         # Solve.
@@ -380,6 +382,8 @@ class Sequence(SequenceBase):
                     self._image_indices[_f_index], self._image_indices[_g_index]
                 )
             )
+            print(self._boundary)
+            print(self._exclusions)
             mesh = gp.mesh.Mesh(
                 f_img=_f_img,
                 g_img=_g_img,
@@ -410,8 +414,12 @@ class Sequence(SequenceBase):
                         + "_"
                         + str(self._image_indices[_g_index]),
                     )
-                self._boundary_tags = mesh._boundary_tags
-                self._exclusion_tags = mesh._exclusion_tags
+                if track == "add":
+                    self._boundary_tags = mesh._boundary_add_tags
+                    self._exclusions_tags = mesh._exclusions_add_tags
+                elif track == "move":
+                    self._boundary_tags = mesh._boundary_move_tags
+                    self._exclusions_tags = mesh._exclusions_move_tags
                 _g_index += 1  # Iterate the target image index.
                 del _g_img
                 if _g_index != len(self._image_indices - 1):
@@ -426,8 +434,8 @@ class Sequence(SequenceBase):
                     self.solved = True
             elif _f_index + 1 < _g_index:
                 _f_index = _g_index - 1
-                if track:
-                    self._track(_f_index)
+                if self._track != "fixed":
+                    self._tracking(_f_index)
                 del _f_img
                 _f_img = gp.image.Image(
                     self._image_folder
@@ -453,17 +461,34 @@ class Sequence(SequenceBase):
         self.data["unsolvable"] = self._unsolvable
         return self.solved
 
-    def _track(self, _f_index):
+    def _tracking(self, _f_index):
         """
         Private method for tracking the movement of the mesh boundary and exclusions upon reference image updates.
         """
 
         log.info("Tracing boundary and exclusion displacements.")
-        self._boundary = self.data["meshes"][_f_index-1]["nodes"][self._boundary_tags] + self.data["meshes"][_f_index-1]["results"]["displacements"][self._boundary_tags]
+
+        self._boundary = (
+            self.data["meshes"][_f_index - 1]["nodes"][self._boundary_tags]
+            + self.data["meshes"][_f_index - 1]["results"]["displacements"][
+                self._boundary_tags
+            ]
+        )
         _exclusions = []
-        for i in range(len(self._exclusions)):
-            _exclusions.append(self.data["meshes"][_f_index-1]["nodes"][self._exclusion_tags[i]] + self.data["meshes"][_f_index-1]["results"]["displacements"][self._exclusion_tags[i]])
+        for i in range(np.shape(self._exclusions)[0]):
+            _exclusions.append(
+                self.data["meshes"][_f_index - 1]["nodes"][self._exclusions_tags[i]]
+                + self.data["meshes"][_f_index - 1]["results"]["displacements"][
+                    self._exclusions_tags[i]
+                ]
+            )
         self._exclusions = _exclusions
+
+        fig, ax = plt.subplots()
+        ax.scatter(self._boundary[:, 0], self._boundary[:, 1], color="r")
+        for i in range(len(self._exclusions)):
+            ax.scatter(self._exclusions[i][:, 0], self._exclusions[i][:, 1], color="b")
+        plt.show()
 
 
 class SequenceResults(SequenceBase):

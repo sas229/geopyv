@@ -20,6 +20,7 @@ import geopyv as gp
 
 log = logging.getLogger(__name__)
 
+
 def inspect_subset(data, mask, show, block, save):
     """
 
@@ -251,8 +252,12 @@ def convergence_mesh(data, quantity, show, block, save):
             split = "/"
         elif platform == "win32":
             split = r"\\"
-        f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]):]
-        g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]):]
+        f_img = data["images"]["f_img"][
+            ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
+        ]
+        g_img = data["images"]["g_img"][
+            ([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]) :
+        ]
         title = "Convergence: f_img = {f_img}; g_img = {g_img}".format(
             f_img=f_img, g_img=g_img
         )
@@ -277,7 +282,6 @@ def convergence_mesh(data, quantity, show, block, save):
     C_ZNCC = np.asarray(C_ZNCC)
 
     # Create plot.
-    title = "Mesh convergence: f_img = {f_img}".format(f_img=f_img)
     fig, ax = plt.subplots(num=title)
     if quantity == "C_ZNCC":
         ax.hist(C_ZNCC, bins=50)
@@ -360,14 +364,20 @@ def contour_mesh(
             split = "/"
         elif platform == "win32":
             split = r"\\"
-        f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :]
-        g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]) :]
-        title = "Contour: f_img = {f_img}; g_img = {g_img}; variable = {variable}".format(
-            f_img=f_img, g_img=g_img, variable=quantity
+        f_img = data["images"]["f_img"][
+            ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
+        ]
+        g_img = data["images"]["g_img"][
+            ([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]) :
+        ]
+        title = (
+            "Contour: f_img = {f_img}; g_img = {g_img}; variable = {variable}".format(
+                f_img=f_img, g_img=g_img, variable=quantity
+            )
         )
     except:
         log.warning("Could not extract image names for plot.")
-        title = "Contour: variable = {variable}".format(variable = quantity)
+        title = "Contour: variable = {variable}".format(variable=quantity)
     fig, ax = plt.subplots(num=title)
 
     # Triangulation.
@@ -474,9 +484,15 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
             split = "/"
         elif platform == "win32":
             split = r"\\"
-        f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :]
-        g_img = data["images"]["g_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]) :]
-        title = "Quiver: f_img = {f_img}; g_img = {g_img}".format(f_img=f_img, g_img=g_img)
+        f_img = data["images"]["f_img"][
+            ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
+        ]
+        g_img = data["images"]["g_img"][
+            ([(m.end(0)) for m in re.finditer(split, data["images"]["g_img"])][-1]) :
+        ]
+        title = "Quiver: f_img = {f_img}; g_img = {g_img}".format(
+            f_img=f_img, g_img=g_img
+        )
     except:
         log.warning("Could not extract image names for plot.")
         title = "Quiver:"
@@ -587,12 +603,14 @@ def inspect_mesh(data, show, block, save):
             split = "/"
         elif platform == "win32":
             split = r"\\"
-        f_img = data["images"]["f_img"][([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :]
+        f_img = data["images"]["f_img"][
+            ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
+        ]
         title = "Inspect mesh: f_img = {f_img}".format(f_img=f_img)
     except:
         log.warning("Could not extract image names for plot.")
         title = "Inspect mesh:"
-    
+
     # Triangulation.
     _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
 

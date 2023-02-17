@@ -82,7 +82,7 @@ class Particle(ParticleBase):
         series=None,
         coordinate_0=np.zeros(2),
         warp_0=np.zeros(12),
-        volume_0=0.0,
+        volume_0=1.0,
         moving=True,
     ):
         """Initialisation of geopyv particle object.
@@ -340,9 +340,12 @@ class Particle(ParticleBase):
             )  # Update the particle positional coordinate.
             # i.e. (reference + mesh interpolation).
             self._warps[m + 1] = self._warps[self._reference_index] + self._warp_inc
-            self._volumes[m + 1] = self._volumes[self._reference_index] * (
-                1 + self._warps[m + 1, 3] + self._warps[m + 1, 4]
-            )  # Update the particle volume.
+            self._volumes[m + 1] = (
+                self._volumes[m]
+                * (1 + (self._warps[m + 1, 2] - self._warps[m, 2]))
+                * (1 + (self._warps[m + 1, 5] - self._warps[m, 5]))
+            )
+            # Update the particle volume.
             # i.e. (reference*(1 + volume altering strain components)).
         return True
 

@@ -43,6 +43,7 @@ class FieldBase(Object):
         Method to show the volumetric error in the particle field.
         """
 
+
     def trace(
         self,
         quantity="warps",

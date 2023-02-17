@@ -35,7 +35,6 @@ class SequenceBase(Object):
         # If a mesh index is given, inspect the mesh.
         if mesh is not None:
             if mesh >= 0 and mesh < len(self.data["meshes"]):
-                print(mesh)
                 # If a subset index is given, inspect the subset of the mesh.
                 if subset is not None:
                     if subset >= 0 and subset < len(
@@ -316,7 +315,8 @@ class Sequence(SequenceBase):
         max_norm=1e-3,
         adaptive_iterations=0,
         method="ICGN",
-        order=1,
+        mesh_order=2,
+        subset_order=1,
         tolerance=0.7,
         alpha=0.5,
         mesh_save=False,
@@ -353,11 +353,12 @@ class Sequence(SequenceBase):
         self._max_norm = max_norm
         self._adaptive_iterations = adaptive_iterations
         self._method = method
-        self._order = order
+        self._subset_order = subset_order
+        self._mesh_order = mesh_order
         self._tolerance = tolerance
         self._alpha = alpha
         self._track = track
-        self._p_0 = np.zeros(6 * self._order)
+        self._p_0 = np.zeros(6 * self._subset_order)
 
         # Solve.
         _f_index = 0
@@ -382,8 +383,6 @@ class Sequence(SequenceBase):
                     self._image_indices[_f_index], self._image_indices[_g_index]
                 )
             )
-            print(self._boundary)
-            print(self._exclusions)
             mesh = gp.mesh.Mesh(
                 f_img=_f_img,
                 g_img=_g_img,
@@ -392,6 +391,7 @@ class Sequence(SequenceBase):
                 exclusions=self._exclusions,
                 size_lower_bound=self._size_lower_bound,
                 size_upper_bound=self._size_upper_bound,
+                mesh_order=self._mesh_order,
             )  # Initialise mesh object.
             mesh.solve(
                 seed_coord=self._seed_coord,
@@ -400,7 +400,7 @@ class Sequence(SequenceBase):
                 max_norm=self._max_norm,
                 adaptive_iterations=self._adaptive_iterations,
                 method=self._method,
-                order=self._order,
+                subset_order=self._subset_order,
                 tolerance=self._tolerance,
                 alpha=self._alpha,
             )  # Solve mesh.
@@ -483,12 +483,6 @@ class Sequence(SequenceBase):
                 ]
             )
         self._exclusions = _exclusions
-
-        fig, ax = plt.subplots()
-        ax.scatter(self._boundary[:, 0], self._boundary[:, 1], color="r")
-        for i in range(len(self._exclusions)):
-            ax.scatter(self._exclusions[i][:, 0], self._exclusions[i][:, 1], color="b")
-        plt.show()
 
 
 class SequenceResults(SequenceBase):

@@ -171,6 +171,7 @@ class Mesh(MeshBase):
         exclusions=[],
         size_lower_bound=1,
         size_upper_bound=1000,
+        mesh_order=2,
     ):
         """
 
@@ -216,6 +217,7 @@ class Mesh(MeshBase):
         self._exclusions = exclusions
         self._size_lower_bound = size_lower_bound
         self._size_upper_bound = size_upper_bound
+        self._mesh_order = mesh_order
         self.solved = False
         self._unsolvable = False
 
@@ -343,7 +345,7 @@ class Mesh(MeshBase):
         template=None,
         max_norm=1e-3,
         max_iterations=15,
-        order=1,
+        subset_order=1,
         tolerance=0.7,
         method="ICGN",
         adaptive_iterations=0,
@@ -405,18 +407,13 @@ class Mesh(MeshBase):
         self._max_norm = max_norm
         self._adaptive_iterations = adaptive_iterations
         self._method = method
-        self._order = order
+        self._subset_order = subset_order
         self._tolerance = tolerance
         self._alpha = alpha
         self._subset_bgf_nodes = None
         self._subset_bgf_values = None
         self._update = False
-        if self._order == 1 and self._method != "WFAGN":
-            self._p_0 = np.zeros(6)
-        elif self._order == 1 and self._method == "WFAGN":
-            self._p_0 = np.zeros(7)
-        elif self._order == 2 and self._method != "WFAGN":
-            self._p_0 = np.zeros(12)
+        self._p_0 = np.zeros(6 * self._subset_order)
 
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
@@ -480,7 +477,7 @@ class Mesh(MeshBase):
                 "max_norm": self._max_norm,
                 "adaptive_iterations": self._adaptive_iterations,
                 "method": self._method,
-                "order": self._order,
+                "mesh_order": self._mesh_order,
                 "tolerance": self._tolerance,
             }
             self.data.update({"settings": self._settings})
@@ -646,6 +643,7 @@ class Mesh(MeshBase):
                 self._target_nodes,
                 self._size_lower_bound,
                 self._size_upper_bound,
+                self._mesh_order,
             )
 
         minimize_scalar(
@@ -671,7 +669,12 @@ class Mesh(MeshBase):
 
             def f(scale):
                 return self._adaptive_remesh(
-                    scale, self._target_nodes, self._nodes, self._elements, self._areas
+                    scale,
+                    self._target_nodes,
+                    self._nodes,
+                    self._elements,
+                    self._areas,
+                    self._mesh_order,
                 )
 
             minimize_scalar(f)
@@ -686,6 +689,7 @@ class Mesh(MeshBase):
         target_nodes,
         size_lower_bound,
         size_upper_bound,
+        order,
     ):
         """
 
@@ -744,7 +748,7 @@ class Mesh(MeshBase):
         # Mesh.
         gmsh.model.mesh.generate(2)
         gmsh.model.mesh.optimize()
-        gmsh.model.mesh.setOrder(2)
+        gmsh.model.mesh.setOrder(order)
 
         # Get mesh topology.
         (
@@ -761,7 +765,7 @@ class Mesh(MeshBase):
         return error
 
     @staticmethod
-    def _adaptive_remesh(scale, target, nodes, elements, areas):
+    def _adaptive_remesh(scale, target, nodes, elements, areas, order):
         """
 
         Private method to perform adaptive mesh generation.
@@ -816,7 +820,7 @@ class Mesh(MeshBase):
         gmsh.model.mesh.clear()  # Tidy.
         gmsh.model.mesh.generate(2)  # Generate mesh.
         gmsh.model.mesh.optimize()
-        gmsh.model.mesh.setOrder(2)
+        gmsh.model.mesh.setOrder(order)
 
         (
             nt,
@@ -1022,6 +1026,7 @@ class Mesh(MeshBase):
                 max_norm=self._max_norm,
                 max_iterations=self._max_iterations,
                 p_0=self._p_0,
+                order=self._subset_order,
                 method=self._method,
                 tolerance=0.9,
             )  # Solve for seed subset.
@@ -1031,7 +1036,6 @@ class Mesh(MeshBase):
             # the variables and solve neighbours.
             if not self._subsets[self._seed_node].data["solved"]:
                 self._update = True
-                # sprint(self._subsets[self._seed_node].data["C_ZNCC"])
                 log.error("Error! The seed subset correlation is below tolerance.")
             else:
                 self._store_variables(self._seed_node, seed=True)
@@ -1144,6 +1148,7 @@ class Mesh(MeshBase):
                 self._subsets[idx].solve(
                     max_norm=self._max_norm,
                     max_iterations=self._max_iterations,
+                    order=self._subset_order,
                     p_0=p_0,
                     method=self._method,
                     tolerance=self._tolerance,

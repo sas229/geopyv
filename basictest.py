@@ -128,7 +128,7 @@ alpha = 0.2
 
 # Sequence instantiation.
 sequence = gp.sequence.Sequence(
-    image_folder="./images/sequence_check2",
+    image_folder="./images/T-Bar",
     target_nodes=1000,
     boundary=boundary,
     exclusions=exclusions,
@@ -178,7 +178,7 @@ del particle
 particle = gp.io.load(filename="particle")
 
 # Other particle methods.
-particle.trace(quantity = "warp", component = 1)
+particle.trace(quantity = "warps", component = 1)
 
 #Field test.
 #Field setup.
@@ -200,3 +200,24 @@ field = gp.io.load(filename="field")
 # Other field methods. 
 field.trace(quantity = "warps", component = 2)
 field.inspect()
+
+# Extracting data.
+component = 0
+particle_index = 4
+
+# Coordinates.
+coordinates = field.data["particles"][particle_index]["coordinates"]
+print(coordinates)
+
+# Warps.
+# Full.
+warps = field.data["particles"][particle_index]["warps"] # warp components : [u, v, dudx, dudy, dvdx, dvdy, d2udx2, d2udxdy, d2udy2, d2vdx2, d2vdxdy, d2vdy2]
+print(warps)
+warps = field.data["particles"][particle_index]["warps"][2:5, :2] # Time steps 2-5 for components 0 and 1 i.e. displacements. 
+print(warps)
+
+# e.g. to extract volume progression. Note, area is in pixels. 
+volume_array = field.data["particles"][particle_index]["volumes"]
+print(volume_array)
+volume = field.data["particles"][particle_index]["volumes"][3] # At time step 3. 
+print(volume)

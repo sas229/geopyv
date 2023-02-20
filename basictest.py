@@ -144,7 +144,7 @@ sequence.solve(
     alpha=alpha,
     tolerance=0.7,
 )
-
+# 
 # Sequence saving.
 gp.io.save(object=sequence, filename="T_bar_sequence")
 del sequence

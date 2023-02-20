@@ -754,31 +754,36 @@ def inspect_field(data, mesh, show, block, save):
 
     if mesh:
         # Load data.
-        nodes = data["mesh"]["nodes"]
-        elements = data["mesh"]["elements"]
+        try:
+            nodes = data["field"]["nodes"]
+            elements = data["field"]["elements"]
 
-        # Extract variables from data.
-        x = []
-        y = []
-        value = []
-        for n in nodes:
-            x.append(n[0])
-            y.append(n[1])
-        x = np.asarray(x)
-        y = np.asarray(y)
-        value = np.asarray(value)
+            # Extract variables from data.
+            x = []
+            y = []
+            value = []
+            for n in nodes:
+                x.append(n[0])
+                y.append(n[1])
+            x = np.asarray(x)
+            y = np.asarray(y)
+            value = np.asarray(value)
 
-        # Triangulation
-        _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
+            # Triangulation
+            _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
 
-        # Plot mesh.
-        for i in range(np.shape(x_p)[0]):
-            ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
+            # Plot mesh.
+            for i in range(np.shape(x_p)[0]):
+                ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
+        except:
+            log.warning(
+                "Mesh requested but no field mesh information exists as field was user-specified."
+            )
 
-    for i in range(len(data["mesh"]["coordinates"])):
+    for i in range(len(data["field"]["coordinates"])):
         ax.scatter(
-            data["mesh"]["coordinates"][i, 0],
-            data["mesh"]["coordinates"][i, 1],
+            data["field"]["coordinates"][i, 0],
+            data["field"]["coordinates"][i, 1],
             c="r",
             marker="o",
         )

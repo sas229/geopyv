@@ -156,13 +156,20 @@ def _convert_list_to_ndarray(data):
             and key != "meshes"
             and key != "mesh"
             and key != "particles"
+            and key != "field"
         ):
             data[key] = np.asarray(value)
         # If a dict convert recursively.
         elif type(value) == dict:
             _convert_list_to_ndarray(data[key])
         # If a list of subsets convert recursively.
-        elif key == "subsets" or key == "meshes" or key == "mesh" or key == "particles":
+        elif (
+            key == "subsets"
+            or key == "meshes"
+            or key == "mesh"
+            or key == "particles"
+            or key == "field"
+        ):
             for subset in value:
                 _convert_list_to_ndarray(subset)
     return data

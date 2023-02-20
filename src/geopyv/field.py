@@ -43,7 +43,6 @@ class FieldBase(Object):
         Method to show the volumetric error in the particle field.
         """
 
-
     def trace(
         self,
         quantity="warps",
@@ -92,24 +91,55 @@ class Field(FieldBase):
         moving=True,
         boundary=None,
         exclusions=[],
+        coordinates=None,
+        volumes=None,
     ):
+        """
+        Initialisation of geopyv field object.
+
+        Parameters
+        ----------
+        series : gp.sequence.Sequence object or gp.mesh.Mesh object
+            The base series for field object interpolation.
+        target_nodes : int, optional
+            Target number of particles. Defaults to a value of 1000.
+        moving : bool, optional
+            Boolean to specify if particles should move or remain static. True - move (Lagrangian), False - static (Eularian). Defaults to True.
+        boundary : numpy.ndarray (N,2), optional
+            Array of coordinates to define the particle auto-distribution mesh boundary.
+        exclusions : list, optional
+            List of `numpy.ndarray` (N,2) to define the particle auto-distribution mesh exclusions.
+        coordinates : numpy.ndarray (N,2), optional
+            Array of coordinates to define the initial particle positions.
+        volumes : numpy.ndarray (N,), optional
+            Array of volumes for particle representation. Defaults to np.ones(N) i.e. measure of volumetric strain.
+
+        Note ::
+        Two kwargs groups for particle distribution:
+        if coordinates is not None:
+            1. User-defined : coordinates, volumes.
+        else:
+            2. Auto-distributed: boundary, exclusions, target_particles.
+
+        Attributes
+        ----------
+        data : dict
+            Data object containing all settings and results.
+            See the data structure :ref:`here <mesh_data_structure>`.
+        solved : bool
+            Boolean to indicate if the mesh has been solved.
+
+        """
         self._initialised = False
+        _auto_distribute = True
+
         # Check types
         if series.data["type"] != "Sequence" and series.data["type"] != "Mesh":
             log.error(
                 "Invalid series type. Must be gp.sequence.Sequence or gp.mesh.Mesh."
             )
-        if type(target_particles) != int:
-            log.error("Maximum number of nodes not of integer type.")
-        elif target_particles < 0:
-            log.error("Target number of particles must be more than 0.")
         if type(moving) != bool:
             log.error("Invalid moving type. Must be a bool.")
-
-        self._target_particles = target_particles
-        self._moving = moving
-        self.solved = False
-        self._series = series
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
             mesh_0 = series.data["meshes"][0]
@@ -119,35 +149,114 @@ class Field(FieldBase):
             mesh_0 = series.data
             self._number_images = 1
         self._image_0 = mesh_0["images"]["f_img"]
+        self._moving = moving
+        self._series = series
+        self.solved = False
+        self._unsolvable = False
 
-        # Extract region of interest.
-        if boundary is None:
-            self._boundary = mesh_0["boundary"]
-        if exclusions == []:
-            self._exclusions = mesh_0["exclusions"]
-        self._size_lower_bound = mesh_0["size_lower_bound"]
-        self._size_upper_bound = mesh_0["size_upper_bound"]
+        if coordinates is not None:
+            _auto_distribute = False
+            if type(coordinates) != np.ndarray:
+                try:
+                    coordinates = np.asarray(coordinates)
+                except:
+                    log.error(
+                        "Coordinates array type invalid. Expected a numpy.ndarray."
+                    )
+                    return False
+            if np.shape(coordinates)[1] != 2:
+                log.error(
+                    "Coordinates array shape invalid. Expected a (N,2) numpy.ndarray."
+                )
+                return False
+            if np.ndim(coordinates) != 2:
+                log.error(
+                    "Coordinates array dimensions invalid. Expected a 2D numpy.ndarray."
+                )
+            image = gp.image.Image(self._image_0)
+            for coord in coordinates:
+                if (
+                    coord[0] > np.shape(image.image_gs)[0]
+                    or coord[0] < 0
+                    or coord[1] > np.shape(image.image_gs)[1]
+                    or coord[1] < 0
+                ):
+                    log.error("User-specified coordinate outside image boundary.")
+                    return False
+            del image
+            if volumes is not None:
+                if type(volumes) != np.ndarray:
+                    try:
+                        volumes = np.asarray(volumes)
+                    except:
+                        log.error(
+                            "Volumes array type invalid. Expected a numpy.ndarray."
+                        )
+                        return False
+                if np.ndim(volumes) != 1:
+                    log.error(
+                        "Volumes array dimensions invalid. Expected a 1D numpy.ndarray."
+                    )
+                    return False
+                if np.shape(volumes)[0] != np.shape(coordinates)[0]:
+                    log.error(
+                        "Volumes-coordinates array mismatch. {volumes} volumes given for {coordinates} coordinates.".format(
+                            volumes=np.shape(volumes)[0],
+                            coordinates=np.shape(coordinates)[0],
+                        )
+                    )
+                    return False
+            else:
+                volumes = np.ones(np.shape(coordinates)[0])
+            self._target_particles = np.shape(coordinates)[0]
+        else:
+            if type(target_particles) != int:
+                try:
+                    volumes = int(target_particles)
+                except:
+                    log.error("Target particles type invalid. Expected an integer.")
+                    return False
+            if target_particles < 0:
+                log.error("Target particles out of range. Must be >0.")
+            if boundary is not None:
+                if type(boundary) != np.ndarray:
+                    try:
+                        boundary = np.asarray(boundary)
+                    except:
+                        log.error(
+                            "Boundary array type invalid. Expected a numpy.ndarray."
+                        )
+                        return False
+                if np.shape(boundary)[1] != 2:
+                    log.error(
+                        "Boundary array shape invalid. Expected a (N,2) numpy.ndarray."
+                    )
+                    return False
+                if np.ndim(boundary) != 2:
+                    log.error(
+                        "Boundary array dimensions invalid. Expected a 2D numpy.ndarray."
+                    )
+            if type(exclusions) != list:
+                log.error("Exclusions type invalid. Expected a list.")
+                return False
+            for exclusion in exclusions:
+                if type(exclusion) != np.ndarray:
+                    log.error(
+                        "Exclusion coordinate array type invalid. Expected a numpy.ndarray."
+                    )
+                    return False
+                if np.ndim(exclusion) != 2:
+                    log.error(
+                        "Exclusion array dimensions invalid. Expected a 2D numpy.ndarray."
+                    )
+                    return False
+                if np.shape(exclusion)[1] != 2:
+                    log.error(
+                        "Exclusion coordinate array shape invalid. Must be numpy.ndarray of size (n, 2)."
+                    )
+                    return False
 
-        # Define region of interest.
-        (
-            self._boundary,
-            self._segments,
-            self._curves,
-            _,
-        ) = gp.geometry.meshing._define_RoI(
-            gp.image.Image(self._image_0), self._boundary, self._exclusions
-        )
-
-        # Initialize gmsh if not already initialized.
-        if gmsh.isInitialized() == 0:
-            gmsh.initialize()
-        gmsh.option.setNumber("General.Verbosity", 2)
-
-        log.info(
-            "Generating mesh using gmsh with approximately {n} particles.".format(
-                n=self._target_particles
-            )
-        )
+            self._target_particles = target_particles
 
         self.data = {
             "type": "Field",
@@ -158,15 +267,57 @@ class Field(FieldBase):
             "target_particles": self._target_particles,
             "image_0": self._image_0,
         }
-        self._initial_mesh()
-        self._distribute_particles()
-        log.info("Field generated with {p} particles.".format(p=len(self._coordinates)))
-        self._mesh = {
-            "nodes": self._nodes,
-            "elements": self._elements,
-            "coordinates": self._coordinates,
-        }
-        self.data.update({"mesh": self._mesh})
+
+        # Particle distribution.
+        if _auto_distribute == True:
+            # Extract region of interest.
+            if boundary is None:
+                self._boundary = mesh_0["boundary"]
+            if exclusions == []:
+                self._exclusions = mesh_0["exclusions"]
+            self._size_lower_bound = mesh_0["size_lower_bound"]
+            self._size_upper_bound = mesh_0["size_upper_bound"]
+
+            # Define region of interest.
+
+            (
+                self._boundary,
+                self._segments,
+                self._curves,
+                _,
+            ) = gp.geometry.meshing._define_RoI(
+                gp.image.Image(self._image_0), self._boundary, self._exclusions
+            )
+
+            # Initialize gmsh if not already initialized.
+            if gmsh.isInitialized() == 0:
+                gmsh.initialize()
+            gmsh.option.setNumber("General.Verbosity", 2)
+
+            log.info(
+                "Generating mesh using gmsh with approximately {n} particles.".format(
+                    n=self._target_particles
+                )
+            )
+
+            self._initial_mesh()
+            self._distribute_particles()
+            log.info(
+                "Field generated with {p} particles.".format(p=len(self._coordinates))
+            )
+            self._field = {
+                "nodes": self._nodes,
+                "elements": self._elements,
+                "coordinates": self._coordinates,
+                "volumes": self._volumes,
+            }
+        else:
+            self._coordinates = coordinates
+            self._volumes = volumes
+            log.info("Using user-specified field.")
+            self._field = {"coordinates": self._coordinates, "volumes": self._volumes}
+
+        self.data.update({"field": self._field})
         self._initialised = True
 
     def _initial_mesh(self):
@@ -217,6 +368,15 @@ class Field(FieldBase):
         self._volumes = abs(0.5 * np.linalg.det(M))
 
     def solve(self):
+        """
+        Method to solve for the field.
+
+        Returns
+        -------
+        solved : bool
+            Boolean to indicate if the particle instances have been solved.
+        """
+
         self._particles = np.empty(len(self._coordinates), dtype=dict)
         for i in range(len(self._coordinates)):
             particle = gp.particle.Particle(
@@ -225,7 +385,11 @@ class Field(FieldBase):
                 volume_0=self._volumes[i],
                 moving=self._moving,
             )
-            particle.solve()
+            _particle_solved = particle.solve()
+            if _particle_solved == False:
+                self._unsolvable = True
+                self.data["unsolvable"] = self._unsolvable
+                return self.solved
             self._particles[i] = particle.data["results"]
             del particle
         self.data.update({"particles": self._particles})

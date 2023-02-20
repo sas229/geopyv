@@ -186,8 +186,8 @@ class Mesh(MeshBase):
             Target image of geopyv.imageImage class, instantiated by
             :mod:`~geopyv.image.Image`.
         target_nodes : int, optional
-            Target number of nodes.
-        boundary : `numpy.ndarray` (Nx,Ny)
+            Target number of nodes. Defaults to a value of 1000.
+        boundary : `numpy.ndarray` (N,2)
             Array of coordinates to define the mesh boundary.
         exclusions : list, optional
             List of `numpy.ndarray` to define the mesh exclusions.
@@ -195,7 +195,8 @@ class Mesh(MeshBase):
             Lower bound on element size. Defaults to a value of 1.
         upper_lower_bound : int, optional
             Lower bound on element size. Defaults to a value of 1000.
-
+        mesh_order : int, optional
+            Mesh element order. Options are 1 and 2. Defaults to 2.
 
         Attributes
         ----------
@@ -362,8 +363,8 @@ class Mesh(MeshBase):
             :math:`1 \cdot 10^{-3}`.
         max_iterations : int, optional
             Exit criterion for number of Gauss-Newton iterations. Defaults to value
-            of 50.
-        order : int
+            of 15.
+        subset_order : int
             Warp function order. Options are 1 and 2.
         tolerance: float, optional
             Correlation coefficient tolerance. Defaults to a value of 0.7.

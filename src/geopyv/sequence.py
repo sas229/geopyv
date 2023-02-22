@@ -524,7 +524,7 @@ class Sequence(SequenceBase):
         _g_index = 1
         _f_img = gp.image.Image(self._images[_f_index])
         _g_img = gp.image.Image(self._images[_g_index])
-        while _g_index < len(self._image_indices) - 1:
+        while _g_index < len(self._image_indices):
             log.info(
                 "Solving for image pair {}-{}.".format(
                     self._image_indices[_f_index], self._image_indices[_g_index]
@@ -569,7 +569,7 @@ class Sequence(SequenceBase):
                     self._exclusions_tags = mesh._exclusions_move_tags
                 _g_index += 1  # Iterate the target image index.
                 del _g_img
-                if _g_index != len(self._image_indices - 1):
+                if _g_index != len(self._image_indices):
                     _g_img = gp.image.Image(self._images[_g_index])
                 else:
                     self.solved = True

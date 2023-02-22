@@ -218,6 +218,7 @@ class Sequence(SequenceBase):
         self,
         *,
         image_folder=".",
+        common_name="",
         image_file_type=".jpg",
         target_nodes=1000,
         boundary=None,
@@ -257,74 +258,86 @@ class Sequence(SequenceBase):
         # Check types.
         if type(image_folder) != str:
             log.error("image_folder type invalid. Expected a string.")
-            return False
+            return
         elif os.path.isdir(image_folder) is False:
             log.error("image_folder does not exist.")
-            return False
+            return
         if type(image_file_type) != str:
             log.error("image_file_type type invalid. Expected a string.")
-            return False
+            return
         elif image_file_type not in [".jpg", ".png", ".bmp"]:
             log.error("image_file_type invalid. Expected: '.jpg', '.png', or '.bmp'.")
-            return False
+            return
         if type(target_nodes) != int:
             try:
                 target_nodes = int(target_nodes)
             except:
                 log.error("Target nodes type invalid. Expected an integer.")
-                return False
+                return
         if type(boundary) != np.ndarray:
             log.error(
                 "Boundary coordinate array type invalid. Expected a numpy.ndarray."
             )
-            return False
+            return
         if np.shape(boundary)[1] != 2:
             log.error(
                 "Boundary coordinate array shape invalid.Must be numpy.ndarray of size (n, 2)."
             )
-            return False
+            return
         if type(exclusions) != list:
             log.error("Exclusions type invalid. Expected a list.")
-            return False
+            return
         for exclusion in exclusions:
             if type(exclusion) != np.ndarray:
                 log.error(
                     "Exclusion coordinate array type invalid. Expected a numpy.ndarray."
                 )
-                return False
+                return
             if np.ndim(exclusion) != 2:
                 log.error(
                     "Exclusion array dimensions invalid. Expected a 2D numpy.ndarray."
                 )
-                return False
+                return
             if np.shape(exclusion)[1] != 2:
                 log.error(
                     "Exclusion coordinate array shape invalid. Must be numpy.ndarray of size (n, 2)."
                 )
-                return False
+                return
 
         if isinstance(size_lower_bound, (int, float)) is False:
             log.error("size_lower_bound type invalid. Expected an integer or float.")
-            return False
+            return
         if isinstance(size_upper_bound, (int, float)) is False:
             log.error("size_lower_bound type invalid. Expected an integer or float.")
-            return False
+            return
 
         # Store variables.
         self._image_folder = image_folder
         self._image_file_type = image_file_type
+        self._common_name = common_name
         platform = sys.platform
         if platform == "linux" or platform == "linux2" or platform == "darwin":
             split = "/"
         elif platform == "win32":
             split = r"\\"
-        self._images = glob.glob(
-            self._image_folder + split + "*" + self._image_file_type
-        )
-        self._images.sort(key=os.path.getmtime)
-        self._image_indices = np.asarray(
-            sorted([int(re.findall(r"\d+", x)[-1]) for x in os.listdir(image_folder)])
-        )
+        try:
+            _images = glob.glob(
+                self._image_folder
+                + split
+                + self._common_name
+                + "*"
+                + self._image_file_type
+            )
+            _image_indices_unordered = np.argsort(
+                [int(re.findall(r"\d+", x)[-1]) for x in _images]
+            )
+            self._images = [_images[index] for index in _image_indices_unordered]
+            self._image_indices = np.sort(_image_indices_unordered)
+        except:
+            log.error(
+                "Issues encountered recognising image file names. Please refer to the documentation for naming guidance."
+            )
+            return
         self._number_images = np.shape(self._image_indices)[0]
         self._target_nodes = target_nodes
         self._boundary = boundary
@@ -511,7 +524,7 @@ class Sequence(SequenceBase):
         _g_index = 1
         _f_img = gp.image.Image(self._images[_f_index])
         _g_img = gp.image.Image(self._images[_g_index])
-        while _g_index < len(self._image_indices - 1):
+        while _g_index < len(self._image_indices) - 1:
             log.info(
                 "Solving for image pair {}-{}.".format(
                     self._image_indices[_f_index], self._image_indices[_g_index]

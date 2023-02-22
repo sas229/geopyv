@@ -143,7 +143,7 @@ class Field(FieldBase):
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
             mesh_0 = series.data["meshes"][0]
-            self._number_images = self._series.data["number_images"]
+            self._number_images = series.data["number_images"]
         else:
             self._series_type = "Mesh"
             mesh_0 = series.data

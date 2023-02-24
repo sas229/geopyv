@@ -98,7 +98,8 @@ class Particle(ParticleBase):
         vol : float
             Volume represented by the particle.
         moving : bool
-            Boolean for Lagrangian (False) or Eulerian (True) specification. Defaults to False.
+            Boolean for Lagrangian (False) or Eulerian (True) specification.
+            Defaults to False.
         """
 
         self._initialised = False

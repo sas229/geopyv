@@ -57,7 +57,8 @@ class SequenceBase(Object):
                         return fig, ax
                     else:
                         log.error(
-                            "Subset index is out of the range of the mesh object contents."
+                            "Subset index is out of the range "
+                            "of the mesh object contents."
                         )
                 # Otherwise inspect the mesh.
                 else:
@@ -102,7 +103,8 @@ class SequenceBase(Object):
                         return fig, ax
                     else:
                         log.error(
-                            "Subset index is out of the range of the mesh object contents."
+                            "Subset index is out of the range of "
+                            "the mesh object contents."
                         )
                 # Otherwise inspect mesh.
                 else:
@@ -237,7 +239,8 @@ class Sequence(SequenceBase):
         target_nodes : int
             Target node number. Defaults to 1000.
         boundary : `numpy.ndarray` (N,2)
-            Array of coordinates to define the mesh boundary. Must be specified in clockwise or anti-clockwise order.
+            Array of coordinates to define the mesh boundary.
+            Must be specified in clockwise or anti-clockwise order.
         exclusions: list, optional
             List of `numpy.ndarray` to define the mesh exclusions.
         size_lower_bound : int, optional
@@ -271,7 +274,7 @@ class Sequence(SequenceBase):
         if type(target_nodes) != int:
             try:
                 target_nodes = int(target_nodes)
-            except:
+            except Exception:
                 log.error("Target nodes type invalid. Expected an integer.")
                 return
         if type(boundary) != np.ndarray:
@@ -281,7 +284,8 @@ class Sequence(SequenceBase):
             return
         if np.shape(boundary)[1] != 2:
             log.error(
-                "Boundary coordinate array shape invalid.Must be numpy.ndarray of size (n, 2)."
+                "Boundary coordinate array shape invalid. "
+                "Must be numpy.ndarray of size (n, 2)."
             )
             return
         if type(exclusions) != list:
@@ -300,7 +304,8 @@ class Sequence(SequenceBase):
                 return
             if np.shape(exclusion)[1] != 2:
                 log.error(
-                    "Exclusion coordinate array shape invalid. Must be numpy.ndarray of size (n, 2)."
+                    "Exclusion coordinate array shape invalid. "
+                    "Must be numpy.ndarray of size (n, 2)."
                 )
                 return
 
@@ -333,9 +338,10 @@ class Sequence(SequenceBase):
             )
             self._images = [_images[index] for index in _image_indices_unordered]
             self._image_indices = np.sort(_image_indices_unordered)
-        except:
+        except Exception:
             log.error(
-                "Issues encountered recognising image file names. Please refer to the documentation for naming guidance."
+                "Issues encountered recognising image file names. "
+                "Please refer to the documentation for naming guidance."
             )
             return
         self._number_images = np.shape(self._image_indices)[0]
@@ -429,7 +435,7 @@ class Sequence(SequenceBase):
         if type(seed_coord) != np.ndarray:
             try:
                 seed_coord = np.asarray(seed_coord)
-            except:
+            except Exception:
                 log.error("Seed coordinate type invalid. Expected a numpy.ndarray. ")
                 return False
         if np.ndim(seed_coord) != 1:
@@ -439,12 +445,13 @@ class Sequence(SequenceBase):
         if type(adaptive_iterations) != int:
             try:
                 adaptive_iterations = int(adaptive_iterations)
-            except:
+            except Exception:
                 log.error("Adaptive iterations type invalid. Expected an integer.")
                 return False
         if adaptive_iterations < 0:
             log.error(
-                "Adaptive iterations out of range. Expected an integer greater than or equal to zero."
+                "Adaptive iterations out of range. "
+                "Expected an integer greater than or equal to zero."
             )
             return False
         if template is None:
@@ -458,7 +465,7 @@ class Sequence(SequenceBase):
         if type(max_iterations) != int:
             try:
                 max_iterations = int(max_iterations)
-            except:
+            except Exception:
                 log.error("Maximum iterations type invalid. Expected an integer.")
                 return False
         if max_iterations < 1:
@@ -467,7 +474,7 @@ class Sequence(SequenceBase):
         if type(max_norm) != float:
             try:
                 max_norm = float(max_norm)
-            except:
+            except Exception:
                 log.error("Maximum norm type invalid. Expected a float.")
                 return False
         if max_norm < 0:
@@ -485,7 +492,7 @@ class Sequence(SequenceBase):
         if type(tolerance) != float:
             try:
                 tolerance = float(tolerance)
-            except:
+            except Exception:
                 log.error("Tolerance type invalid. Expected a float.")
                 return False
         if tolerance < 0 or tolerance > 1:
@@ -494,7 +501,7 @@ class Sequence(SequenceBase):
         if type(alpha) != float:
             try:
                 alpha = float(alpha)
-            except:
+            except Exception:
                 log.error("Alpha type invalid. Expected a float.")
                 return False
         if alpha > 1 or alpha < 0:
@@ -581,7 +588,8 @@ class Sequence(SequenceBase):
                 _f_img = gp.image.Image(self._images[_f_index])
             else:
                 log.error(
-                    "Mesh for consecutive image pair {a}-{b} is unsolvable. Sequence curtailed.".format(
+                    "Mesh for consecutive image pair {a}-{b} is unsolvable. "
+                    "Sequence curtailed.".format(
                         a=self._image_indices[_f_index], b=self._image_indices[_g_index]
                     )
                 )
@@ -598,7 +606,8 @@ class Sequence(SequenceBase):
 
     def _tracking(self, _f_index):
         """
-        Private method for tracking the movement of the mesh boundary and exclusions upon reference image updates.
+        Private method for tracking the movement of the mesh boundary
+        and exclusions upon reference image updates.
         """
 
         log.info("Tracing boundary and exclusion displacements.")

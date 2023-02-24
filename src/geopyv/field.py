@@ -104,15 +104,18 @@ class Field(FieldBase):
         target_nodes : int, optional
             Target number of particles. Defaults to a value of 1000.
         moving : bool, optional
-            Boolean to specify if particles should move or remain static. True - move (Lagrangian), False - static (Eularian). Defaults to True.
+            Boolean to specify if particles should move or remain static.
+            True: move (Lagrangian), False: static (Eularian). Defaults to True.
         boundary : numpy.ndarray (N,2), optional
             Array of coordinates to define the particle auto-distribution mesh boundary.
         exclusions : list, optional
-            List of `numpy.ndarray` (N,2) to define the particle auto-distribution mesh exclusions.
+            List to define the particle auto-distribution mesh exclusions.
+            Shape of `numpy.ndarray` (N,2).
         coordinates : numpy.ndarray (N,2), optional
             Array of coordinates to define the initial particle positions.
         volumes : numpy.ndarray (N,), optional
-            Array of volumes for particle representation. Defaults to np.ones(N) i.e. measure of volumetric strain.
+            Array of volumes for particle representation.
+            Defaults to np.ones(N) i.e. measure of volumetric strain.
 
         Note ::
         Two kwargs groups for particle distribution:
@@ -159,7 +162,7 @@ class Field(FieldBase):
             if type(coordinates) != np.ndarray:
                 try:
                     coordinates = np.asarray(coordinates)
-                except:
+                except Exception:
                     log.error(
                         "Coordinates array type invalid. Expected a numpy.ndarray."
                     )
@@ -188,7 +191,7 @@ class Field(FieldBase):
                 if type(volumes) != np.ndarray:
                     try:
                         volumes = np.asarray(volumes)
-                    except:
+                    except Exception:
                         log.error(
                             "Volumes array type invalid. Expected a numpy.ndarray."
                         )
@@ -200,7 +203,8 @@ class Field(FieldBase):
                     return False
                 if np.shape(volumes)[0] != np.shape(coordinates)[0]:
                     log.error(
-                        "Volumes-coordinates array mismatch. {volumes} volumes given for {coordinates} coordinates.".format(
+                        "Volumes-coordinates array mismatch. "
+                        "{volumes} volumes given for {coordinates} coordinates.".format(
                             volumes=np.shape(volumes)[0],
                             coordinates=np.shape(coordinates)[0],
                         )
@@ -213,7 +217,7 @@ class Field(FieldBase):
             if type(target_particles) != int:
                 try:
                     volumes = int(target_particles)
-                except:
+                except Exception:
                     log.error("Target particles type invalid. Expected an integer.")
                     return False
             if target_particles < 0:
@@ -222,7 +226,7 @@ class Field(FieldBase):
                 if type(boundary) != np.ndarray:
                     try:
                         boundary = np.asarray(boundary)
-                    except:
+                    except Exception:
                         log.error(
                             "Boundary array type invalid. Expected a numpy.ndarray."
                         )
@@ -234,25 +238,29 @@ class Field(FieldBase):
                     return False
                 if np.ndim(boundary) != 2:
                     log.error(
-                        "Boundary array dimensions invalid. Expected a 2D numpy.ndarray."
+                        "Boundary array dimensions invalid. "
+                        "Expected a 2D numpy.ndarray."
                     )
             if type(exclusions) != list:
-                log.error("Exclusions type invalid. Expected a list.")
+                log.error("Exclusions type invalid. " "Expected a list.")
                 return False
             for exclusion in exclusions:
                 if type(exclusion) != np.ndarray:
                     log.error(
-                        "Exclusion coordinate array type invalid. Expected a numpy.ndarray."
+                        "Exclusion coordinate array type invalid. "
+                        "Expected a numpy.ndarray."
                     )
                     return False
                 if np.ndim(exclusion) != 2:
                     log.error(
-                        "Exclusion array dimensions invalid. Expected a 2D numpy.ndarray."
+                        "Exclusion array dimensions invalid. "
+                        "Expected a 2D numpy.ndarray."
                     )
                     return False
                 if np.shape(exclusion)[1] != 2:
                     log.error(
-                        "Exclusion coordinate array shape invalid. Must be numpy.ndarray of size (n, 2)."
+                        "Exclusion coordinate array shape invalid. "
+                        "Must be numpy.ndarray of size (n, 2)."
                     )
                     return False
 
@@ -269,7 +277,7 @@ class Field(FieldBase):
         }
 
         # Particle distribution.
-        if _auto_distribute == True:
+        if _auto_distribute is True:
             # Extract region of interest.
             if boundary is None:
                 self._boundary = mesh_0["boundary"]
@@ -386,7 +394,7 @@ class Field(FieldBase):
                 moving=self._moving,
             )
             _particle_solved = particle.solve()
-            if _particle_solved == False:
+            if _particle_solved is False:
                 self._unsolvable = True
                 self.data["unsolvable"] = self._unsolvable
                 return self.solved

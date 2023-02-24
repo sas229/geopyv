@@ -223,19 +223,21 @@ class Mesh(MeshBase):
         self._unsolvable = False
 
         # Check types.
-        # if type(f_img) != gp.image.Image:
-        #     self._f_img = gp.io._load_f_img()
-        # if type(g_img) != gp.image.Image:
-        #     self._g_img = gp.io._load_g_img()
+        if type(f_img) != gp.image.Image:
+            self._f_img = gp.io._load_f_img()
+        if type(g_img) != gp.image.Image:
+            self._g_img = gp.io._load_g_img()
         if type(target_nodes) != int:
             log.warn(
-                "Target node number not of integer type. Attempting integer conversion..."
+                "Target node number not of integer type. "
+                "Attempting integer conversion."
             )
             try:
                 self._target_nodes = int(target_nodes)
-            except:
+            except Exception:
                 log.warn(
-                    "Target node number conversion failed. Setting target nodes as 1000."
+                    "Target node number conversion failed. "
+                    "Setting target nodes as 1000."
                 )
                 self._target_nodes = 1000
         elif target_nodes <= 0:

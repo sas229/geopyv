@@ -46,7 +46,7 @@ alpha = 0.2
 
 # Mesh instantiation.
 mesh = gp.mesh.Mesh(
-    f_img=ref, g_img=tar, target_nodes=1000, boundary=boundary, exclusions=exclusions
+    f_img=ref, g_img=tar, target_nodes="a", boundary=boundary, exclusions=exclusions
 )
 
 # Mesh inspection.

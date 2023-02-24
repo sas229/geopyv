@@ -1,7 +1,8 @@
 import numpy as np
 import scipy as sp
 import gmsh
-from scipy.optimize import minimize_scalar
+
+# from scipy.optimize import minimize_scalar
 import PIL.Image as ImagePIL
 import PIL.ImageDraw as ImageDrawPIL
 
@@ -13,14 +14,14 @@ def _gmsh_initializer():
     gmsh.option.setNumber("General.Verbosity", 2)
 
 
-def _set_target_nodes(target):
-    _gmsh_initializer()
-    log.info(
-        "Generating mesh using gmsh with approximately {n} nodes.".format(
-            n=self._target_nodes
-        )
-    )
-    _initial_mesh()
+# def _set_target_nodes(target):
+#     _gmsh_initializer()
+#     log.info(
+#         "Generating mesh using gmsh with approximately {n} nodes.".format(
+#             n=self._target_nodes
+#         )
+#     )
+#     _initial_mesh()
 
 
 def _define_RoI(_f_img, _boundary, _exclusions):

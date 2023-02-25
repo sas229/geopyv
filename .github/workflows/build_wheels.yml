@@ -46,7 +46,7 @@ jobs:
 
   upload_pypi:
     needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-latest
+    runs-on: [ubuntu-latest, windows-latest]
 
     if: github.event_name == 'release' && github.event.action == 'published'
 

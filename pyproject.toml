@@ -40,3 +40,6 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/sas229/geopyv"
 "Bug Tracker" = "https://github.com/sas229/geopyv/issues"
+
+[tool.cibuildwheel]
+skip = "pp*" # Disable building PyPy wheels on all platforms.

@@ -261,7 +261,7 @@ def convergence_mesh(data, quantity, show, block, save):
         title = "Convergence: f_img = {f_img}; g_img = {g_img}".format(
             f_img=f_img, g_img=g_img
         )
-    except:
+    except Exception:
         log.warning("Could not extract image names for plot.")
         title = "Convergence:"
 
@@ -375,7 +375,7 @@ def contour_mesh(
                 f_img=f_img, g_img=g_img, variable=quantity
             )
         )
-    except:
+    except Exception:
         log.warning("Could not extract image names for plot.")
         title = "Contour: variable = {variable}".format(variable=quantity)
     fig, ax = plt.subplots(num=title)
@@ -493,7 +493,7 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
         title = "Quiver: f_img = {f_img}; g_img = {g_img}".format(
             f_img=f_img, g_img=g_img
         )
-    except:
+    except Exception:
         log.warning("Could not extract image names for plot.")
         title = "Quiver:"
     fig, ax = plt.subplots(num=title)
@@ -607,7 +607,7 @@ def inspect_mesh(data, show, block, save):
             ([(m.end(0)) for m in re.finditer(split, data["images"]["f_img"])][-1]) :
         ]
         title = "Inspect mesh: f_img = {f_img}".format(f_img=f_img)
-    except:
+    except Exception:
         log.warning("Could not extract image names for plot.")
         title = "Inspect mesh:"
 
@@ -716,7 +716,6 @@ def trace_particle(
         ax.set_aspect("equal", "box")
 
     if colorbar is True:
-        label = labels[component]
         fig.colorbar(lines, label=labels[component])
 
         # Limit control.
@@ -775,9 +774,10 @@ def inspect_field(data, mesh, show, block, save):
             # Plot mesh.
             for i in range(np.shape(x_p)[0]):
                 ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
-        except:
+        except Exception:
             log.warning(
-                "Mesh requested but no field mesh information exists as field was user-specified."
+                "Mesh requested but no field mesh information "
+                "exists as field was user-specified."
             )
 
     for i in range(len(data["field"]["coordinates"])):

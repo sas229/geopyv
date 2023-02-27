@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geopyv"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
   { name="Sam Stanier", email="sas229@cam.ac.uk" },
   { name="Jonathan Smith", email="jdks2@cam.ac.uk" },
@@ -40,3 +40,6 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/sas229/geopyv"
 "Bug Tracker" = "https://github.com/sas229/geopyv/issues"
+
+# [tool.cibuildwheel]
+# skip = "pp*" # Disable building PyPy wheels on all platforms.

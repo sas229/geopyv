@@ -42,13 +42,14 @@ def load(*, filename=None):
           data from a `Subset` instance will be loaded into a `SubsetResults` instance.
 
     """
+    directory = os.getcwd()
     if filename is None:
-        directory = os.getcwd()
         dialog = gp.gui.selectors.file.FileSelector()
         filepath = dialog.get_path("Select geopyv data file", directory)
     else:
         ext = ".pyv"
-        filepath = filename + ext
+        # filepath = filename + ext
+        filepath = directory + "/" + filename + ext
     try:
         with open(filepath, "r") as infile:
             message = "Loading geopyv object"
@@ -70,8 +71,12 @@ def load(*, filename=None):
             results_instance = getattr(module, class_name)
             return results_instance(data)
     except Exception:
-        log.error("File not found.")
-        return None
+        log.error(
+            "File does not exist at the path supplied:\n{filepath}".format(
+                filepath=filepath
+            )
+        )
+        raise FileExistsError
 
 
 def save(*, object, filename=None):
@@ -149,11 +154,16 @@ def _convert_list_to_ndarray(data):
 
     """
     for key, value in data.items():
+        if key == "meshes":
+            try:
+                for subset in value:
+                    _convert_list_to_ndarray(subset)
+            except:
+                data[key] = list(value)
         # If not a list of subsets, convert to numpy ndarray.
-        if (
+        elif (
             type(value) == list
             and key != "subsets"
-            and key != "meshes"
             and key != "mesh"
             and key != "particles"
             and key != "field"
@@ -163,13 +173,7 @@ def _convert_list_to_ndarray(data):
         elif type(value) == dict:
             _convert_list_to_ndarray(data[key])
         # If a list of subsets convert recursively.
-        elif (
-            key == "subsets"
-            or key == "meshes"
-            or key == "mesh"
-            or key == "particles"
-            or key == "field"
-        ):
+        elif key == "subsets" or key == "mesh" or key == "particles" or key == "field":
             for subset in value:
                 _convert_list_to_ndarray(subset)
     return data
@@ -202,3 +206,35 @@ def _load_g_img():
     """
     log.warn("No target image supplied. Please select the target image.")
     return _load_img("Select target image.")
+
+
+def _get_folder(message):
+    """
+
+    Private method to open a file dialog and select a folder.
+
+    """
+    directory = os.getcwd()
+    dialog = gp.gui.selectors.folder.FolderSelector()
+    folder_path = dialog.get_path(directory, message)
+    return folder_path
+
+
+def _get_image_folder():
+    """
+
+    Private method to get the `image_folder`.
+
+    """
+    log.warn("No `image_folder` supplied. Please select the `image_folder`.")
+    return _get_folder("Select image folder.")
+
+
+def _get_mesh_folder():
+    """
+
+    Private method to get the `image_folder`.
+
+    """
+    log.warn("No `mesh_folder` supplied. Please select the `mesh_folder`.")
+    return _get_folder("Select mesh folder.")

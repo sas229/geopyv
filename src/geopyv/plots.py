@@ -341,7 +341,12 @@ def contour_mesh(
     for s in subsets:
         x.append(s["position"]["x"])
         y.append(s["position"]["y"])
-        if quantity == "u_x":
+
+        if quantity == "u":
+            value.append(float((s["results"]["p"])[0]))
+        elif quantity == "v":
+            value.append(float((s["results"]["p"])[1]))
+        elif quantity == "u_x":
             value.append(float((s["results"]["p"])[2]))
         elif quantity == "v_x":
             value.append(float((s["results"]["p"])[3]))
@@ -353,6 +358,7 @@ def contour_mesh(
             value.append(np.sqrt(s["results"]["u"] ** 2 + s["results"]["v"] ** 2))
         else:
             value.append(s["results"][quantity])
+
     x = np.asarray(x)
     y = np.asarray(y)
     value = np.asarray(value)
@@ -426,7 +432,7 @@ def contour_mesh(
         fig.colorbar(contours, label=label, ticks=ticks)
 
     # Axis control.
-    if axis == "off":
+    if axis is False:
         ax.set_axis_off()
 
     # Limit control.
@@ -646,8 +652,6 @@ def trace_particle(
     data,
     quantity,
     component,
-    start_frame,
-    end_frame,
     imshow,
     colorbar,
     ticks,

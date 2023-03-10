@@ -61,6 +61,43 @@ class SubsetBase(Object):
             :meth:`~geopyv.plots.inspect_subset`
 
         """
+
+        # Check input.
+        if type(show) != bool:
+            log.error(
+                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(show).__name__
+                )
+            )
+            raise TypeError(
+                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(show).__name__
+                )
+            )
+        if type(block) != bool:
+            log.error(
+                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(block).__name__
+                )
+            )
+            raise TypeError(
+                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(block).__name__
+                )
+            )
+        if type(save) != str and save is not None:
+            log.error(
+                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                    type3=type(save).__name__
+                )
+            )
+            raise TypeError(
+                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                    type3=type(save).__name__
+                )
+            )
+
+        # Inspect subset.
         fig, ax = gp.plots.inspect_subset(
             data=self.data, mask=None, show=show, block=block, save=save
         )
@@ -103,6 +140,43 @@ class SubsetBase(Object):
             :meth:`~geopyv.plots.convergence_subset`
 
         """
+
+        # Check input.
+        if type(show) != bool:
+            log.error(
+                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(show).__name__
+                )
+            )
+            raise TypeError(
+                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(show).__name__
+                )
+            )
+        if type(block) != bool:
+            log.error(
+                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(block).__name__
+                )
+            )
+            raise TypeError(
+                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(block).__name__
+                )
+            )
+        if type(save) != str and save is not None:
+            log.error(
+                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                    type3=type(save).__name__
+                )
+            )
+            raise TypeError(
+                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                    type3=type(save).__name__
+                )
+            )
+
+        # Plot convergence.
         if "results" in self.data:
             fig, ax = gp.plots.convergence_subset(
                 data=self.data, show=show, block=block, save=save
@@ -210,36 +284,45 @@ class Subset(SubsetBase):
 
         """
         log.debug("Initialising geopyv Subset object.")
+
+        # Check types.
+        if type(f_img) != gp.image.Image:
+            log.info("Selecting a reference image...")
+            _img = gp.io._load_f_img()
+        if type(g_img) != gp.image.Image:
+            log.info("Selecting a target image...")
+            g_img = gp.io._load_g_img()
+        if type(f_coord) != np.ndarray:
+            f_coord = np.empty(2)
+            coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
+            _f_coord = coordinate.select(f_img, template)
+        elif np.shape(f_coord) != np.shape(np.empty(2)):
+            log.error("Template coordinate of invalid shape.")
+            coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_coord = coordinate.select(f_img, template)
+        if template is None:
+            template = gp.templates.Circle(50)
+        elif (
+            type(template) != gp.templates.Circle
+            and type(template) != gp.templates.Square
+        ):
+            log.error(
+                "`template` keyword argument value invalod. Expected `gp.templates.Circle` or `gp.templates.Square`, but got {type3}.".format(
+                    type3=type(template).__name__
+                )
+            )
+            raise ValueError(
+                "`template` keyword argument value invalod. Expected `gp.templates.Circle` or `gp.templates.Square`, but got {type3}.".format(
+                    type3=type(template).__name__
+                )
+            )
+
+        # Store.
         self._initialised = False
         self._f_coord = f_coord
         self._f_img = f_img
         self._g_img = g_img
         self._template = template
-
-        # Check types.
-        if type(self._f_img) != gp.image.Image:
-            self._f_img = gp.io._load_f_img()
-        if type(self._g_img) != gp.image.Image:
-            self._g_img = gp.io._load_g_img()
-        if type(self._f_coord) != np.ndarray:
-            self._f_coord = np.empty(2)
-            coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
-            self._f_coord = coordinate.select(self._f_img, self._template)
-        elif np.shape(self._f_coord) != np.shape(np.empty(2)):
-            log.error("Template coordinate of invalid shape.")
-            coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
-            self._f_coord = coordinate.select(self._f_img, self._template)
-        if self._template is None:
-            self._template = gp.templates.Circle(50)
-        elif (
-            type(self._template) != gp.templates.Circle
-            and type(self._template) != gp.templates.Square
-        ):
-            log.error(
-                "Template not defined in geopyv.templates. "
-                "Using default: gp.templates.Circle(50)."
-            )
-            self._template = gp.templates.Circle(50)
 
         # Check subset is entirely within the reference image.
         self._x = self._f_coord[0]

@@ -427,6 +427,7 @@ class Sequence(SequenceBase):
 
         Returns
         -------
+        
         solved : bool
             Boolean to indicate if the subset instance has been solved.
         """

@@ -145,8 +145,15 @@ class Field(FieldBase):
             log.error("Invalid moving type. Must be a bool.")
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
+            if series.data["file_settings"]["save_by_reference"] == True:
+                for i in range(np.shape(series.data["meshes"])[0]):
+                    series.data["meshes"][i] = gp.io.load(
+                        filename=series.data["file_settings"]["mesh_folder"]
+                        + series.data["meshes"][i]
+                    ).data
+            series.data["file_settings"]["save_by_reference"] = False
             mesh_0 = series.data["meshes"][0]
-            self._number_images = series.data["number_images"]
+            self._number_images = np.shape(series.data["meshes"])[0] + 1
         else:
             self._series_type = "Mesh"
             mesh_0 = series.data
@@ -287,7 +294,6 @@ class Field(FieldBase):
             self._size_upper_bound = mesh_0["size_upper_bound"]
 
             # Define region of interest.
-
             (
                 self._boundary,
                 self._segments,

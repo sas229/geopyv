@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 # Subset test.
 # Subset setup.
 ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
-tar = gp.image.Image("./images/T-Bar/IMG_1064.jpg")
+tar = gp.image.Image("./images/T-Bar/IMG_1071.jpg")
 template = gp.templates.Circle(50)
 
 # Subset instantiation.
@@ -30,7 +30,7 @@ subset = gp.io.load(filename="test")
 # Mesh test.
 # Mesh setup.
 ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
-tar = gp.image.Image("./images/T-Bar/IMG_1064.jpg")
+tar = gp.image.Image("./images/T-Bar/IMG_1071.jpg")
 template = gp.templates.Circle(50)
 boundary = np.asarray(
     [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
@@ -46,11 +46,11 @@ alpha = 0.2
 
 # Mesh instantiation.
 mesh = gp.mesh.Mesh(
-    f_img=ref, g_img=tar, target_nodes="a", boundary=boundary, exclusions=exclusions
+    f_img=ref, g_img=tar, target_nodes=1000, boundary=boundary, exclusions=exclusions
 )
 
 # Mesh inspection.
-mesh.inspect()
+#mesh.inspect(subset_index=5000)
 
 # Mesh saving : note, prior to solving, a geopyv object cannot be saved.
 gp.io.save(object=mesh, filename="mesh")
@@ -71,8 +71,8 @@ del mesh
 # Mesh loading.
 mesh = gp.io.load(filename="mesh")
 
-# Other mesh methods (plot functionaility). 
-# The commands are basically standard matplotlib...
+Other mesh methods (plot functionaility). 
+The commands are basically standard matplotlib...
 mesh.convergence()
 mesh.convergence(quantity="norm")
 mesh.convergence(quantity="iterations")
@@ -82,7 +82,7 @@ mesh.contour(
     colorbar=False,
     alpha=0.75,
     levels=np.arange(-5, 6, 1),
-    axis="off",
+    axis=False,
     xlim=((900, 2900)),
     ylim=((500, 2500)),
 )
@@ -91,25 +91,25 @@ mesh.contour(quantity="iterations")
 mesh.contour(quantity="R")
 
 # You can also return the fig and ax objects and add customised items to the plot.
-fig, ax = mesh.contour("v", alpha=1.0, levels=np.arange(-5, 6, 1))
+fig, ax = mesh.contour(quantity = "v", alpha=1.0, levels=np.arange(-5, 6, 1))
 ax.plot([0, 2000], [1000, 1000], color="k", linewidth=3.0, zorder=10)
 ax.set_xlim((0, 2000))
 plt.show()
 
 # Let's inspect some clipped subsets.
-mesh.inspect(subset=0)
-mesh.inspect(subset=1)
-mesh.inspect(subset=2)
-mesh.inspect(subset=3)
-mesh.inspect(subset=4)
+mesh.inspect(subset_index=0)
+mesh.inspect(subset_index=1)
+mesh.inspect(subset_index=2)
+mesh.inspect(subset_index=3)
+mesh.inspect(subset_index=4)
 
 # You can inspect subsets and their convergence
 # via the mesh object by passing a subset number.
-mesh.inspect(subset=0)
-mesh.convergence(subset=0)
+mesh.inspect(subset_index=0)
+mesh.convergence(subset_index=0)
 
 # If you supply a subset index that is out of range you get a ValueError.
-mesh.convergence(subset=4000)
+mesh.convergence(subset_index=4000)
 
 # Sequence test.
 # Sequence setup.
@@ -128,15 +128,17 @@ alpha = 0.2
 
 # Sequence instantiation.
 sequence = gp.sequence.Sequence(
-    image_folder="./images/T-Bar",
+    image_folder="images/T-Bar/",
     target_nodes=1000,
     boundary=boundary,
     exclusions=exclusions,
+    save_by_reference = True,
+    mesh_folder = "images/T-Bar/meshes/"
 )
 
 # Sequence solving.
 sequence.solve(
-    track="move",
+    track=True,
     seed_coord=seed,
     template=template,
     adaptive_iterations=0,
@@ -144,7 +146,7 @@ sequence.solve(
     alpha=alpha,
     tolerance=0.7,
 )
-# 
+ 
 # Sequence saving.
 gp.io.save(object=sequence, filename="T_bar_sequence")
 del sequence
@@ -153,13 +155,13 @@ del sequence
 sequence = gp.io.load(filename="T_bar_sequence")
 
 # Other sequence methods (plot functionality).
-sequence.inspect(mesh=0)
-sequence.inspect(mesh=3, subset=20) 
-sequence.convergence(mesh=1)
-sequence.convergence(mesh=2, subset=4)
+sequence.inspect(mesh_index=0)
+sequence.inspect(mesh_index=3, subset_index=20) 
+sequence.convergence(mesh_index=1)
+sequence.convergence(mesh_index=2, subset_index=4)
 sequence.contour(mesh_index = 1, quantity = "R", mesh = True)
-sequence.quiver(mesh_index = 4)
-
+sequence.quiver(mesh_index = 3)
+ 
 # Particle test.
 # Particle setup.
 coordinate_0 = np.asarray([1600.,1900.])

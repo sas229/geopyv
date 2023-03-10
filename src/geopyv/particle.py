@@ -15,14 +15,14 @@ log = logging.getLogger(__name__)
 
 class ParticleBase(Object):
     """
-    Particle base class to be used as a mixin.
+    Particle base class to be used as a mixin. Contains plot functionality.
     """
 
     def __init__(self):
         super().__init__(object_type="Particle")
         """
 
-        Particle base class initialiser
+        Particle base class initialiser.
 
         """
 
@@ -30,50 +30,292 @@ class ParticleBase(Object):
         self,
         quantity="warps",
         component=0,
-        start_frame=None,
-        end_frame=None,
         imshow=True,
         colorbar=True,
         ticks=None,
         alpha=0.75,
-        axis=None,
+        axis=True,
         xlim=None,
         ylim=None,
         show=True,
         block=True,
         save=None,
     ):
-        if quantity is not None:
-            fig, ax = gp.plots.trace_particle(
-                data=self.data,
-                quantity=quantity,
-                component=component,
-                start_frame=start_frame,
-                end_frame=end_frame,
-                imshow=imshow,
-                colorbar=True,
-                ticks=ticks,
-                alpha=alpha,
-                axis=axis,
-                xlim=xlim,
-                ylim=ylim,
-                show=show,
-                block=block,
-                save=save,
+        """
+        Method to plot an incremental quantity along the particle position path.
+
+        Parameters
+        ----------
+        quantity : str, optional
+            Specifier for which metric to plot along the particle path.
+        component : int, optional
+            Specifier for which component of the metric to plot along the particle path.
+        imshow : bool, optional
+            Control whether the reference image is plotted.
+            Defaults to True.
+        colorbar : bool, optional
+            Control whether the colour bar is plotted.
+            Defaults to True.
+        ticks : list, optional
+            Overwrite default colourbar ticks.
+            Defaults to None.
+        alpha : float, optional
+            Control contour opacity. Must be between 0.0-1.0.
+            Defaults to 0.75.
+        axis : bool, optional
+            Control whether the axes are plotted.
+            Defaults to True.
+        xlim : array-like, optional
+            Set the plot x-limits (lower_limit,upper_limit).
+            Defaults to None.
+        ylim : array-like, optional
+            Set the plot y-limits (lower_limit,upper_limit).
+            Defaults to None.
+        show : bool, optional
+            Control whether the plot is displayed.
+            Defaults to True.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+            Defaults to False.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
+        """
+
+        # Check if solved.
+        if self.data["solved"] != True or "results" not in self.data:
+            log.error(
+                "Particle not yet solved therefore no convergence data to plot. First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
             )
-            return fig, ax
+            raise ValueError(
+                "Particle not yet solved therefore no convergence data to plot. First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+
+        # Check input.
+        if type(quantity) != str:
+            log.error(
+                "`quantity` keyword argument type invalid. Expected a `str`, but got a {type3}.".format(
+                    type3=type(quantity).__name__
+                )
+            )
+            raise TypeError(
+                "`quantity` keyword argument type invalid. Expected a `str`, but got a {type3}.".format(
+                    type3=type(quantity).__name__
+                )
+            )
+        elif quantity not in ["coordinates", "warps", "volumes", "stresses"]:
+            log.error(
+                "`quantity` keyword argument value invalid. Expected `coordinates`, `warps`, `volumes`, `stresses`, but got {value}.".format(
+                    value=quantity
+                )
+            )
+            raise ValueError(
+                "`quantity` keyword argument value invalid. Expected `coordinates`, `warps`, `volumes`, `stresses`, but got {value}.".format(
+                    value=quantity
+                )
+            )
+        if type(component) != int:
+            log.error(
+                "`component` keyword argument type invalid. Expected a `int`, but got a {type3}.".format(
+                    type3=type(component).__name__
+                )
+            )
+            raise TypeError(
+                "`component` keyword argument type invalid. Expected a `int`, but got a {type3}.".format(
+                    type3=type(component).__name__
+                )
+            )
+        if component >= np.shape(self.data["results"][quantity])[1]:
+            log.error(
+                "`component` {input_value} is out of bounds for axis 0 with size {max_value}.".format(
+                    max_value=np.shape(self.data["results"][quantity])[1] - 1,
+                    input_value=component,
+                )
+            )
+            raise IndexError(
+                "`component` {input_value} is out of bounds for axis 0 with size {max_value}.".format(
+                    max_value=np.shape(self.data["results"][quantity])[1] - 1,
+                    input_value=component,
+                )
+            )
+        if type(imshow) != bool:
+            log.error(
+                "`imshow` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(imshow).__name__
+                )
+            )
+            raise TypeError(
+                "`imshow` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(imshow).__name__
+                )
+            )
+        if type(colorbar) != bool:
+            log.error(
+                "`colorbar` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(colorbar).__name__
+                )
+            )
+            raise TypeError(
+                "`colorbar` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(colorbar).__name__
+                )
+            )
+        if isinstance(ticks, (tuple, list, np.ndarray)) is False and ticks is not None:
+            log.error(
+                "`ticks` keyword argument type invalid. Expected a `tuple`, `list` or `numpy.ndarray`, but got a `{type2}`.".format(
+                    type2=type(ticks).__name__
+                )
+            )
+            raise TypeError(
+                "`ticks` keyword argument type invalid. Expected a `tuple`, `list` or `numpy.ndarray`, but got a `{type2}`.".format(
+                    type2=type(ticks).__name__
+                )
+            )
+        if type(alpha) != float:
+            log.warning(
+                "`alpha` keyword argument type invalid. Expected a `float`, but got a `{type2}`.\nAttempting conversion...".format(
+                    type2=type(alpha).__name__
+                )
+            )
+            try:
+                alpha = float(alpha)
+                log.warning(
+                    "`alpha` keyword argument type conversion successful. New value: {value}".format(
+                        value=alpha
+                    )
+                )
+            except ValueError:
+                log.error(
+                    "`alpha` keyword argument type conversion failed. Input a `float`, 0.0-1.0."
+                )
+                raise TypeError(
+                    "`alpha` keyword argument type conversion failed. Input a `float`, 0.0-1.0."
+                )
+        elif alpha < 0.0 or alpha > 1.0:
+            log.error(
+                "`alpha` keyword argument value {value} out of range 0.0-1.0. Input a `float`, 0.0-1.0.".format(
+                    value=alpha
+                )
+            )
+            raise ValueError(
+                "`alpha` keyword argument value {value} out of range 0.0-1.0. Input a `float`, 0.0-1.0.".format(
+                    value=alpha
+                )
+            )
+        if type(axis) != bool:
+            log.error(
+                "`axis` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(axis).__name__
+                )
+            )
+            raise TypeError(
+                "`axis` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(axis).__name__
+                )
+            )
+        if xlim is not None:
+            if isinstance(xlim, (tuple, list, np.ndarray)) is False:
+                log.error(
+                    "`xlim` keyword argument type invalid. Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, but got a {type5}.".format(
+                        type5=type(xlim).__name__
+                    )
+                )
+                raise TypeError(
+                    "`xlim` keyword argument type invalid. Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, but got a {type5}.".format(
+                        type5=type(xlim).__name__
+                    )
+                )
+            elif np.shape(xlim)[0] != 2:
+                log.error(
+                    "`xlim` keyword argument primary axis size invalid. Expected 2, but got {size}.".format(
+                        size=np.shape(xlim)[0]
+                    )
+                )
+                raise ValueError(
+                    "`xlim` keyword argument primary axis size invalid. Expected 2, but got {size}.".format(
+                        size=np.shape(xlim)[0]
+                    )
+                )
+        if ylim is not None:
+            if isinstance(ylim, (tuple, list, np.ndarray)) is False:
+                log.error(
+                    "`ylim` keyword argument type invalid. Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, but got a {type5}.".format(
+                        type5=type(ylim).__name__
+                    )
+                )
+                raise TypeError(
+                    "`ylim` keyword argument type invalid. Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, but got a {type5}.".format(
+                        type5=type(ylim).__name__
+                    )
+                )
+            elif np.shape(ylim)[0] != 2:
+                log.error(
+                    "`ylim` keyword argument primary axis size invalid. Expected 2, but got {size}.".format(
+                        size=np.shape(ylim)[0]
+                    )
+                )
+                raise ValueError(
+                    "`ylim` keyword argument primary axis size invalid. Expected 2, but got {size}.".format(
+                        size=np.shape(ylim)[0]
+                    )
+                )
+        if type(show) != bool:
+            log.error(
+                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(show).__name__
+                )
+            )
+            raise TypeError(
+                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(show).__name__
+                )
+            )
+        if type(block) != bool:
+            log.error(
+                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(block).__name__
+                )
+            )
+            raise TypeError(
+                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                    type2=type(block).__name__
+                )
+            )
+        if type(save) != str and save is not None:
+            log.error(
+                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                    type3=type(save).__name__
+                )
+            )
+            raise TypeError(
+                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                    type3=type(save).__name__
+                )
+            )
+
+        fig, ax = gp.plots.trace_particle(
+            data=self.data,
+            quantity=quantity,
+            component=component,
+            imshow=imshow,
+            colorbar=True,
+            ticks=ticks,
+            alpha=alpha,
+            axis=axis,
+            xlim=xlim,
+            ylim=ylim,
+            show=show,
+            block=block,
+            save=save,
+        )
+        return fig, ax
 
 
 class Particle(ParticleBase):
     """Particle class for geopyv.
 
-    Parameters
-    ----------
+    Private Attributes
+    ------------------
 
-
-
-    vol : float
-        Particle representative volume.
     """
 
     def __init__(
@@ -123,14 +365,27 @@ class Particle(ParticleBase):
 
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
-            self._series = series.data["meshes"]
+            if series.data["file_settings"]["save_by_reference"]:
+                self._series = np.empty(
+                    np.shape(series.data["meshes"])[0], dtype=object
+                )
+                for i in range(np.shape(series.data["meshes"])[0]):
+                    self._series[i] = gp.io.load(
+                        filename=series.data["file_settings"]["mesh_folder"]
+                        + series.data["meshes"][i]
+                    ).data
+            else:
+                self._series = series.data["meshes"]
         else:
             self._series_type = "Mesh"
             self._series = np.asarray([series.data])
         self._moving = moving
 
         if self._series[0]["mask"][int(coordinate_0[1]), int(coordinate_0[0])] == 0:
-            log.error("Particle coordinate lies outside the mesh.")
+            log.warning(
+                "`coordinate_0` keyword argument value out of boundary.\nSelect `coordinate_0`..."
+            )
+            coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
 
         self._coordinates = np.zeros((len(self._series) + 1, 2))
         self._warps = np.zeros((len(self._series) + 1, 12))
@@ -182,7 +437,7 @@ class Particle(ParticleBase):
         """
 
         Method to locate the numerical particle within the mesh,
-        returning the current element index.
+        returning the current element_nodes index.
 
 
         Parameters
@@ -200,58 +455,69 @@ class Particle(ParticleBase):
         )  # Particle-mesh node "distances" (truly distance^2).
         tri_idxs = np.argwhere(
             np.any(self._series[m]["elements"] == np.argmin(dist), axis=1)
-        ).flatten()  # Retrieve relevant element indices.
+        ).flatten()  # Retrieve relevant element_nodes indices.
         for i in range(len(tri_idxs)):
             if path.Path(
                 self._series[m]["nodes"][self._series[m]["elements"][tri_idxs[i]]]
             ).contains_point(
                 self._coordinates[self._reference_index]
-            ):  # Check if the element includes the particle coordinates.
-                break  # If the correct element is identified, stop the search.
+            ):  # Check if the element_nodes includes the particle coordinates.
+                break  # If the correct element_nodes is identified, stop the search.
 
-        return tri_idxs[i]  # Return the element index.
+        return tri_idxs[i]  # Return the element_nodes index.
 
-    def _N_T(self, m, tri_idx):
+    def _local_coordinates(self, element_nodes):
         """
-
-        Private method to calculate the element shape functions for
-        position and strain calculations.
-
+        Private method to find the particle position in terms of the local elementcoordinate
+        system (zeta, eta, theta).
 
         Parameters
         ----------
-        mesh : `geopyv.Mesh` object
-            The relevant mesh.
-        tri_idx: `int`
-            The index of the relevant element within mesh.
+        element_nodes : numpy.ndarray
+            Nodal coordinate array.
+
+        Returns
+        -------
+        zeta : float
+            The local coordinate along the 1st axis. Value will be between 0.0-1.0.
+        eta : float
+            The local coordinate along the 2nd axis. Value will be between 0.0-1.0.
+        theta : float
+            The local coordinate along the 3rd axis. Value will be between 0.0-1.0.
 
         """
-        M = np.ones((4, 3))
-        M[0, 1:] = self._coordinates[self._reference_index]
-        M[1:, 1:] = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
-        area = self._series[m]["areas"][tri_idx]
-
-        self.W = np.ones(3)
-        self.W[0] = abs(np.linalg.det(M[[0, 2, 3]])) / (2 * abs(area))
-        self.W[1] = abs(np.linalg.det(M[[0, 1, 3]])) / (2 * abs(area))
-        self.W[2] -= self.W[0] + self.W[1]
-
-    def _warp_increment(self, m, tri_idx):
-        self._warp_inc = np.zeros(12)
-        element = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
-        displacements = self._series[m]["results"]["displacements"][
-            self._series[m]["elements"][tri_idx]
-        ]
-
         # Local coordinates
         A = np.ones((3, 4))
         A[1:, 0] = self._coordinates[self._reference_index]
-        A[1:, 1:] = element[:3, :2].transpose()
+        A[1:, 1:] = element_nodes[:3, :2].transpose()
         zeta = np.linalg.det(A[:, [0, 2, 3]]) / np.linalg.det(A[:, [1, 2, 3]])
         eta = np.linalg.det(A[:, [0, 3, 1]]) / np.linalg.det(A[:, [1, 2, 3]])
         theta = 1 - zeta - eta
 
-        # Weighting function (and derivatives to 2nd order)
+        return zeta, eta, theta, A
+
+    def _shape_function(self, zeta, eta, theta):
+        """
+        Private method to create the shape function array and it's derivatives up to 2nd order.
+
+        Parameters
+        ----------
+        zeta : float
+            The local coordinate along the 1st axis. Value will be between 0.0-1.0.
+        eta : float
+            The local coordinate along the 2nd axis. Value will be between 0.0-1.0.
+        theta : float
+            The local coordinate along the 3rd axis. Value will be between 0.0-1.0.
+
+        Returns
+        -------
+        N : numpy.ndarray (6)
+            Element shape function : [N1 N2 N3 N4 N5 N6]
+        dN : numpy.ndarray (2,6)
+            Element shape function 1st order derivatives : [[dN1/dzeta dN1/dzeta ...][dN1/deta dN1/deta ...]]
+        d2N : numpy.ndarray(3,6)
+            Element shape function 2nd order derivatives : [[d^2N1/dzeta^2 d^2N2/dzeta^2 ...][d^2N1/dzeta^2 d^2N2/dzetadeta ...][d^2N1/deta^2 d^2N2/deta^2 ...]]
+        """
         N = np.asarray(
             [
                 zeta * (2 * zeta - 1),
@@ -272,53 +538,78 @@ class Particle(ParticleBase):
             [[4, 0, 4, 0, 0, -8], [0, 0, 4, 4, -4, -4], [0, 4, 4, 0, -8, 0]]
         )
 
+        return N, dN, d2N
+
+    def _warp_increment(self, m, tri_idx):
+        self._warp_inc = np.zeros(12)
+        element_nodes = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
+        displacements = self._series[m]["results"]["displacements"][
+            self._series[m]["elements"][tri_idx]
+        ]
+
+        # Get local coordinates.
+        zeta, eta, theta, A = self._local_coordinates(element_nodes)
+
+        # Shape function and derivatives.
+        N, dN, d2N = self._shape_function(zeta, eta, theta)
+
         # Displacements
         self._warp_inc[:2] = N @ displacements
 
         # 1st Order Strains
-        J_x_T = dN @ element
+        J_x_T = dN @ element_nodes
         J_u_T = dN @ displacements
         self._warp_inc[2:6] = (np.linalg.inv(J_x_T) @ J_u_T).flatten()
 
         # 2nd Order Strains
-        d2udzeta2 = d2N @ displacements
+        K_u = d2N @ displacements
         J_zeta = np.zeros((2, 2))
-        J_zeta[0, 0] = element[1, 1] - element[2, 1]
-        J_zeta[0, 1] = element[2, 0] - element[1, 0]
-        J_zeta[1, 0] = element[2, 1] - element[0, 1]
-        J_zeta[1, 1] = element[0, 0] - element[2, 0]
+        J_zeta[0, 0] = element_nodes[1, 1] - element_nodes[2, 1]
+        J_zeta[0, 1] = element_nodes[2, 0] - element_nodes[1, 0]
+        J_zeta[1, 0] = element_nodes[2, 1] - element_nodes[0, 1]
+        J_zeta[1, 1] = element_nodes[0, 0] - element_nodes[2, 0]
         J_zeta /= np.linalg.det(A[:, [1, 2, 3]])
+
+        K_x_inv = np.zeros((3, 3))
+        K_x_inv[0, 0] = J_zeta[0, 0] ** 2
+        K_x_inv[0, 1] = 2 * J_zeta[0, 0] * J_zeta[0, 1]
+        K_x_inv[0, 2] = J_zeta[0, 1] ** 2
+        K_x_inv[1, 0] = J_zeta[0, 0] * J_zeta[1, 0]
+        K_x_inv[1, 1] = J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[1, 0] * J_zeta[0, 1]
+        K_x_inv[1, 2] = J_zeta[0, 1] * J_zeta[1, 1]
+        K_x_inv[2, 0] = J_zeta[1, 0] ** 2
+        K_x_inv[2, 1] = 2 * J_zeta[1, 0] * J_zeta[1, 1]
+        K_x_inv[2, 2] = J_zeta[1, 1] ** 2
+
         self._warp_inc[6] = (
-            d2udzeta2[0, 0] * J_zeta[0, 0] ** 2
-            + 2 * d2udzeta2[1, 0] * J_zeta[0, 0] * J_zeta[1, 0]
-            + d2udzeta2[2, 0] * J_zeta[1, 0] ** 2
+            K_u[0, 0] * J_zeta[0, 0] ** 2
+            + 2 * K_u[1, 0] * J_zeta[0, 0] * J_zeta[1, 0]
+            + K_u[2, 0] * J_zeta[1, 0] ** 2
         )
         self._warp_inc[7] = (
-            d2udzeta2[0, 1] * J_zeta[0, 0] ** 2
-            + 2 * d2udzeta2[1, 1] * J_zeta[0, 0] * J_zeta[1, 0]
-            + d2udzeta2[2, 1] * J_zeta[1, 0] ** 2
+            K_u[0, 1] * J_zeta[0, 0] ** 2
+            + 2 * K_u[1, 1] * J_zeta[0, 0] * J_zeta[1, 0]
+            + K_u[2, 1] * J_zeta[1, 0] ** 2
         )
         self._warp_inc[8] = (
-            d2udzeta2[0, 0] * J_zeta[0, 0] * J_zeta[0, 1]
-            + d2udzeta2[1, 0]
-            * (J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[1, 0] * J_zeta[0, 1])
-            + d2udzeta2[2, 0] * J_zeta[1, 0] * J_zeta[1, 1]
+            K_u[0, 0] * J_zeta[0, 0] * J_zeta[0, 1]
+            + K_u[1, 0] * (J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[1, 0] * J_zeta[0, 1])
+            + K_u[2, 0] * J_zeta[1, 0] * J_zeta[1, 1]
         )
         self._warp_inc[9] = (
-            d2udzeta2[0, 1] * J_zeta[0, 0] * J_zeta[0, 1]
-            + d2udzeta2[1, 1]
-            * (J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[1, 0] * J_zeta[0, 1])
-            + d2udzeta2[2, 1] * J_zeta[1, 0] * J_zeta[1, 1]
+            K_u[0, 1] * J_zeta[0, 0] * J_zeta[0, 1]
+            + K_u[1, 1] * (J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[1, 0] * J_zeta[0, 1])
+            + K_u[2, 1] * J_zeta[1, 0] * J_zeta[1, 1]
         )
         self._warp_inc[10] = (
-            d2udzeta2[0, 0] * J_zeta[0, 1] ** 2
-            + 2 * d2udzeta2[1, 0] * J_zeta[0, 1] * J_zeta[1, 1]
-            + d2udzeta2[2, 0] * J_zeta[1, 1] ** 2
+            K_u[0, 0] * J_zeta[0, 1] ** 2
+            + 2 * K_u[1, 0] * J_zeta[0, 1] * J_zeta[1, 1]
+            + K_u[2, 0] * J_zeta[1, 1] ** 2
         )
         self._warp_inc[11] = (
-            d2udzeta2[0, 1] * J_zeta[0, 1] ** 2
-            + 2 * d2udzeta2[1, 1] * J_zeta[0, 1] * J_zeta[1, 1]
-            + d2udzeta2[2, 1] * J_zeta[1, 1] ** 2
+            K_u[0, 1] * J_zeta[0, 1] ** 2
+            + 2 * K_u[1, 1] * J_zeta[0, 1] * J_zeta[1, 1]
+            + K_u[2, 1] * J_zeta[1, 1] ** 2
         )
 
     def _strain_path(self):

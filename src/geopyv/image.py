@@ -51,7 +51,9 @@ class Image(Object):
             log.debug("Initialised geopyv Image object at {}.".format(filepath))
         else:
             log.error("Image does not exist at the path supplied:\n{}".format(filepath))
-            raise FileExistsError("Image does not exist at the path supplied.")
+            raise FileExistsError(
+                "Image does not exist at the path supplied:\n{}".format(filepath)
+            )
 
     def _get_image_gs(self):
         r"""

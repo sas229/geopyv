@@ -33,6 +33,9 @@ class ImageSelector:
 
         """
         path, _ = QFileDialog.getOpenFileName(
-            self.widget, directory, message, "Image files (*.png *.bmp *.jpg)"
+            self.widget,
+            directory,
+            message,
+            "Image files (*.png *.bmp *.jpg)",
         )
         return path

@@ -68,5 +68,3 @@ Classes
    Bases: :py:obj:`SequenceBase`
 
    Initialisation of geopyv SequenceResults class.
-
-

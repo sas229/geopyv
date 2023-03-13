@@ -65,5 +65,3 @@ Classes
    Bases: :py:obj:`ParticleBase`
 
    Initialisation of geopyv SequenceResults class.
-
-

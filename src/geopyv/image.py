@@ -88,7 +88,10 @@ class Image(Object):
         )
 
         # Define the quintic B-spline kernel.
-        k = np.array([1 / 120, 13 / 60, 11 / 20, 13 / 60, 1 / 120, 0], order="F")
+        k = np.array(
+            [1 / 120, 13 / 60, 11 / 20, 13 / 60, 1 / 120, 0],
+            order="F",
+        )
 
         # Create initial C array.
         C = np.zeros(

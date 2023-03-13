@@ -5,7 +5,6 @@ Subset module for geopyv.
 """
 import logging
 import cv2
-import os
 import numpy as np
 import geopyv as gp
 from geopyv.object import Object
@@ -65,41 +64,51 @@ class SubsetBase(Object):
         # Check input.
         if type(show) != bool:
             log.error(
-                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                "`show` keyword argument type invalid. "
+                "Expected a `bool`, but got a `{type2}`.".format(
                     type2=type(show).__name__
                 )
             )
             raise TypeError(
-                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                "`show` keyword argument type invalid. "
+                "Expected a `bool`, but got a `{type2}`.".format(
                     type2=type(show).__name__
                 )
             )
         if type(block) != bool:
             log.error(
-                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                "`block` keyword argument type invalid. "
+                "Expected a `bool`, but got a `{type2}`.".format(
                     type2=type(block).__name__
                 )
             )
             raise TypeError(
-                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                "`block` keyword argument type invalid. "
+                "Expected a `bool`, but got a `{type2}`.".format(
                     type2=type(block).__name__
                 )
             )
         if type(save) != str and save is not None:
             log.error(
-                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                "`save` keyword argument type invalid. "
+                "Expected a `str` or `NoneType`, but got a `{type3}`.".format(
                     type3=type(save).__name__
                 )
             )
             raise TypeError(
-                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                "`save` keyword argument type invalid. "
+                "Expected a `str` or `NoneType`, but got a `{type3}`.".format(
                     type3=type(save).__name__
                 )
             )
 
         # Inspect subset.
         fig, ax = gp.plots.inspect_subset(
-            data=self.data, mask=None, show=show, block=block, save=save
+            data=self.data,
+            mask=None,
+            show=show,
+            block=block,
+            save=save,
         )
         return fig, ax
 
@@ -144,34 +153,40 @@ class SubsetBase(Object):
         # Check input.
         if type(show) != bool:
             log.error(
-                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                "`show` keyword argument type invalid. "
+                "Expected a `bool`, but got a `{type2}`.".format(
                     type2=type(show).__name__
                 )
             )
             raise TypeError(
-                "`show` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                "`show` keyword argument type invalid. "
+                "Expected a `bool`, but got a `{type2}`.".format(
                     type2=type(show).__name__
                 )
             )
         if type(block) != bool:
             log.error(
-                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                "`block` keyword argument type invalid. "
+                "Expected a `bool`, but got a `{type2}`.".format(
                     type2=type(block).__name__
                 )
             )
             raise TypeError(
-                "`block` keyword argument type invalid. Expected a `bool`, but got a `{type2}`.".format(
+                "`block` keyword argument type invalid. "
+                "Expected a `bool`, but got a `{type2}`.".format(
                     type2=type(block).__name__
                 )
             )
         if type(save) != str and save is not None:
             log.error(
-                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                "`save` keyword argument type invalid. "
+                "Expected a `str` or `NoneType`, but got a `{type3}`.".format(
                     type3=type(save).__name__
                 )
             )
             raise TypeError(
-                "`save` keyword argument type invalid. Expected a `str` or `NoneType`, but got a `{type3}`.".format(
+                "`save` keyword argument type invalid. "
+                "Expected a `str` or `NoneType`, but got a `{type3}`.".format(
                     type3=type(save).__name__
                 )
             )
@@ -288,14 +303,13 @@ class Subset(SubsetBase):
         # Check types.
         if type(f_img) != gp.image.Image:
             log.info("Selecting a reference image...")
-            _img = gp.io._load_f_img()
+            f_img = gp.io._load_f_img()
         if type(g_img) != gp.image.Image:
             log.info("Selecting a target image...")
             g_img = gp.io._load_g_img()
         if type(f_coord) != np.ndarray:
-            f_coord = np.empty(2)
             coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
-            _f_coord = coordinate.select(f_img, template)
+            f_coord = coordinate.select(f_img, template)
         elif np.shape(f_coord) != np.shape(np.empty(2)):
             log.error("Template coordinate of invalid shape.")
             coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
@@ -307,14 +321,18 @@ class Subset(SubsetBase):
             and type(template) != gp.templates.Square
         ):
             log.error(
-                "`template` keyword argument value invalod. Expected `gp.templates.Circle` or `gp.templates.Square`, but got {type3}.".format(
-                    type3=type(template).__name__
-                )
+                (
+                    "`template` keyword argument value invalid. "
+                    "Expected `gp.templates.Circle` or `gp.templates.Square`, "
+                    "but got {type3}."
+                ).format(type3=type(template).__name__)
             )
             raise ValueError(
-                "`template` keyword argument value invalod. Expected `gp.templates.Circle` or `gp.templates.Square`, but got {type3}.".format(
-                    type3=type(template).__name__
-                )
+                (
+                    "`template` keyword argument value invalid. "
+                    "Expected `gp.templates.Circle` or `gp.templates.Square`, "
+                    "but got {type3}."
+                ).format(type3=type(template).__name__)
             )
 
         # Store.
@@ -329,10 +347,22 @@ class Subset(SubsetBase):
         self._y = self._f_coord[1]
         subset_list = np.array(
             [
-                [self._x - self._template.size, self._y - self._template.size],
-                [self._x + self._template.size, self._y + self._template.size],
-                [self._x - self._template.size, self._y + self._template.size],
-                [self._x + self._template.size, self._y - self._template.size],
+                [
+                    self._x - self._template.size,
+                    self._y - self._template.size,
+                ],
+                [
+                    self._x + self._template.size,
+                    self._y + self._template.size,
+                ],
+                [
+                    self._x - self._template.size,
+                    self._y + self._template.size,
+                ],
+                [
+                    self._x + self._template.size,
+                    self._y - self._template.size,
+                ],
             ]
         )
         if np.any(subset_list < 0):
@@ -639,7 +669,9 @@ class Subset(SubsetBase):
 
         # Apply template matching technique.
         res = cv2.matchTemplate(
-            self._g_img.image_gs.astype(np.float32), subset, cv2.TM_CCORR_NORMED
+            self._g_img.image_gs.astype(np.float32),
+            subset,
+            cv2.TM_CCORR_NORMED,
         )
         max_loc = cv2.minMaxLoc(res)[3]
 

@@ -140,5 +140,3 @@ Classes
    Bases: :py:obj:`MeshBase`
 
    Initialisation of geopyv MeshResults class.
-
-

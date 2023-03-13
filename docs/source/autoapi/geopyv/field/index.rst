@@ -50,6 +50,3 @@ Classes
    .. py:method:: volume_divergence(show=True, block=True, save=None)
 
       Method to show the volumetric error in the particle field.
-
-
-

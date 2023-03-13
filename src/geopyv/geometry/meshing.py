@@ -1,5 +1,4 @@
 import numpy as np
-import scipy as sp
 import gmsh
 
 # from scipy.optimize import minimize_scalar

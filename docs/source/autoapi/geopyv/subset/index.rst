@@ -186,6 +186,3 @@ Classes
        * To re-analyse data instantiate a new object using
          :class:`~geopyv.subset.Subset` and use the
          :class:`~geopyv.subset.Subset.solve` method.
-
-
-

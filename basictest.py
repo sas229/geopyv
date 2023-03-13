@@ -9,7 +9,9 @@ tar = gp.image.Image("./images/T-Bar/IMG_1071.jpg")
 template = gp.templates.Circle(50)
 
 # Subset instantiation.
-subset = gp.subset.Subset(f_img=ref, g_img=tar, f_coord=np.asarray([1000, 1000]), template=template)
+subset = gp.subset.Subset(
+    f_img=ref, g_img=tar, f_coord=np.asarray([1000, 1000]), template=template
+)
 
 # Subset inspection.
 subset.inspect()
@@ -50,7 +52,7 @@ mesh = gp.mesh.Mesh(
 )
 
 # Mesh inspection.
-#mesh.inspect(subset_index=5000)
+# mesh.inspect(subset_index=5000)
 
 # Mesh saving : note, prior to solving, a geopyv object cannot be saved.
 gp.io.save(object=mesh, filename="mesh")
@@ -71,8 +73,8 @@ del mesh
 # Mesh loading.
 mesh = gp.io.load(filename="mesh")
 
-Other mesh methods (plot functionaility). 
-The commands are basically standard matplotlib...
+# Other mesh methods (plot functionaility).
+# The commands are basically standard matplotlib...
 mesh.convergence()
 mesh.convergence(quantity="norm")
 mesh.convergence(quantity="iterations")
@@ -91,7 +93,7 @@ mesh.contour(quantity="iterations")
 mesh.contour(quantity="R")
 
 # You can also return the fig and ax objects and add customised items to the plot.
-fig, ax = mesh.contour(quantity = "v", alpha=1.0, levels=np.arange(-5, 6, 1))
+fig, ax = mesh.contour(quantity="v", alpha=1.0, levels=np.arange(-5, 6, 1))
 ax.plot([0, 2000], [1000, 1000], color="k", linewidth=3.0, zorder=10)
 ax.set_xlim((0, 2000))
 plt.show()
@@ -132,8 +134,8 @@ sequence = gp.sequence.Sequence(
     target_nodes=1000,
     boundary=boundary,
     exclusions=exclusions,
-    save_by_reference = True,
-    mesh_folder = "images/T-Bar/meshes/"
+    save_by_reference=True,
+    mesh_folder="images/T-Bar/meshes/",
 )
 
 # Sequence solving.
@@ -146,7 +148,7 @@ sequence.solve(
     alpha=alpha,
     tolerance=0.7,
 )
- 
+
 # Sequence saving.
 gp.io.save(object=sequence, filename="T_bar_sequence")
 del sequence
@@ -156,18 +158,18 @@ sequence = gp.io.load(filename="T_bar_sequence")
 
 # Other sequence methods (plot functionality).
 sequence.inspect(mesh_index=0)
-sequence.inspect(mesh_index=3, subset_index=20) 
+sequence.inspect(mesh_index=3, subset_index=20)
 sequence.convergence(mesh_index=1)
 sequence.convergence(mesh_index=2, subset_index=4)
-sequence.contour(mesh_index = 1, quantity = "R", mesh = True)
-sequence.quiver(mesh_index = 3)
- 
+sequence.contour(mesh_index=1, quantity="R", mesh=True)
+sequence.quiver(mesh_index=3)
+
 # Particle test.
 # Particle setup.
-coordinate_0 = np.asarray([1600.,1900.])
+coordinate_0 = np.asarray([1600.0, 1900.0])
 
 # Particle instantiation.
-particle = gp.particle.Particle(series=sequence, coordinate_0 = coordinate_0)
+particle = gp.particle.Particle(series=sequence, coordinate_0=coordinate_0)
 
 # Particle solving.
 particle.solve()
@@ -180,14 +182,14 @@ del particle
 particle = gp.io.load(filename="particle")
 
 # Other particle methods.
-particle.trace(quantity = "warps", component = 1)
+particle.trace(quantity="warps", component=1)
 
-#Field test.
-#Field setup.
+# Field test.
+# Field setup.
 target_particles = 500
 
 # Field instantiation.
-field = gp.field.Field(series=sequence, target_particles = target_particles)
+field = gp.field.Field(series=sequence, target_particles=target_particles)
 
 # Field solving.
 field.solve()
@@ -199,8 +201,8 @@ del field
 # Field loading.
 field = gp.io.load(filename="field")
 
-# Other field methods. 
-field.trace(quantity = "warps", component = 2)
+# Other field methods.
+field.trace(quantity="warps", component=2)
 field.inspect()
 
 # Extracting data.
@@ -213,13 +215,16 @@ print(coordinates)
 
 # Warps.
 # Full.
-warps = field.data["particles"][particle_index]["warps"] # warp components : [u, v, dudx, dudy, dvdx, dvdy, d2udx2, d2udxdy, d2udy2, d2vdx2, d2vdxdy, d2vdy2]
+warps = field.data["particles"][particle_index]["warps"]  # warp components :
+# [u, v, dudx, dudy, dvdx, dvdy, d2udx2, d2udxdy, d2udy2, d2vdx2, d2vdxdy, d2vdy2]
 print(warps)
-warps = field.data["particles"][particle_index]["warps"][2:5, :2] # Time steps 2-5 for components 0 and 1 i.e. displacements. 
+warps = field.data["particles"][particle_index]["warps"][
+    2:5, :2
+]  # Time steps 2-5 for components 0 and 1 i.e. displacements.
 print(warps)
 
-# e.g. to extract volume progression. Note, area is in pixels. 
+# e.g. to extract volume progression. Note, area is in pixels.
 volume_array = field.data["particles"][particle_index]["volumes"]
 print(volume_array)
-volume = field.data["particles"][particle_index]["volumes"][3] # At time step 3. 
+volume = field.data["particles"][particle_index]["volumes"][3]  # At time step 3.
 print(volume)

@@ -158,7 +158,7 @@ def _convert_list_to_ndarray(data):
             try:
                 for subset in value:
                     _convert_list_to_ndarray(subset)
-            except:
+            except Exception:
                 data[key] = list(value)
         # If not a list of subsets, convert to numpy ndarray.
         elif (

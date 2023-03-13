@@ -11,9 +11,6 @@ import matplotlib.tri as tri
 
 # import matplotlib.collections.LineCollection as LineCollection
 from matplotlib.collections import LineCollection
-from matplotlib import cm
-
-# import matplotlib.cm as cm
 import numpy as np
 import re
 import geopyv as gp
@@ -104,7 +101,12 @@ def inspect_subset(data, mask, show, block, save):
     size_str = r"Size: {} (px); ".format(template_size)
     sigma_str = r"Quality metrics: $\sigma_s$ = {:.2f} (-);".format(sigma_intensity)
     SSSIG_str = r"SSSIG = {:.2E} (-)".format(SSSIG)
-    ax.text(3.0, -1.0, size_str + sigma_str + SSSIG_str, horizontalalignment="center")
+    ax.text(
+        3.0,
+        -1.0,
+        size_str + sigma_str + SSSIG_str,
+        horizontalalignment="center",
+    )
     ax.set_axis_off()
     plt.tight_layout()
 
@@ -167,9 +169,18 @@ def convergence_subset(data, show, block, save):
     title = "Subset convergence: f_coord = ({x},{y}) (px)".format(x=x, y=y)
     fig, ax = plt.subplots(2, 1, sharex=True, num=title)
     ax[0].semilogy(
-        history[0, :], history[1, :], marker="o", clip_on=True, label="Convergence"
+        history[0, :],
+        history[1, :],
+        marker="o",
+        clip_on=True,
+        label="Convergence",
     )
-    ax[0].plot([1, max_iterations], [max_norm, max_norm], "--r", label="Threshold")
+    ax[0].plot(
+        [1, max_iterations],
+        [max_norm, max_norm],
+        "--r",
+        label="Threshold",
+    )
     ax[0].set_ylabel(r"$\Delta$ Norm (-)")
     ax[0].set_ylim(max_norm / 1000, max_norm * 1000)
     ax[0].set_yticks(
@@ -184,9 +195,18 @@ def convergence_subset(data, show, block, save):
         ]
     )
     ax[1].plot(
-        history[0, :], history[2, :], marker="o", clip_on=True, label="Convergence"
+        history[0, :],
+        history[2, :],
+        marker="o",
+        clip_on=True,
+        label="Convergence",
     )
-    ax[1].plot([1, max_iterations], [tolerance, tolerance], "--r", label="Threshold")
+    ax[1].plot(
+        [1, max_iterations],
+        [tolerance, tolerance],
+        "--r",
+        label="Threshold",
+    )
     ax[1].set_ylabel(r"$C_{CC}$ (-)")
     ax[1].set_xlabel("Iteration number (-)")
     ax[1].set_xlim(1, max_iterations)
@@ -387,9 +407,11 @@ def contour_mesh(
     fig, ax = plt.subplots(num=title)
 
     # Triangulation.
-    mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
-        elements, x, y
-    )
+    (
+        mesh_triangulation,
+        x_p,
+        y_p,
+    ) = gp.geometry.utilities.plot_triangulation(elements, x, y)
 
     # Plot mesh.
     if mesh is True:
@@ -418,7 +440,11 @@ def contour_mesh(
 
     # Plot contours.
     contours = ax.tricontourf(
-        triangulation, value, alpha=alpha, levels=levels, extend=extend
+        triangulation,
+        value,
+        alpha=alpha,
+        levels=levels,
+        extend=extend,
     )
     if colorbar is True:
         if quantity == "iterations":
@@ -624,13 +650,21 @@ def inspect_mesh(data, show, block, save):
     fig, ax = plt.subplots(num=title)
     for i in range(np.shape(x_p)[0]):
         ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
-    ax.imshow(image, cmap="gist_gray", interpolation="nearest", aspect="equal")
+    ax.imshow(
+        image,
+        cmap="gist_gray",
+        interpolation="nearest",
+        aspect="equal",
+    )
     details = r"{nodes} nodes; {elements} elements".format(
         nodes=np.shape(nodes)[0], elements=np.shape(elements)[0]
     )
     image_size = np.shape(image)
     ax.text(
-        image_size[1] / 2, image_size[0] * 1.05, details, horizontalalignment="center"
+        image_size[1] / 2,
+        image_size[0] * 1.05,
+        details,
+        horizontalalignment="center",
     )
     ax.set_axis_off()
     plt.tight_layout()
@@ -692,11 +726,19 @@ def trace_particle(
 
     elif data["type"] == "Field":
         values = np.empty(
-            (len(data["particles"]), len(data["particles"][0][quantity]) - 1)
+            (
+                len(data["particles"]),
+                len(data["particles"][0][quantity]) - 1,
+            )
         )
         if data["number_images"] > 1:
             segments = np.empty(
-                (len(data["particles"]), data["number_images"] - 1, 2, 2)
+                (
+                    len(data["particles"]),
+                    data["number_images"] - 1,
+                    2,
+                    2,
+                )
             )
         else:
             segments = np.empty((len(data["particles"]), 2, 2))
@@ -753,7 +795,12 @@ def inspect_field(data, mesh, show, block, save):
     image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
 
     # Plot image.
-    ax.imshow(image, cmap="gist_gray", interpolation="nearest", aspect="equal")
+    ax.imshow(
+        image,
+        cmap="gist_gray",
+        interpolation="nearest",
+        aspect="equal",
+    )
 
     if mesh:
         # Load data.
@@ -777,7 +824,13 @@ def inspect_field(data, mesh, show, block, save):
 
             # Plot mesh.
             for i in range(np.shape(x_p)[0]):
-                ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
+                ax.plot(
+                    x_p[i],
+                    y_p[i],
+                    color="b",
+                    alpha=1.0,
+                    linewidth=1.0,
+                )
         except Exception:
             log.warning(
                 "Mesh requested but no field mesh information "
@@ -794,7 +847,10 @@ def inspect_field(data, mesh, show, block, save):
     details = r"{elements} particles".format(elements=np.shape(elements)[0])
     image_size = np.shape(image)
     ax.text(
-        image_size[1] / 2, image_size[0] * 1.05, details, horizontalalignment="center"
+        image_size[1] / 2,
+        image_size[0] * 1.05,
+        details,
+        horizontalalignment="center",
     )
     ax.set_axis_off()
     plt.tight_layout()

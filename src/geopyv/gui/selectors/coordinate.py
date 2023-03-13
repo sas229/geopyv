@@ -58,7 +58,11 @@ class CoordinateSelector:
                         if self.boundary is not None:
                             self.boundary[0].remove()
                         self.point = self.ax.plot(
-                            self.x, self.y, marker="+", color="b", zorder=10
+                            self.x,
+                            self.y,
+                            marker="+",
+                            color="b",
+                            zorder=10,
                         )
                         if type(self.template) == templates.Circle:
                             theta = np.linspace(0, 2 * np.pi, 150)

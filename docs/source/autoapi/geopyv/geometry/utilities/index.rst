@@ -60,5 +60,3 @@ Functions
                closed triangles.
              * **x_p** (*np.ndarray (Nx, 1)*) -- Horizontal coordinate of triangle vertices.
              * **y_p** (*np.ndarray (Nx, 1)*) -- Vertical coordinate of triangle vertices.
-
-

@@ -28,5 +28,3 @@ Classes
 
    :param object_type: Object type.
    :type object_type: str
-
-

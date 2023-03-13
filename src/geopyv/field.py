@@ -9,8 +9,7 @@ import geopyv as gp
 from geopyv.object import Object
 import gmsh
 from scipy.optimize import minimize_scalar
-import PIL.Image as ImagePIL
-import PIL.ImageDraw as ImageDrawPIL
+
 
 log = logging.getLogger(__name__)
 
@@ -145,7 +144,7 @@ class Field(FieldBase):
             log.error("Invalid moving type. Must be a bool.")
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
-            if series.data["file_settings"]["save_by_reference"] == True:
+            if series.data["file_settings"]["save_by_reference"]:
                 for i in range(np.shape(series.data["meshes"])[0]):
                     series.data["meshes"][i] = gp.io.load(
                         filename=series.data["file_settings"]["mesh_folder"]
@@ -300,7 +299,9 @@ class Field(FieldBase):
                 self._curves,
                 _,
             ) = gp.geometry.meshing._define_RoI(
-                gp.image.Image(self._image_0), self._boundary, self._exclusions
+                gp.image.Image(self._image_0),
+                self._boundary,
+                self._exclusions,
             )
 
             # Initialize gmsh if not already initialized.
@@ -329,7 +330,10 @@ class Field(FieldBase):
             self._coordinates = coordinates
             self._volumes = volumes
             log.info("Using user-specified field.")
-            self._field = {"coordinates": self._coordinates, "volumes": self._volumes}
+            self._field = {
+                "coordinates": self._coordinates,
+                "volumes": self._volumes,
+            }
 
         self.data.update({"field": self._field})
         self._initialised = True
@@ -354,7 +358,9 @@ class Field(FieldBase):
             )
 
         minimize_scalar(
-            f, bounds=(self._size_lower_bound, self._size_upper_bound), method="bounded"
+            f,
+            bounds=(self._size_lower_bound, self._size_upper_bound),
+            method="bounded",
         )
         self._update_mesh()
         gmsh.finalize()
@@ -365,7 +371,11 @@ class Field(FieldBase):
         Private method to update the mesh variables.
 
         """
-        _, nc, _ = gmsh.model.mesh.getNodes()  # Extracts: node coordinates.
+        (
+            _,
+            nc,
+            _,
+        ) = gmsh.model.mesh.getNodes()  # Extracts: node coordinates.
         _, _, ent = gmsh.model.mesh.getElements(dim=2)  # Extracts: element node tags.
         self._nodes = np.column_stack(
             (nc[0::3], nc[1::3])

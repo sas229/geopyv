@@ -36,6 +36,3 @@ Classes
 
       :returns: **path** -- Path to selected image file.
       :rtype: str
-
-
-

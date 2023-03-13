@@ -143,5 +143,3 @@ Functions
 .. py:function:: quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save)
 
    Function to plot quiver plot of mesh data.
-
-

@@ -3,7 +3,7 @@
 Mesh
 ----
 
-An analysis mesh is a spatial distribution of subsets (nodes), grouped into elements, that is used to discretise a region of interest. Regional warp between an image pair is considered throguh the relative displacement of subsets. 
+An analysis mesh is a spatial distribution of subsets (nodes), grouped into elements, that is used to discretise a region of interest. Regional warp between an image pair is considered throguh the relative displacement of subsets.
 
 Elemental warp
 ^^^^^^^^^^^^^^
@@ -16,6 +16,4 @@ Local Coordinates
   :width: 600
   :align: center
 
-The 
-
-
+The

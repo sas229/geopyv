@@ -74,7 +74,7 @@ class SequenceBase(Object):
         """
 
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Sequence not yet solved therefore nothing to inspect. "
                 "First, run :meth:`~geopyv.sequence.Sequence.solve()` to solve."
@@ -104,7 +104,7 @@ class SequenceBase(Object):
                     "`mesh_index` {input_value} is out of bounds for "
                     "axis 0 with size {max_value}."
                 ).format(
-                    max_value=np.shape(np.shape(self.data["meshes"])[0])[0] - 1,
+                    max_value=np.shape(self.data["meshes"])[0],
                     input_value=mesh_index,
                 )
             )
@@ -113,7 +113,7 @@ class SequenceBase(Object):
                     "`mesh_index` {input_value} is out of bounds for "
                     "axis 0 with size {max_value}."
                 ).format(
-                    max_value=np.shape(np.shape(self.data["meshes"])[0])[0] - 1,
+                    max_value=np.shape(self.data["meshes"])[0],
                     input_value=mesh_index,
                 )
             )
@@ -287,7 +287,7 @@ class SequenceBase(Object):
         """
 
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Sequence not yet solved therefore nothing to inspect. "
                 "First, run :meth:`~geopyv.sequence.Sequence.solve()` to solve."
@@ -317,7 +317,7 @@ class SequenceBase(Object):
                     "`mesh_index` {input_value} is out of bounds for "
                     "axis 0 with size {max_value}."
                 ).format(
-                    max_value=np.shape(np.shape(self.data["meshes"])[0])[0] - 1,
+                    max_value=np.shape(self.data["meshes"])[0],
                     input_value=mesh_index,
                 )
             )
@@ -326,7 +326,7 @@ class SequenceBase(Object):
                     "`mesh_index` {input_value} is out of bounds for "
                     "axis 0 with size {max_value}."
                 ).format(
-                    max_value=np.shape(np.shape(self.data["meshes"])[0])[0] - 1,
+                    max_value=np.shape(self.data["meshes"])[0],
                     input_value=mesh_index,
                 )
             )
@@ -568,7 +568,7 @@ class SequenceBase(Object):
 
         """
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Sequence not yet solved therefore nothing to inspect. "
                 "First, run :meth:`~geopyv.sequence.Sequence.solve()` to solve."
@@ -972,7 +972,7 @@ class SequenceBase(Object):
             :meth:`~geopyv.plots.quiver_mesh`
         """
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Sequence not yet solved therefore nothing to inspect. "
                 "First, run :meth:`~geopyv.sequence.Sequence.solve()` to solve."

@@ -112,7 +112,7 @@ class FieldBase(Object):
         colorbar=True,
         ticks=None,
         alpha=0.75,
-        axis=None,
+        axis=True,
         xlim=None,
         ylim=None,
         show=True,
@@ -160,7 +160,7 @@ class FieldBase(Object):
         """
 
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Particle not yet solved therefore no convergence data to plot. "
                 "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
@@ -216,7 +216,7 @@ class FieldBase(Object):
                     "Expected a `int`, but got a {type3}."
                 ).format(type3=type(component).__name__)
             )
-        if component >= np.shape(self.data["results"][quantity])[1]:
+        if component >= np.shape(self.data["particles"][0][quantity])[1]:
             log.error(
                 (
                     "`component` {input_value} is out of bounds for "
@@ -592,32 +592,33 @@ class Field(FieldBase):
                     "`boundary` keyword argument type conversion failed. "
                     "Input a `numpy.ndarray` of shape (Nx,2)."
                 )
-        elif np.shape(boundary)[1] != 2 and boundary is not None:
-            log.error(
-                (
-                    "`boundary` keyword argument secondary axis size invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=np.shape(boundary)[1])
-            )
-            raise ValueError(
-                (
-                    "`boundary` keyword argument secondary axis size invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=np.shape(boundary)[1])
-            )
-        elif boundary.ndim != 2 and boundary is not None:
-            log.error(
-                (
-                    "`boundary` keyword argument dimensions invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=boundary.ndim)
-            )
-            raise ValueError(
-                (
-                    "`boundary` keyword argument dimensions invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=boundary.ndim)
-            )
+        if boundary is not None:
+            if np.shape(boundary)[1] != 2:
+                log.error(
+                    (
+                        "`boundary` keyword argument secondary axis size invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=np.shape(boundary)[1])
+                )
+                raise ValueError(
+                    (
+                        "`boundary` keyword argument secondary axis size invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=np.shape(boundary)[1])
+                )
+            elif boundary.ndim != 2:
+                log.error(
+                    (
+                        "`boundary` keyword argument dimensions invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=boundary.ndim)
+                )
+                raise ValueError(
+                    (
+                        "`boundary` keyword argument dimensions invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=boundary.ndim)
+                )
         if type(exclusions) != list:
             log.warning(
                 (
@@ -708,32 +709,33 @@ class Field(FieldBase):
                     "`coordinates` keyword argument type conversion failed. "
                     "Input a `numpy.ndarray` of shape (Nx,2)."
                 )
-        elif np.shape(coordinates)[1] != 2 and coordinates is not None:
-            log.error(
-                (
-                    "`coordinates` keyword argument secondary axis size invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=np.shape(coordinates)[1])
-            )
-            raise ValueError(
-                (
-                    "`coordinates` keyword argument secondary axis size invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=np.shape(coordinates)[1])
-            )
-        elif coordinates.ndim != 2 and coordinates is not None:
-            log.error(
-                (
-                    "`coordinates` keyword argument dimensions invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=coordinates.ndim)
-            )
-            raise ValueError(
-                (
-                    "`coordinates` keyword argument dimensions invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=coordinates.ndim)
-            )
+        if coordinates is not None:
+            if np.shape(coordinates)[1] != 2:
+                log.error(
+                    (
+                        "`coordinates` keyword argument secondary axis size invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=np.shape(coordinates)[1])
+                )
+                raise ValueError(
+                    (
+                        "`coordinates` keyword argument secondary axis size invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=np.shape(coordinates)[1])
+                )
+            elif coordinates.ndim != 2:
+                log.error(
+                    (
+                        "`coordinates` keyword argument dimensions invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=coordinates.ndim)
+                )
+                raise ValueError(
+                    (
+                        "`coordinates` keyword argument dimensions invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=coordinates.ndim)
+                )
         if type(volumes) != np.ndarray and coordinates is not None:
             log.warning(
                 (
@@ -759,26 +761,29 @@ class Field(FieldBase):
                     "`volumes` keyword argument type conversion failed. "
                     "Input a `numpy.ndarray` of shape (Nx,)."
                 )
-        elif volumes.ndim != 1 and volumes is not None:
-            log.error(
-                (
-                    "`volumes` keyword argument dimensions invalid. "
-                    "Expected 1, but got {size}."
-                ).format(size=volumes.ndim)
-            )
-            raise ValueError(
-                (
-                    "`volumes` keyword argument dimensions invalid. "
-                    "Expected 1, but got {size}."
-                ).format(size=volumes.ndim)
-            )
-        if np.shape(volumes)[0] != np.shape(coordinates)[0] and volumes is not None:
-            log.error(
-                (
-                    "Array shape mismatch. {value1} `volumes` "
-                    "given for {value2} `coordinates`."
-                ).format(value1=np.shape(volumes)[0], value2=np.shape(coordinates)[0])
-            )
+        if volumes is not None:
+            if volumes.ndim != 1:
+                log.error(
+                    (
+                        "`volumes` keyword argument dimensions invalid. "
+                        "Expected 1, but got {size}."
+                    ).format(size=volumes.ndim)
+                )
+                raise ValueError(
+                    (
+                        "`volumes` keyword argument dimensions invalid. "
+                        "Expected 1, but got {size}."
+                    ).format(size=volumes.ndim)
+                )
+            if np.shape(volumes)[0] != np.shape(coordinates)[0] and volumes is not None:
+                log.error(
+                    (
+                        "Array shape mismatch. {value1} `volumes` "
+                        "given for {value2} `coordinates`."
+                    ).format(
+                        value1=np.shape(volumes)[0], value2=np.shape(coordinates)[0]
+                    )
+                )
 
         # Store.
         if series.data["type"] == "Sequence":

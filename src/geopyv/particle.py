@@ -381,7 +381,7 @@ class Particle(ParticleBase):
         coordinate_0=np.zeros(2),
         warp_0=np.zeros(12),
         volume_0=1.0,
-        moving=True,
+        track=True,
     ):
         """Initialisation of geopyv particle object.
 
@@ -395,29 +395,157 @@ class Particle(ParticleBase):
             Initial warp vector.
         vol : float
             Volume represented by the particle.
-        moving : bool
+        track : bool
             Boolean for Lagrangian (False) or Eulerian (True) specification.
             Defaults to False.
         """
 
+        # Set initialised boolean.
         self._initialised = False
-        # Check types.
-        if series.data["type"] != "Sequence" and series.data["type"] != "Mesh":
+
+        # Check inputs.
+        if series.data["type"] not in ["Sequence", "Mesh"]:
             log.error(
-                "Invalid series type. Must be gp.sequence.Sequence or gp.mesh.Mesh."
+                (
+                    "`series` keyword argument type invalid. "
+                    "Expected `gp.sequence.Sequence` or `gp.mesh.Mesh, "
+                    "but got {value}."
+                ).format(value=type(series).__name__)
+            )
+            raise ValueError(
+                (
+                    "`series` keyword argument type invalid. "
+                    "Expected `gp.sequence.Sequence` or `gp.mesh.Mesh, "
+                    "but got {value}."
+                ).format(value=type(series).__name__)
             )
         if type(coordinate_0) != np.ndarray:
-            log.error("Invalid coordinate type. Must be numpy.ndarray.")
-        elif np.shape(coordinate_0) != np.shape(np.empty(2)):
-            log.error("Invalid coordinate shape. Must be (2).")
+            log.warning(
+                (
+                    "`coordinate_0` keyword argument type invalid. "
+                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
+                    "Selecting `coordinate_0`..."
+                ).format(type2=type(coordinate_0).__name__)
+            )
+            coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
+        elif np.shape(coordinate_0)[0] != 2:
+            log.warning(
+                (
+                    "`see_coord` keyword argument primary axis size invalid. "
+                    "Expected 2, but got {size}.\nSelecting `coordinate_0`..."
+                ).format(size=np.shape(coordinate_0)[0])
+            )
+            coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
+        elif coordinate_0.ndim != 1:
+            log.warning(
+                (
+                    "`coordinate_0` keyword argument dimensions invalid. "
+                    "Expected 1, but got {size}."
+                ).format(size=coordinate_0.ndim)
+            )
+            coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
         if type(warp_0) != np.ndarray:
-            log.error("Invalid initial warp type. Must be numpy.ndarray.")
-        elif np.shape(warp_0) != np.shape(np.empty(12)):
-            log.error("Invalid initial warp shape. Must be (12).")
-        # if type(volume_0) != float or type(volume_0)!= np.float64:
-        #    log.error("Invalid initial volume type. Must be a float.")
-        if type(moving) != bool:
-            log.error("Invalid moving type. Must be a bool.")
+            log.warning(
+                (
+                    "`warp_0` keyword argument type invalid. "
+                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
+                    "Attempting conversion..."
+                ).format(type2=type(warp_0).__name__)
+            )
+            try:
+                warp_0 = np.asarray(warp_0)
+                log.warning(
+                    (
+                        "`warp_0` keyword argument type conversion successful. "
+                        "New value: {value}"
+                    ).format(value=warp_0)
+                )
+            except ValueError:
+                log.error(
+                    "`warp_0` keyword argument type conversion failed. "
+                    "Input a `numpy.ndarray` of shape (6,) or (12,)."
+                )
+                raise TypeError(
+                    "`warp_0` keyword argument type conversion failed. "
+                    "Input a `numpy.ndarray` of shape (6,) or (12,)."
+                )
+        elif np.shape(warp_0)[0] != 6 and np.shape(warp_0)[0] != 12:
+            log.error(
+                (
+                    "`warp_0` keyword argument primary axis size invalid. "
+                    "Expected 6 or 12, but got {size}."
+                ).format(size=np.shape(warp_0)[0])
+            )
+            raise ValueError(
+                (
+                    "`warp_0` keyword argument primary axis size invalid. "
+                    "Expected 6 or 12, but got {size}."
+                ).format(size=np.shape(warp_0)[0])
+            )
+        elif warp_0.ndim != 1:
+            log.error(
+                (
+                    "`warp_0` keyword argument dimensions invalid. "
+                    "Expected 1, but got {size}."
+                ).format(size=warp_0.ndim)
+            )
+            raise ValueError(
+                (
+                    "`warp_0` keyword argument dimensions invalid. "
+                    "Expected 1, but got {size}."
+                ).format(size=warp_0.ndim)
+            )
+        if type(volume_0) != float:
+            log.warning(
+                (
+                    "`volume_0` keyword argument type invalid. "
+                    "Expected a `float`, but got a `{type2}`.\n"
+                    "Attempting conversion..."
+                ).format(type2=type(volume_0).__name__)
+            )
+            try:
+                volume_0 = float(volume_0)
+                log.warning(
+                    (
+                        "`volume_0` keyword argument type conversion successful. "
+                        "New value: {value}"
+                    ).format(value=volume_0)
+                )
+            except ValueError:
+                log.error(
+                    "`volume_0` keyword argument type conversion failed. "
+                    "Input a `float` > 0.0."
+                )
+                raise TypeError(
+                    "`volume_0` keyword argument type conversion failed. "
+                    "Input a `float` > 0.0."
+                )
+        elif volume_0 <= 0.0:
+            log.error(
+                (
+                    "`volume_0` keyword argument value {value} out of range >0.0. "
+                    "Input a `float` > 0.0."
+                ).format(value=volume_0)
+            )
+            raise ValueError(
+                (
+                    "`volume_0` keyword argument value {value} out of range >0.0. "
+                    "Input a `float` > 0.0."
+                ).format(value=volume_0)
+            )
+        if type(track) != bool:
+            log.error(
+                (
+                    "`track` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(track).__name__)
+            )
+            raise TypeError(
+                (
+                    "`track` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(track).__name__)
+            )
 
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
@@ -435,7 +563,7 @@ class Particle(ParticleBase):
         else:
             self._series_type = "Mesh"
             self._series = np.asarray([series.data])
-        self._moving = moving
+        self._track = track
 
         if self._series[0]["mask"][int(coordinate_0[1]), int(coordinate_0[0])] == 0:
             log.warning(
@@ -461,20 +589,17 @@ class Particle(ParticleBase):
             "type": "Particle",
             "solved": self.solved,
             "series_type": self._series_type,
-            "moving": self._moving,
+            "track": self._track,
             "coordinate_0": self._coordinates[0],
             "warp_0": self._warps[0],
             "volume_0": self._volumes[0],
             "image_0": self._series[0]["images"]["f_img"],
         }
-        # "series": self._series,
 
     def solve(self):  # model, statev, props):
         """
 
-        Method to calculate the strain path of the particle from the
-        mesh sequence and optionally the stress path employing the
-        model specified by the input parameters.
+        Method to solve for the particle.
 
         """
 
@@ -493,14 +618,13 @@ class Particle(ParticleBase):
     def _triangulation_locator(self, m):
         """
 
-        Method to locate the numerical particle within the mesh,
-        returning the current element_nodes index.
-
+        Private method to identify the current element index
+        for the particle.
 
         Parameters
         ----------
-        mesh : `geopyv.Mesh` object
-            The relevant mesh.
+        m : int
+            Series index.
 
         """
 
@@ -541,6 +665,8 @@ class Particle(ParticleBase):
             The local coordinate along the 2nd axis. Value will be between 0.0-1.0.
         theta : float
             The local coordinate along the 3rd axis. Value will be between 0.0-1.0.
+        A : `numpy.ndarray`
+            Element nodes coordinate array.
 
         """
         # Local coordinates
@@ -621,6 +747,19 @@ class Particle(ParticleBase):
         return N, dN, d2N
 
     def _warp_increment(self, m, tri_idx):
+        """
+        Private method to calculate the warp increment between the reference and target
+        image.
+
+        Parameters
+        ----------
+        m : int
+            Series index.
+        tri_idx : int
+            Element index.
+
+        """
+
         self._warp_inc = np.zeros(12)
         element_nodes = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
         displacements = self._series[m]["results"]["displacements"][
@@ -693,7 +832,11 @@ class Particle(ParticleBase):
         )
 
     def _strain_path(self):
-        """Method to calculate and store stress path data for the particle object."""
+        """
+        Private method to calculate the particle strain path.
+
+        """
+
         for m in range(len(self._series)):
             if int(
                 re.findall(
@@ -709,7 +852,7 @@ class Particle(ParticleBase):
             self._coordinates[m + 1] = self._coordinates[
                 self._reference_index
             ] + self._warp_inc[:2] * int(
-                self._moving
+                self._track
             )  # Update the particle positional coordinate.
             # i.e. (reference + mesh interpolation).
             self._warps[m + 1] = self._warps[self._reference_index] + self._warp_inc
@@ -739,5 +882,5 @@ class ParticleResults(ParticleBase):
     """
 
     def __init__(self, data):
-        """Initialisation of geopyv SequenceResults class."""
+        """Initialisation of geopyv ParticleResults class."""
         self.data = data

@@ -30,24 +30,84 @@ class FieldBase(Object):
     def inspect(self, mesh=True, show=True, block=True, save=None):
         """
         Method to show the particles and associated representative areas.
+
+        Parameters
+        ----------
+        mesh : bool, optional
+            Control whether the mesh is plotted.
+            Defaults to True.
+        show : bool, optional
+            Control whether the plot is displayed.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
         """
+
+        # Check inputs.
+        if type(mesh) != bool:
+            log.error(
+                (
+                    "`mesh` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(mesh).__name__)
+            )
+            raise TypeError(
+                (
+                    "`mesh` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(mesh).__name__)
+            )
+        if type(show) != bool:
+            log.error(
+                (
+                    "`show` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(show).__name__)
+            )
+            raise TypeError(
+                (
+                    "`show` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(show).__name__)
+            )
+        if type(block) != bool:
+            log.error(
+                (
+                    "`block` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(block).__name__)
+            )
+            raise TypeError(
+                (
+                    "`block` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(block).__name__)
+            )
+        if type(save) != str and save is not None:
+            log.error(
+                (
+                    "`save` keyword argument type invalid. "
+                    "Expected a `str` or `NoneType`, but got a `{type3}`."
+                ).format(type3=type(save).__name__)
+            )
+            raise TypeError(
+                (
+                    "`save` keyword argument type invalid. "
+                    "Expected a `str` or `NoneType`, but got a `{type3}`."
+                ).format(type3=type(save).__name__)
+            )
+
         log.info("Inspecting field...")
         fig, ax = gp.plots.inspect_field(
             self.data, mesh=mesh, show=show, block=block, save=save
         )
         return fig, ax
 
-    def volume_divergence(self, show=True, block=True, save=None):
-        """
-        Method to show the volumetric error in the particle field.
-        """
-
     def trace(
         self,
         quantity="warps",
         component=0,
-        start_frame=None,
-        end_frame=None,
         imshow=True,
         colorbar=True,
         ticks=None,
@@ -59,26 +119,329 @@ class FieldBase(Object):
         block=True,
         save=None,
     ):
-        if quantity is not None:
-            log.info("Tracing field...")
-            fig, ax = gp.plots.trace_particle(
-                data=self.data,
-                quantity=quantity,
-                component=component,
-                start_frame=start_frame,
-                end_frame=end_frame,
-                imshow=imshow,
-                colorbar=True,
-                ticks=ticks,
-                alpha=alpha,
-                axis=axis,
-                xlim=xlim,
-                ylim=ylim,
-                show=show,
-                block=block,
-                save=save,
+        """
+        Method to plot an incremental quantity along the particle position path.
+
+        Parameters
+        ----------
+        quantity : str, optional
+            Specifier for which metric to plot along the particle path.
+        component : int, optional
+            Specifier for which component of the metric to plot along the particle path.
+        imshow : bool, optional
+            Control whether the reference image is plotted.
+            Defaults to True.
+        colorbar : bool, optional
+            Control whether the colour bar is plotted.
+            Defaults to True.
+        ticks : list, optional
+            Overwrite default colourbar ticks.
+            Defaults to None.
+        alpha : float, optional
+            Control contour opacity. Must be between 0.0-1.0.
+            Defaults to 0.75.
+        axis : bool, optional
+            Control whether the axes are plotted.
+            Defaults to True.
+        xlim : array-like, optional
+            Set the plot x-limits (lower_limit,upper_limit).
+            Defaults to None.
+        ylim : array-like, optional
+            Set the plot y-limits (lower_limit,upper_limit).
+            Defaults to None.
+        show : bool, optional
+            Control whether the plot is displayed.
+            Defaults to True.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+            Defaults to False.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
+        """
+
+        # Check if solved.
+        if self.data["solved"] is not True or "results" not in self.data:
+            log.error(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
             )
-            return fig, ax
+            raise ValueError(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+        # Check input.
+        if type(quantity) != str and quantity is not None:
+            log.error(
+                (
+                    "`quantity` keyword argument type invalid. "
+                    "Expected a `str` or `NoneType`, but got a {type3}."
+                ).format(type3=type(quantity).__name__)
+            )
+            raise TypeError(
+                (
+                    "`quantity` keyword argument type invalid. "
+                    "Expected a `str` or `NoneType`, but got a {type3}."
+                ).format(type3=type(quantity).__name__)
+            )
+        elif quantity not in [
+            "coordinates",
+            "warps",
+            "volumes",
+            "stresses",
+        ]:
+            log.error(
+                (
+                    "`quantity` keyword argument value invalid. "
+                    "Expected `coordinates`, `warps`, `volumes`, `stresses`, "
+                    "but got {value}."
+                ).format(value=quantity)
+            )
+            raise ValueError(
+                (
+                    "`quantity` keyword argument value invalid. "
+                    "Expected `coordinates`, `warps`, `volumes`, `stresses`, "
+                    "but got {value}."
+                ).format(value=quantity)
+            )
+        if type(component) != int:
+            log.error(
+                (
+                    "`component` keyword argument type invalid. "
+                    "Expected a `int`, but got a {type3}."
+                ).format(type3=type(component).__name__)
+            )
+            raise TypeError(
+                (
+                    "`component` keyword argument type invalid. "
+                    "Expected a `int`, but got a {type3}."
+                ).format(type3=type(component).__name__)
+            )
+        if component >= np.shape(self.data["results"][quantity])[1]:
+            log.error(
+                (
+                    "`component` {input_value} is out of bounds for "
+                    "axis 0 with size {max_value}."
+                ).format(
+                    max_value=np.shape(self.data["results"][quantity])[1] - 1,
+                    input_value=component,
+                )
+            )
+            raise IndexError(
+                (
+                    "`component` {input_value} is out of bounds for "
+                    "axis 0 with size {max_value}."
+                ).format(
+                    max_value=np.shape(self.data["results"][quantity])[1] - 1,
+                    input_value=component,
+                )
+            )
+        if type(imshow) != bool:
+            log.error(
+                (
+                    "`imshow` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(imshow).__name__)
+            )
+            raise TypeError(
+                (
+                    "`imshow` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(imshow).__name__)
+            )
+        if type(colorbar) != bool:
+            log.error(
+                (
+                    "`colorbar` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(colorbar).__name__)
+            )
+            raise TypeError(
+                (
+                    "`colorbar` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(colorbar).__name__)
+            )
+        if isinstance(ticks, (tuple, list, np.ndarray)) is False and ticks is not None:
+            log.error(
+                (
+                    "`ticks` keyword argument type invalid. "
+                    "Expected a `tuple`, `list` or `numpy.ndarray`, "
+                    "but got a `{type2}`."
+                ).format(type2=type(ticks).__name__)
+            )
+            raise TypeError(
+                (
+                    "`ticks` keyword argument type invalid. "
+                    "Expected a `tuple`, `list` or `numpy.ndarray`, "
+                    "but got a `{type2}`."
+                ).format(type2=type(ticks).__name__)
+            )
+        if type(alpha) != float:
+            log.warning(
+                (
+                    "`alpha` keyword argument type invalid. "
+                    "Expected a `float`, but got a `{type2}`.\n"
+                    "Attempting conversion..."
+                ).format(type2=type(alpha).__name__)
+            )
+            try:
+                alpha = float(alpha)
+                log.warning(
+                    (
+                        "`alpha` keyword argument type conversion successful. "
+                        "New value: {value}"
+                    ).format(value=alpha)
+                )
+            except ValueError:
+                log.error(
+                    "`alpha` keyword argument type conversion failed. "
+                    "Input a `float`, 0.0-1.0."
+                )
+                raise TypeError(
+                    "`alpha` keyword argument type conversion failed. "
+                    "Input a `float`, 0.0-1.0."
+                )
+        elif alpha < 0.0 or alpha > 1.0:
+            log.error(
+                (
+                    "`alpha` keyword argument value {value} out of range 0.0-1.0. "
+                    "Input a `float`, 0.0-1.0."
+                ).format(value=alpha)
+            )
+            raise ValueError(
+                (
+                    "`alpha` keyword argument value {value} out of range 0.0-1.0. "
+                    "Input a `float`, 0.0-1.0."
+                ).format(value=alpha)
+            )
+        if type(axis) != bool:
+            log.error(
+                (
+                    "`axis` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(axis).__name__)
+            )
+            raise TypeError(
+                (
+                    "`axis` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(axis).__name__)
+            )
+        if xlim is not None:
+            if isinstance(xlim, (tuple, list, np.ndarray)) is False:
+                log.error(
+                    (
+                        "`xlim` keyword argument type invalid. "
+                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
+                        "but got a {type5}."
+                    ).format(type5=type(xlim).__name__)
+                )
+                raise TypeError(
+                    (
+                        "`xlim` keyword argument type invalid. "
+                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
+                        "but got a {type5}."
+                    ).format(type5=type(xlim).__name__)
+                )
+            elif np.shape(xlim)[0] != 2:
+                log.error(
+                    (
+                        "`xlim` keyword argument primary axis size invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=np.shape(xlim)[0])
+                )
+                raise ValueError(
+                    (
+                        "`xlim` keyword argument primary axis size invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=np.shape(xlim)[0])
+                )
+        if ylim is not None:
+            if isinstance(ylim, (tuple, list, np.ndarray)) is False:
+                log.error(
+                    (
+                        "`ylim` keyword argument type invalid. "
+                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
+                        "but got a {type5}."
+                    ).format(type5=type(ylim).__name__)
+                )
+                raise TypeError(
+                    (
+                        "`ylim` keyword argument type invalid. "
+                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
+                        "but got a {type5}."
+                    ).format(type5=type(ylim).__name__)
+                )
+            elif np.shape(ylim)[0] != 2:
+                log.error(
+                    (
+                        "`ylim` keyword argument primary axis size invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=np.shape(ylim)[0])
+                )
+                raise ValueError(
+                    (
+                        "`ylim` keyword argument primary axis size invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=np.shape(ylim)[0])
+                )
+        if type(show) != bool:
+            log.error(
+                (
+                    "`show` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(show).__name__)
+            )
+            raise TypeError(
+                (
+                    "`show` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(show).__name__)
+            )
+        if type(block) != bool:
+            log.error(
+                (
+                    "`block` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(block).__name__)
+            )
+            raise TypeError(
+                (
+                    "`block` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(block).__name__)
+            )
+        if type(save) != str and save is not None:
+            log.error(
+                (
+                    "`save` keyword argument type invalid. "
+                    "Expected a `str` or `NoneType`, but got a `{type3}`."
+                ).format(type3=type(save).__name__)
+            )
+            raise TypeError(
+                (
+                    "`save` keyword argument type invalid. "
+                    "Expected a `str` or `NoneType`, but got a `{type3}`."
+                ).format(type3=type(save).__name__)
+            )
+
+        log.info("Tracing field...")
+        fig, ax = gp.plots.trace_particle(
+            data=self.data,
+            quantity=quantity,
+            component=component,
+            imshow=imshow,
+            colorbar=True,
+            ticks=ticks,
+            alpha=alpha,
+            axis=axis,
+            xlim=xlim,
+            ylim=ylim,
+            show=show,
+            block=block,
+            save=save,
+        )
+        return fig, ax
 
 
 class Field(FieldBase):
@@ -87,7 +450,7 @@ class Field(FieldBase):
         *,
         series=None,
         target_particles=1000,
-        moving=True,
+        track=True,
         boundary=None,
         exclusions=[],
         coordinates=None,
@@ -100,13 +463,14 @@ class Field(FieldBase):
         ----------
         series : gp.sequence.Sequence object or gp.mesh.Mesh object
             The base series for field object interpolation.
-        target_nodes : int, optional
+        target_particles : int, optional
             Target number of particles. Defaults to a value of 1000.
-        moving : bool, optional
+        track : bool, optional
             Boolean to specify if particles should move or remain static.
             True: move (Lagrangian), False: static (Eularian). Defaults to True.
         boundary : numpy.ndarray (N,2), optional
-            Array of coordinates to define the particle auto-distribution mesh boundary.
+            Array of coordinates to define the particle auto-distribution mesh
+            boundary.
         exclusions : list, optional
             List to define the particle auto-distribution mesh exclusions.
             Shape of `numpy.ndarray` (N,2).
@@ -127,21 +491,296 @@ class Field(FieldBase):
         ----------
         data : dict
             Data object containing all settings and results.
-            See the data structure :ref:`here <mesh_data_structure>`.
+            See the data structure :ref:`here <field_data_structure>`.
         solved : bool
-            Boolean to indicate if the mesh has been solved.
+            Boolean to indicate if the field has been solved.
 
         """
         self._initialised = False
         _auto_distribute = True
 
-        # Check types
-        if series.data["type"] != "Sequence" and series.data["type"] != "Mesh":
+        # Check inputs.
+        if series.data["type"] not in ["Sequence", "Mesh"]:
             log.error(
-                "Invalid series type. Must be gp.sequence.Sequence or gp.mesh.Mesh."
+                (
+                    "`series` keyword argument type invalid. "
+                    "Expected `gp.sequence.Sequence`, `gp.mesh.Mesh, "
+                    "but got {value}."
+                ).format(value=type(series).__name__)
             )
-        if type(moving) != bool:
-            log.error("Invalid moving type. Must be a bool.")
+            raise ValueError(
+                (
+                    "`series` keyword argument type invalid. "
+                    "Expected `gp.sequence.Sequence` or `gp.mesh.Mesh, "
+                    "but got {value}."
+                ).format(value=type(series).__name__)
+            )
+        if type(target_particles) != int and coordinates is None:
+            log.warning(
+                (
+                    "`target_particles` keyword argument type invalid. "
+                    "Expected an `int`, but got a `{type2}`.\n"
+                    "Attempting conversion..."
+                ).format(type2=type(target_particles).__name__)
+            )
+            try:
+                target_particles = int(target_particles)
+                log.warning(
+                    (
+                        "`target_particles` keyword argument type "
+                        "conversion successful. "
+                        "New value: {value}"
+                    ).format(value=target_particles)
+                )
+            except ValueError:
+                log.error(
+                    "`target_particles` keyword argument type conversion failed. "
+                    "Input an `int` > 0."
+                )
+                raise TypeError(
+                    "`target_particles` keyword argument type conversion failed. "
+                    "Input an `int` > 0."
+                )
+        elif target_particles <= 0 and coordinates is None:
+            log.error(
+                (
+                    "`target_particles` keyword argument value {value} out of range. "
+                    "Input an `int` > 0."
+                ).format(value=target_particles)
+            )
+            raise ValueError(
+                (
+                    "`target_particles` keyword argument value {value} out of range. "
+                    "Input an `int` > 0."
+                ).format(value=target_particles)
+            )
+        if type(track) != bool:
+            log.error(
+                (
+                    "`track` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(track).__name__)
+            )
+            raise TypeError(
+                (
+                    "`track` keyword argument type invalid. "
+                    "Expected a `bool`, but got a `{type2}`."
+                ).format(type2=type(track).__name__)
+            )
+        if type(boundary) != np.ndarray and boundary is not None:
+            log.warning(
+                (
+                    "`boundary` keyword argument type invalid. "
+                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
+                    "Attempting conversion..."
+                ).format(type2=type(boundary).__name__)
+            )
+            try:
+                boundary = np.asarray(boundary)
+                log.warning(
+                    (
+                        "`boundary` keyword argument type conversion successful. "
+                        "New value: {value}"
+                    ).format(value=boundary)
+                )
+            except ValueError:
+                log.error(
+                    "`boundary` keyword argument type conversion failed. "
+                    "Input a `numpy.ndarray` of shape (Nx,2)."
+                )
+                raise TypeError(
+                    "`boundary` keyword argument type conversion failed. "
+                    "Input a `numpy.ndarray` of shape (Nx,2)."
+                )
+        elif np.shape(boundary)[1] != 2 and boundary is not None:
+            log.error(
+                (
+                    "`boundary` keyword argument secondary axis size invalid. "
+                    "Expected 2, but got {size}."
+                ).format(size=np.shape(boundary)[1])
+            )
+            raise ValueError(
+                (
+                    "`boundary` keyword argument secondary axis size invalid. "
+                    "Expected 2, but got {size}."
+                ).format(size=np.shape(boundary)[1])
+            )
+        elif boundary.ndim != 2 and boundary is not None:
+            log.error(
+                (
+                    "`boundary` keyword argument dimensions invalid. "
+                    "Expected 2, but got {size}."
+                ).format(size=boundary.ndim)
+            )
+            raise ValueError(
+                (
+                    "`boundary` keyword argument dimensions invalid. "
+                    "Expected 2, but got {size}."
+                ).format(size=boundary.ndim)
+            )
+        if type(exclusions) != list:
+            log.warning(
+                (
+                    "`exclusions` keyword argument type invalid. "
+                    "Expected a `list`, but got a `{type2}`.\n"
+                    "Attempting conversion..."
+                ).format(type2=type(exclusions).__name__)
+            )
+            try:
+                exclusions = list(exclusions)
+                log.warning(
+                    (
+                        "`exclusions` keyword argument type conversion successful. "
+                        "New value: {value}"
+                    ).format(value=exclusions)
+                )
+            except ValueError:
+                log.error(
+                    "`exclusions` keyword arguement type conversion failed. "
+                    "Input a `list` of `numpy.ndarray` of shape (Nx,2)."
+                )
+                raise TypeError(
+                    "`exclusions` keyword arguement type conversion failed. "
+                    "Input a `list` of `numpy.ndarray` of shape (Nx,2)."
+                )
+        for exclusion in exclusions:
+            if type(exclusion) != np.ndarray:
+                log.error(
+                    (
+                        "`exclusions` keyword argument value type invalid. "
+                        "Expected a `numpy.ndarray`, but got a `{type2}`."
+                    ).format(type2=type(exclusion).__name__)
+                )
+                raise TypeError(
+                    (
+                        "`exclusions` keyword argument value type invalid. "
+                        "Expected a `numpy.ndarray`, but got a `{type2}`."
+                    ).format(type2=type(exclusion).__name__)
+                )
+            elif np.shape(exclusion)[1] != 2:
+                log.error(
+                    (
+                        "`exclusions` keyword argument value secondary axis "
+                        "size invalid. Expected 2, but got {size}."
+                    ).format(size=np.shape(exclusion)[1])
+                )
+                raise ValueError(
+                    (
+                        "`exclusions` keyword argument value secondary axis "
+                        "size invalid. Expected 2, but got {size}."
+                    ).format(size=np.shape(exclusion)[1])
+                )
+            elif exclusion.ndim != 2:
+                log.error(
+                    (
+                        "`exclusions` keyword argument dimensions invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=exclusion.ndim)
+                )
+                raise ValueError(
+                    (
+                        "`exclusions` keyword argument dimensions invalid. "
+                        "Expected 2, but got {size}."
+                    ).format(size=exclusion.ndim)
+                )
+        if type(coordinates) != np.ndarray and coordinates is not None:
+            log.warning(
+                (
+                    "`coordinates` keyword argument type invalid. "
+                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
+                    "Attempting conversion..."
+                ).format(type2=type(coordinates).__name__)
+            )
+            try:
+                coordinates = np.asarray(coordinates)
+                log.warning(
+                    (
+                        "`coordinates` keyword argument type conversion successful. "
+                        "New value: {value}"
+                    ).format(value=coordinates)
+                )
+            except ValueError:
+                log.error(
+                    "`coordinates` keyword argument type conversion failed. "
+                    "Input a `numpy.ndarray` of shape (Nx,2)."
+                )
+                raise TypeError(
+                    "`coordinates` keyword argument type conversion failed. "
+                    "Input a `numpy.ndarray` of shape (Nx,2)."
+                )
+        elif np.shape(coordinates)[1] != 2 and coordinates is not None:
+            log.error(
+                (
+                    "`coordinates` keyword argument secondary axis size invalid. "
+                    "Expected 2, but got {size}."
+                ).format(size=np.shape(coordinates)[1])
+            )
+            raise ValueError(
+                (
+                    "`coordinates` keyword argument secondary axis size invalid. "
+                    "Expected 2, but got {size}."
+                ).format(size=np.shape(coordinates)[1])
+            )
+        elif coordinates.ndim != 2 and coordinates is not None:
+            log.error(
+                (
+                    "`coordinates` keyword argument dimensions invalid. "
+                    "Expected 2, but got {size}."
+                ).format(size=coordinates.ndim)
+            )
+            raise ValueError(
+                (
+                    "`coordinates` keyword argument dimensions invalid. "
+                    "Expected 2, but got {size}."
+                ).format(size=coordinates.ndim)
+            )
+        if type(volumes) != np.ndarray and coordinates is not None:
+            log.warning(
+                (
+                    "`volumes` keyword argument type invalid. "
+                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
+                    "Attempting conversion..."
+                ).format(type2=type(volumes).__name__)
+            )
+            try:
+                volumes = np.asarray(volumes)
+                log.warning(
+                    (
+                        "`volumes` keyword argument type conversion successful. "
+                        "New value: {value}"
+                    ).format(value=volumes)
+                )
+            except ValueError:
+                log.error(
+                    "`volumes` keyword argument type conversion failed. "
+                    "Input a `numpy.ndarray` of shape (Nx,)."
+                )
+                raise TypeError(
+                    "`volumes` keyword argument type conversion failed. "
+                    "Input a `numpy.ndarray` of shape (Nx,)."
+                )
+        elif volumes.ndim != 1 and volumes is not None:
+            log.error(
+                (
+                    "`volumes` keyword argument dimensions invalid. "
+                    "Expected 1, but got {size}."
+                ).format(size=volumes.ndim)
+            )
+            raise ValueError(
+                (
+                    "`volumes` keyword argument dimensions invalid. "
+                    "Expected 1, but got {size}."
+                ).format(size=volumes.ndim)
+            )
+        if np.shape(volumes)[0] != np.shape(coordinates)[0] and volumes is not None:
+            log.error(
+                (
+                    "Array shape mismatch. {value1} `volumes` "
+                    "given for {value2} `coordinates`."
+                ).format(value1=np.shape(volumes)[0], value2=np.shape(coordinates)[0])
+            )
+
+        # Store.
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
             if series.data["file_settings"]["save_by_reference"]:
@@ -158,30 +797,13 @@ class Field(FieldBase):
             mesh_0 = series.data
             self._number_images = 1
         self._image_0 = mesh_0["images"]["f_img"]
-        self._moving = moving
+        self._track = track
         self._series = series
         self.solved = False
         self._unsolvable = False
 
         if coordinates is not None:
             _auto_distribute = False
-            if type(coordinates) != np.ndarray:
-                try:
-                    coordinates = np.asarray(coordinates)
-                except Exception:
-                    log.error(
-                        "Coordinates array type invalid. Expected a numpy.ndarray."
-                    )
-                    return False
-            if np.shape(coordinates)[1] != 2:
-                log.error(
-                    "Coordinates array shape invalid. Expected a (N,2) numpy.ndarray."
-                )
-                return False
-            if np.ndim(coordinates) != 2:
-                log.error(
-                    "Coordinates array dimensions invalid. Expected a 2D numpy.ndarray."
-                )
             image = gp.image.Image(self._image_0)
             for coord in coordinates:
                 if (
@@ -190,86 +812,23 @@ class Field(FieldBase):
                     or coord[1] > np.shape(image.image_gs)[1]
                     or coord[1] < 0
                 ):
-                    log.error("User-specified coordinate outside image boundary.")
-                    return False
+                    log.error(
+                        (
+                            "User-specified coordinate {value} "
+                            "outside image boundary."
+                        ).format(value=coord)
+                    )
+                    raise ValueError(
+                        (
+                            "User-specified coordinate {value} "
+                            "outside image boundary."
+                        ).format(value=coord)
+                    )
             del image
-            if volumes is not None:
-                if type(volumes) != np.ndarray:
-                    try:
-                        volumes = np.asarray(volumes)
-                    except Exception:
-                        log.error(
-                            "Volumes array type invalid. Expected a numpy.ndarray."
-                        )
-                        return False
-                if np.ndim(volumes) != 1:
-                    log.error(
-                        "Volumes array dimensions invalid. Expected a 1D numpy.ndarray."
-                    )
-                    return False
-                if np.shape(volumes)[0] != np.shape(coordinates)[0]:
-                    log.error(
-                        "Volumes-coordinates array mismatch. "
-                        "{volumes} volumes given for {coordinates} coordinates.".format(
-                            volumes=np.shape(volumes)[0],
-                            coordinates=np.shape(coordinates)[0],
-                        )
-                    )
-                    return False
-            else:
+            if volumes is None:
                 volumes = np.ones(np.shape(coordinates)[0])
             self._target_particles = np.shape(coordinates)[0]
         else:
-            if type(target_particles) != int:
-                try:
-                    volumes = int(target_particles)
-                except Exception:
-                    log.error("Target particles type invalid. Expected an integer.")
-                    return False
-            if target_particles < 0:
-                log.error("Target particles out of range. Must be >0.")
-            if boundary is not None:
-                if type(boundary) != np.ndarray:
-                    try:
-                        boundary = np.asarray(boundary)
-                    except Exception:
-                        log.error(
-                            "Boundary array type invalid. Expected a numpy.ndarray."
-                        )
-                        return False
-                if np.shape(boundary)[1] != 2:
-                    log.error(
-                        "Boundary array shape invalid. Expected a (N,2) numpy.ndarray."
-                    )
-                    return False
-                if np.ndim(boundary) != 2:
-                    log.error(
-                        "Boundary array dimensions invalid. "
-                        "Expected a 2D numpy.ndarray."
-                    )
-            if type(exclusions) != list:
-                log.error("Exclusions type invalid. " "Expected a list.")
-                return False
-            for exclusion in exclusions:
-                if type(exclusion) != np.ndarray:
-                    log.error(
-                        "Exclusion coordinate array type invalid. "
-                        "Expected a numpy.ndarray."
-                    )
-                    return False
-                if np.ndim(exclusion) != 2:
-                    log.error(
-                        "Exclusion array dimensions invalid. "
-                        "Expected a 2D numpy.ndarray."
-                    )
-                    return False
-                if np.shape(exclusion)[1] != 2:
-                    log.error(
-                        "Exclusion coordinate array shape invalid. "
-                        "Must be numpy.ndarray of size (n, 2)."
-                    )
-                    return False
-
             self._target_particles = target_particles
 
         self.data = {
@@ -277,7 +836,7 @@ class Field(FieldBase):
             "solved": self.solved,
             "series_type": self._series_type,
             "number_images": self._number_images,
-            "moving": self._moving,
+            "track": self._track,
             "target_particles": self._target_particles,
             "image_0": self._image_0,
         }
@@ -407,7 +966,7 @@ class Field(FieldBase):
                 series=self._series,
                 coordinate_0=self._coordinates[i],
                 volume_0=self._volumes[i],
-                moving=self._moving,
+                track=self._track,
             )
             _particle_solved = particle.solve()
             if _particle_solved is False:
@@ -444,7 +1003,7 @@ class Field(FieldBase):
             Array of segments for gmsh mesh generation.
         curves : `numpy.ndarray` (Nx,Ny)
             Array of curves for gmsh mesh generation.
-        target_nodes : int
+        target_particles : int
             Target number of nodes.
         size_lower_bound : int
             Lower bound on element size.

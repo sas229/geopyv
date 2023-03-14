@@ -227,7 +227,7 @@ class MeshBase(Object):
         """
 
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Mesh not yet solved therefore no convergence data to plot. "
                 "First, run :meth:`~geopyv.mesh.Mesh.solve()` to solve."
@@ -453,7 +453,7 @@ class MeshBase(Object):
 
         """
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Mesh not yet solved therefore no convergence data to plot. "
                 "First, run :meth:`~geopyv.mesh.Mesh.solve()` to solve."
@@ -813,7 +813,7 @@ class MeshBase(Object):
         """
 
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Mesh not yet solved therefore no convergence data to plot. "
                 "First, run :meth:`~geopyv.mesh.Mesh.solve()` to solve."

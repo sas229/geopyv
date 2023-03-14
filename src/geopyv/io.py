@@ -6,16 +6,16 @@ IO module for geopyv.
 import importlib
 import logging
 import json
+import pickle
 import os
 import numpy as np
 import geopyv as gp
-from numpyencoder import NumpyEncoder
 from alive_progress import alive_bar
 
 log = logging.getLogger(__name__)
 
 
-def load(*, filename=None):
+def load(*, filename=None, old_format=False):
     """
 
     Function to load a geopyv data object into the workspace. If no filename
@@ -51,13 +51,20 @@ def load(*, filename=None):
         # filepath = filename + ext
         filepath = directory + "/" + filename + ext
     try:
-        with open(filepath, "r") as infile:
+        with open(filepath, "rb") as infile:
             message = "Loading geopyv object"
             with alive_bar(dual_line=True, bar=None, title=message) as bar:
                 bar.text = "-> Loading object from {filepath}...".format(
                     filepath=filepath
                 )
-                data = json.load(infile)
+                if old_format:
+                    log.warning(
+                        "json file storage deprecated. "
+                        "Load and save objects to convert to new format."
+                    )
+                    data = json.load(infile)
+                else:
+                    data = pickle.load(infile)
                 data = _convert_list_to_ndarray(data)
                 bar()
             object_type = data["type"]
@@ -111,13 +118,13 @@ def save(*, object, filename=None):
         if solved is True:
             ext = ".pyv"
             filepath = directory + "/" + filename + ext
-            with open(filepath, "w") as outfile:
+            with open(filepath, "wb") as outfile:
                 message = "Saving geopyv object"
                 with alive_bar(dual_line=True, bar=None, title=message) as bar:
                     bar.text = "-> Saving object to {filepath}...".format(
                         filepath=filepath
                     )
-                    json.dump(object.data, outfile, cls=NumpyEncoder)
+                    pickle.dump(object.data, outfile)
                     bar()
                 object_type = object.data["type"]
                 log.info(

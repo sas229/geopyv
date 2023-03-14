@@ -82,7 +82,7 @@ class ParticleBase(Object):
         """
 
         # Check if solved.
-        if self.data["solved"] is not True or "results" not in self.data:
+        if self.data["solved"] is not True:
             log.error(
                 "Particle not yet solved therefore no convergence data to plot. "
                 "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
@@ -495,7 +495,7 @@ class Particle(ParticleBase):
                     "Expected 1, but got {size}."
                 ).format(size=warp_0.ndim)
             )
-        if type(volume_0) != float:
+        if isinstance(volume_0, (float, np.floating)) is False:
             log.warning(
                 (
                     "`volume_0` keyword argument type invalid. "
@@ -503,6 +503,7 @@ class Particle(ParticleBase):
                     "Attempting conversion..."
                 ).format(type2=type(volume_0).__name__)
             )
+            print(type(volume_0))
             try:
                 volume_0 = float(volume_0)
                 log.warning(

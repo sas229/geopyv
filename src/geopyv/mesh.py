@@ -1048,6 +1048,8 @@ class Mesh(MeshBase):
         size_lower_bound=1.0,
         size_upper_bound=1000.0,
         mesh_order=2,
+        hard_boundary=True,
+        subset_size_compensation=False,
     ):
         """
 
@@ -1285,6 +1287,19 @@ class Mesh(MeshBase):
                     "Expected `size_upper_bound`>=`size_lower_bound`."
                 ).format(value1=size_upper_bound, value2=size_lower_bound)
             )
+        if type(hard_boundary) != bool:
+            log.error(
+                (
+                    "`mask_options` keyword argument type invalid. "
+                    "Expected an `int` or a `float`, but got a {type3}."
+                ).format(type3=type(hard_boundary).__name__)
+            )
+            raise TypeError(
+                (
+                    "`mask_options` keyword argument type invalid. "
+                    "Expected an `int` or a `float`, but got a {type3}."
+                ).format(type3=type(hard_boundary).__name__)
+            )
 
         # Store.
         self._initialised = False
@@ -1296,6 +1311,8 @@ class Mesh(MeshBase):
         self._size_lower_bound = size_lower_bound
         self._size_upper_bound = size_upper_bound
         self._mesh_order = mesh_order
+        self._hard_boundary = hard_boundary
+        self._subset_size_compensation = subset_size_compensation
         self.solved = False
         self._unsolvable = False
 
@@ -1507,7 +1524,7 @@ class Mesh(MeshBase):
         elif np.shape(seed_coord)[0] != 2:
             log.warning(
                 (
-                    "`see_coord` keyword argument primary axis size invalid. "
+                    "`seed_coord` keyword argument primary axis size invalid. "
                     "Expected 2, but got {size}.\nSelecting `seed_coord`..."
                 ).format(size=np.shape(seed_coord)[0])
             )
@@ -1899,7 +1916,7 @@ class Mesh(MeshBase):
             self.data.update({"results": self._results})
 
         except Exception:
-            log.info("exception")
+            log.error("Could not solve mesh. Not a correlation issue.")
             self._update = True
             self.solved = False
             self._unsolvable = True
@@ -1952,9 +1969,27 @@ class Mesh(MeshBase):
             ),
             0,
         )
-        ImageDrawPIL.Draw(binary_img).polygon(
-            self._boundary.flatten().tolist(), outline=1, fill=1
-        )
+        # plt.imshow(np.asarray(binary_img))
+        # plt.show()
+        if self._hard_boundary:
+            ImageDrawPIL.Draw(binary_img).polygon(
+                self._boundary.flatten().tolist(), outline=1, fill=1
+            )
+        else:
+            image_edge = np.asarray(
+                [
+                    [0.0, 0.0],
+                    [0.0, np.shape(self._f_img.image_gs)[0]],
+                    [
+                        np.shape(self._f_img.image_gs)[1],
+                        np.shape(self._f_img.image_gs)[0],
+                    ],
+                    [np.shape(self._f_img.image_gs)[1], 0.0],
+                ]
+            )
+            ImageDrawPIL.Draw(binary_img).polygon(
+                image_edge.flatten().tolist(), outline=1, fill=1
+            )
 
         # Create objects for mesh generation.
         self._segments = np.empty(
@@ -2398,6 +2433,17 @@ class Mesh(MeshBase):
                 centre = self._nodes[tag]
                 template = deepcopy(self._template)
                 template.mask(centre, self._mask)
+                if self._subset_size_compensation:
+                    if template.n_px < self._template.n_px:
+                        size = int(
+                            self._template.size
+                            / np.sqrt(template.n_px / self._template.n_px)
+                        )
+                        if self._template.shape == "circle":
+                            template = gp.templates.Circle(radius=size)
+                        elif self._template.shape == "square":
+                            template = gp.templates.Square(length=size)
+                        template.mask(centre, self._mask)
                 self._subsets[tag] = gp.subset.Subset(
                     f_coord=self._nodes[tag],
                     f_img=self._f_img,

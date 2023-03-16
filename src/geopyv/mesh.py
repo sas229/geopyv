@@ -1075,7 +1075,14 @@ class Mesh(MeshBase):
             Lower bound on element size. Defaults to a value of 1000.0.
         mesh_order : int, optional
             Mesh element order. Options are 1 and 2. Defaults to 2.
-
+        hard_boundary : bool, optional
+            Boolean to control whether the boundary is included in the
+            binary mask. True -included, False - not included.
+            Defaults to True.
+        subset_size_compensation: bool, optional
+            Boolean to control whether masked subsets are enlarged to
+            maintain area (and thus better correlation).
+            Defaults to False.
 
         Attributes
         ----------
@@ -1290,15 +1297,28 @@ class Mesh(MeshBase):
         if type(hard_boundary) != bool:
             log.error(
                 (
-                    "`mask_options` keyword argument type invalid. "
-                    "Expected an `int` or a `float`, but got a {type3}."
+                    "`hard_boundary` keyword argument type invalid. "
+                    "Expected a `bool`, but got a {type3}."
                 ).format(type3=type(hard_boundary).__name__)
             )
             raise TypeError(
                 (
-                    "`mask_options` keyword argument type invalid. "
-                    "Expected an `int` or a `float`, but got a {type3}."
+                    "`hard_boundary` keyword argument type invalid. "
+                    "Expected a `bool`, but got a {type3}."
                 ).format(type3=type(hard_boundary).__name__)
+            )
+        if type(subset_size_compensation) != bool:
+            log.error(
+                (
+                    "`subset_size_compensation` keyword argument type invalid. "
+                    "Expected a `bool`, but got a {type3}."
+                ).format(type3=type(subset_size_compensation).__name__)
+            )
+            raise TypeError(
+                (
+                    "`subset_size_compensation` keyword argument type invalid. "
+                    "Expected a `bool`, but got a {type3}."
+                ).format(type3=type(subset_size_compensation).__name__)
             )
 
         # Store.

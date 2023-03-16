@@ -1620,6 +1620,8 @@ class Sequence(SequenceBase):
         seed_tolerance=0.9,
         alpha=0.5,
         track=False,
+        hard_boundary=True,
+        subset_size_compensation=False,
     ):
         """
         Method to solve for the sequence.
@@ -1659,6 +1661,14 @@ class Sequence(SequenceBase):
             Mesh boundary tracking at reference image updates. Options are:
             False - no movement,
             True - movement of initially defined boundary points tracked.
+        hard_boundary : bool, optional
+            Boolean to control whether the boundary is included in the
+            binary mask. True -included, False - not included.
+            Defaults to True.
+        subset_size_compensation: bool, optional
+            Boolean to control whether masked subsets are enlarged to
+            maintain area (and thus better correlation).
+            Defaults to False.
 
         Returns
         -------
@@ -2052,6 +2062,32 @@ class Sequence(SequenceBase):
                     "Expected a `bool`, but got a `{type2}`."
                 ).format(type2=type(track).__name__)
             )
+        if type(hard_boundary) != bool:
+            log.error(
+                (
+                    "`hard_boundary` keyword argument type invalid. "
+                    "Expected a `bool`, but got a {type3}."
+                ).format(type3=type(hard_boundary).__name__)
+            )
+            raise TypeError(
+                (
+                    "`hard_boundary` keyword argument type invalid. "
+                    "Expected a `bool`, but got a {type3}."
+                ).format(type3=type(hard_boundary).__name__)
+            )
+        if type(subset_size_compensation) != bool:
+            log.error(
+                (
+                    "`subset_size_compensation` keyword argument type invalid. "
+                    "Expected a `bool`, but got a {type3}."
+                ).format(type3=type(subset_size_compensation).__name__)
+            )
+            raise TypeError(
+                (
+                    "`subset_size_compensation` keyword argument type invalid. "
+                    "Expected a `bool`, but got a {type3}."
+                ).format(type3=type(subset_size_compensation).__name__)
+            )
 
         # Store variables.
         self._seed_coord = seed_coord
@@ -2066,6 +2102,8 @@ class Sequence(SequenceBase):
         self._seed_tolerance = seed_tolerance
         self._alpha = alpha
         self._track = track
+        self._hard_boundary = hard_boundary
+        self._subset_size_compensation = subset_size_compensation
         self._p_0 = np.zeros(6 * self._subset_order)
 
         # Solve.
@@ -2089,6 +2127,8 @@ class Sequence(SequenceBase):
                 size_lower_bound=self._size_lower_bound,
                 size_upper_bound=self._size_upper_bound,
                 mesh_order=self._mesh_order,
+                hard_boundary=self._hard_boundary,
+                subset_size_compensation=self._subset_size_compensation,
             )  # Initialise mesh object.
             mesh.solve(
                 seed_coord=self._seed_coord,

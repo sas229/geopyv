@@ -2675,6 +2675,9 @@ class Mesh(MeshBase):
                             self._store_variables(idx)
                             return True
                         else:
+                            self._C_ZNCC[idx] = np.max(
+                                (self._subsets[idx].data["results"]["C_ZNCC"], 0)
+                            )
                             return False
 
     def _store_variables(self, idx, seed=False):

@@ -550,15 +550,18 @@ class Particle(ParticleBase):
 
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
-            if series.data["file_settings"]["save_by_reference"]:
-                self._series = np.empty(
-                    np.shape(series.data["meshes"])[0], dtype=object
-                )
-                for i in range(np.shape(series.data["meshes"])[0]):
-                    self._series[i] = gp.io.load(
-                        filename=series.data["file_settings"]["mesh_folder"]
-                        + series.data["meshes"][i]
-                    ).data
+            if "file_settings" in series.data:
+                if series.data["file_settings"]["save_by_reference"]:
+                    self._series = np.empty(
+                        np.shape(series.data["meshes"])[0], dtype=object
+                    )
+                    for i in range(np.shape(series.data["meshes"])[0]):
+                        self._series[i] = gp.io.load(
+                            filename=series.data["file_settings"]["mesh_folder"]
+                            + series.data["meshes"][i]
+                        ).data
+                else:
+                    self._series = series.data["meshes"]
             else:
                 self._series = series.data["meshes"]
         else:

@@ -788,15 +788,16 @@ class Field(FieldBase):
         # Store.
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
-            if series.data["file_settings"]["save_by_reference"]:
-                for i in range(np.shape(series.data["meshes"])[0]):
-                    series.data["meshes"][i] = gp.io.load(
-                        filename=series.data["file_settings"]["mesh_folder"]
-                        + series.data["meshes"][i]
-                    ).data
-            series.data["file_settings"]["save_by_reference"] = False
-            mesh_0 = series.data["meshes"][0]
-            self._number_images = np.shape(series.data["meshes"])[0] + 1
+            if "file_settings" in series.data:
+                if series.data["file_settings"]["save_by_reference"]:
+                    for i in range(np.shape(series.data["meshes"])[0]):
+                        series.data["meshes"][i] = gp.io.load(
+                            filename=series.data["file_settings"]["mesh_folder"]
+                            + series.data["meshes"][i]
+                        ).data
+                series.data["file_settings"]["save_by_reference"] = False
+                mesh_0 = series.data["meshes"][0]
+                self._number_images = np.shape(series.data["meshes"])[0] + 1
         else:
             self._series_type = "Mesh"
             mesh_0 = series.data

@@ -62,45 +62,9 @@ class SubsetBase(Object):
         """
 
         # Check input.
-        if type(show) != bool:
-            log.error(
-                "`show` keyword argument type invalid. "
-                "Expected a `bool`, but got a `{type2}`.".format(
-                    type2=type(show).__name__
-                )
-            )
-            raise TypeError(
-                "`show` keyword argument type invalid. "
-                "Expected a `bool`, but got a `{type2}`.".format(
-                    type2=type(show).__name__
-                )
-            )
-        if type(block) != bool:
-            log.error(
-                "`block` keyword argument type invalid. "
-                "Expected a `bool`, but got a `{type2}`.".format(
-                    type2=type(block).__name__
-                )
-            )
-            raise TypeError(
-                "`block` keyword argument type invalid. "
-                "Expected a `bool`, but got a `{type2}`.".format(
-                    type2=type(block).__name__
-                )
-            )
-        if type(save) != str and save is not None:
-            log.error(
-                "`save` keyword argument type invalid. "
-                "Expected a `str` or `NoneType`, but got a `{type3}`.".format(
-                    type3=type(save).__name__
-                )
-            )
-            raise TypeError(
-                "`save` keyword argument type invalid. "
-                "Expected a `str` or `NoneType`, but got a `{type3}`.".format(
-                    type3=type(save).__name__
-                )
-            )
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Inspect subset.
         fig, ax = gp.plots.inspect_subset(
@@ -151,45 +115,9 @@ class SubsetBase(Object):
         """
 
         # Check input.
-        if type(show) != bool:
-            log.error(
-                "`show` keyword argument type invalid. "
-                "Expected a `bool`, but got a `{type2}`.".format(
-                    type2=type(show).__name__
-                )
-            )
-            raise TypeError(
-                "`show` keyword argument type invalid. "
-                "Expected a `bool`, but got a `{type2}`.".format(
-                    type2=type(show).__name__
-                )
-            )
-        if type(block) != bool:
-            log.error(
-                "`block` keyword argument type invalid. "
-                "Expected a `bool`, but got a `{type2}`.".format(
-                    type2=type(block).__name__
-                )
-            )
-            raise TypeError(
-                "`block` keyword argument type invalid. "
-                "Expected a `bool`, but got a `{type2}`.".format(
-                    type2=type(block).__name__
-                )
-            )
-        if type(save) != str and save is not None:
-            log.error(
-                "`save` keyword argument type invalid. "
-                "Expected a `str` or `NoneType`, but got a `{type3}`.".format(
-                    type3=type(save).__name__
-                )
-            )
-            raise TypeError(
-                "`save` keyword argument type invalid. "
-                "Expected a `str` or `NoneType`, but got a `{type3}`.".format(
-                    type3=type(save).__name__
-                )
-            )
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Plot convergence.
         if "results" in self.data:
@@ -199,6 +127,19 @@ class SubsetBase(Object):
             return fig, ax
         else:
             log.error("Subset not yet solved. Run the solve() method.")
+
+    def _report(self, msg, error_type):
+        if msg and error_type != "Warning":
+            log.error(msg)
+        elif msg and error_type == "Warning":
+            log.warning(msg)
+            return True
+        if error_type == "ValueError":
+            raise ValueError(msg)
+        elif error_type == "TypeError":
+            raise TypeError(msg)
+        elif error_type == "IndexError":
+            raise IndexError(msg)
 
 
 class Subset(SubsetBase):
@@ -301,39 +242,26 @@ class Subset(SubsetBase):
         log.debug("Initialising geopyv Subset object.")
 
         # Check types.
-        if type(f_img) != gp.image.Image:
-            log.info("Selecting a reference image...")
+        if self._report(
+            gp.check._check_type(f_img, "f_img", [gp.image.Image]), "Warning"
+        ):
             f_img = gp.io._load_f_img()
-        if type(g_img) != gp.image.Image:
-            log.info("Selecting a target image...")
+        if self._report(
+            gp.check._check_type(g_img, "g_img", [gp.image.Image]), "Warning"
+        ):
             g_img = gp.io._load_g_img()
-        if type(f_coord) != np.ndarray:
-            coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
-            f_coord = coordinate.select(f_img, template)
-        elif np.shape(f_coord) != np.shape(np.empty(2)):
-            log.error("Template coordinate of invalid shape.")
-            coordinate = gp.gui.selectors.coordinate.CoordinateSelector()
-            f_coord = coordinate.select(f_img, template)
+        if self._report(
+            gp.check._check_type(f_coord, "f_coord", [np.ndarray]), "Warning"
+        ):
+            f_coord = gp.gui.selectors.coordinate.CoordinateSelector()
+        elif self._report(gp.check._check_dim(f_coord, "f_coord", 1), "Warning"):
+            f_coord = gp.gui.selectors.coordinate.CoordinateSelector()
+        elif self._report(gp.check._check_axis(f_coord, "f_coord", 0, [2]), "Warning"):
+            f_coord = gp.gui.selectors.coordinate.CoordinateSelector()
         if template is None:
             template = gp.templates.Circle(50)
-        elif (
-            type(template) != gp.templates.Circle
-            and type(template) != gp.templates.Square
-        ):
-            log.error(
-                (
-                    "`template` keyword argument value invalid. "
-                    "Expected `gp.templates.Circle` or `gp.templates.Square`, "
-                    "but got {type3}."
-                ).format(type3=type(template).__name__)
-            )
-            raise ValueError(
-                (
-                    "`template` keyword argument value invalid. "
-                    "Expected `gp.templates.Circle` or `gp.templates.Square`, "
-                    "but got {type3}."
-                ).format(type3=type(template).__name__)
-            )
+        types = [gp.templates.Circle, gp.templates.Square]
+        self._report(gp.check._check_type(template, "template", types), "TypeError")
 
         # Store.
         self._initialised = False
@@ -419,7 +347,7 @@ class Subset(SubsetBase):
         max_norm=1e-3,
         max_iterations=15,
         order=1,
-        p_0=None,
+        warp_0=np.zeros(6),
         tolerance=0.7,
         method="ICGN",
     ):
@@ -437,7 +365,7 @@ class Subset(SubsetBase):
             value of 50.
         order : int
             Warp function order. Options are 1 and 2.
-        p_0 : ndarray, optional
+        warp_0 : ndarray, optional
             1D array of warp function parameters with `float` type.
         tolerance: float, optional
             Correlation coefficient tolerance. Defaults to a value of 0.7.
@@ -470,56 +398,63 @@ class Subset(SubsetBase):
         """
         # Check other control parameters.
         log.debug("Solving geopyv Subset object.")
-        if max_norm < 1e-10:
-            log.error("Maximum norm value too small. Suggested default is 1e-3.")
-            return False
-        elif type(max_iterations) != int:
-            log.error(
-                "Maximum number of iterations of invalid type. "
-                "Must be positive integer."
-            )
-            return False
-        elif max_iterations <= 0:
-            log.error(
-                "Invalid maximum number of iterations specified. "
-                "Must be positive integer."
-            )
-            return False
-        elif type(tolerance) != float:
-            log.error(
-                "Tolerance of invalid type. Must be float greater than "
-                "zero and less than one."
-            )
-            return False
-        elif tolerance < 0:
-            log.error(
-                "Tolerance must be greater than or equal to zero. "
-                "Suggested default is 0.75."
-            )
-            return False
-        elif tolerance > 1:
-            log.error("Tolerance must be less than one. Suggested default is 0.75.")
-            return False
+        check = gp.check._check_type(max_norm, "max_norm", [float])
+        if check:
+            try:
+                max_norm = float(max_norm)
+                self._report(
+                    gp.check._conversion(max_norm, "max_norm", float), "Warning"
+                )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(max_norm, "max_norm", 1e-10), "ValueError")
+        check = gp.check._check_type(max_iterations, "max_iterations", [int])
+        if check:
+            try:
+                max_iterations = int(max_iterations)
+                self._report(
+                    gp.check._conversion(max_iterations, "max_iterations", int),
+                    "Warning",
+                )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_range(max_iterations, "max_iterations", 0.5), "ValueError"
+        )
+        check = gp.check._check_type(tolerance, "tolerance", [float])
+        if check:
+            try:
+                tolerance = float(tolerance)
+                self._report(
+                    gp.check._conversion(tolerance, "tolerance", float), "Warning"
+                )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_range(tolerance, "tolerance", 0.0, 1.0), "ValueError"
+        )
+        check = gp.check._check_type(order, "order", [int])
+        if check:
+            try:
+                order = int(order)
+                self._report(gp.check._conversion(order, "order", int), "Warning")
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_value(order, "order", [1, 2]), "ValueError")
 
-        # Check warp function order and type.
-        if isinstance(p_0, type(None)):
-            if order == 1:
-                p_0 = np.zeros(6)
-            elif order == 2:
-                p_0 = np.zeros(12)
-            else:
-                log.error("Invalid warp function order.")
-                return False
-        else:
-            if type(p_0) != np.ndarray:
-                log.error("Warp function of incorrect type.")
-                return False
-            if order == 1 and np.shape(p_0)[0] != 6:
-                log.error("Warp function preconditioning vector of incorrect shape.")
-                return False
-            if order == 2 and np.shape(p_0)[0] != 12:
-                log.error("Warp function preconditioning vector of incorrect shape.")
-                return False
+        check = gp.check._check_type(warp_0, "warp_0", [np.ndarray])
+        if check:
+            try:
+                warp_0 = np.asarray(warp_0)
+                self._report(
+                    gp.check._conversion(warp_0, "warp_0", np.ndarray), "Warning"
+                )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_dim(warp_0, "warp_0", 1), "ValueError")
+        self._report(
+            gp.check._check_axis(warp_0, "warp_0", 0, [6 * order]), "ValueError"
+        )
 
         # Store settings.
         self._method = method
@@ -538,12 +473,12 @@ class Subset(SubsetBase):
 
         # Compute initial guess if u and v in deformation parameter vector
         # initialised with zeros, otherwise precondition.
-        if p_0[0] == 0 and p_0[1] == 0:
-            self._p_init = p_0
+        if warp_0[0] == 0 and warp_0[1] == 0:
+            self._p_init = warp_0
             self._get_initial_guess()
             self._p = self._p_init
         else:
-            self._p = p_0
+            self._p = warp_0
 
         # Call appropriate iterative solver:
         try:

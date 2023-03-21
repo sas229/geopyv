@@ -63,9 +63,9 @@ def load(*, filename=None, old_format=False):
                         "Load and save objects to convert to new format."
                     )
                     data = json.load(infile)
+                    data = _convert_list_to_ndarray(data)
                 else:
                     data = pickle.load(infile)
-                data = _convert_list_to_ndarray(data)
                 bar()
             object_type = data["type"]
             log.info(

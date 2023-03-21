@@ -8,7 +8,6 @@ import numpy as np
 import geopyv as gp
 from geopyv.object import Object
 import re
-import os
 import sys
 import glob
 
@@ -85,127 +84,39 @@ class SequenceBase(Object):
             )
 
         # Check mesh_index input.
-        if type(mesh_index) != int:
-            log.error(
-                (
-                    "`mesh_index` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`."
-                ).format(type2=type(mesh_index).__name__)
-            )
-            raise TypeError(
-                (
-                    "`mesh_index` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`."
-                ).format(type2=type(mesh_index).__name__)
-            )
-        elif mesh_index < 0 or mesh_index >= np.shape(self.data["meshes"])[0]:
-            log.error(
-                (
-                    "`mesh_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(self.data["meshes"])[0],
-                    input_value=mesh_index,
-                )
-            )
-            raise IndexError(
-                (
-                    "`mesh_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(self.data["meshes"])[0],
-                    input_value=mesh_index,
-                )
+        self._report(
+            gp.check._check_type(mesh_index, "mesh_index", [int, type(None)]),
+            "TypeError",
+        )
+        if mesh_index:
+            self._report(
+                gp.check._check_index(mesh_index, "mesh_index", 0, self.data["meshes"]),
+                "IndexError",
             )
 
         # Load/access selected mesh object.
-        if self.data["file_settings"]["save_by_reference"]:
-            mesh = gp.io.load(
-                filename=self.data["file_settings"]["mesh_folder"]
-                + self.data["meshes"][mesh_index]
-            ).data
-        else:
-            mesh = self.data["meshes"][mesh_index]
+        mesh_obj = self._load_mesh(mesh_index)
 
         # Check remaining input.
-        if type(subset_index) != int and subset_index is not None:
-            log.error(
-                "`subset_index` keyword argument type invalid. "
-                "Expected an `int` or a `NoneType`, but got a `{type2}`.".format(
-                    type2=type(subset_index).__name__
-                )
+        self._report(
+            gp.check._check_type(subset_index, "subset_index", [int, type(None)]),
+            "TypeError",
+        )
+        if subset_index:
+            self._report(
+                gp.check._check_index(
+                    subset_index, "subset_index", 0, mesh_obj["results"]["subsets"]
+                ),
+                "IndexError",
             )
-            raise TypeError(
-                "`subset_index` keyword argument type invalid. "
-                "Expected an `int` or a `NoneType`, but got a `{type2}`.".format(
-                    type2=type(subset_index).__name__
-                )
-            )
-        elif subset_index is not None and (
-            subset_index < 0 or subset_index >= np.shape(mesh["results"]["subsets"])[0]
-        ):
-            log.error(
-                (
-                    "`subset_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(mesh["results"]["subsets"])[0] - 1,
-                    input_value=subset_index,
-                )
-            )
-            raise IndexError(
-                (
-                    "`subset_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(mesh["results"]["subsets"])[0] - 1,
-                    input_value=subset_index,
-                )
-            )
-        if type(show) != bool:
-            log.error(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-            raise TypeError(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-        if type(block) != bool:
-            log.error(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-            raise TypeError(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-        if type(save) != str and save is not None:
-            log.error(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
-            raise TypeError(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Inspect.
         if subset_index is not None:
-            subset_data = mesh["results"]["subsets"][subset_index]
-            mask = np.asarray(mesh["mask"])
+            subset_data = mesh_obj["results"]["subsets"][subset_index]
+            mask = np.asarray(mesh_obj["mask"])
             log.info(
                 "Inspecting subset {subset} of mesh {mesh}...".format(
                     subset=subset_index, mesh=mesh_index
@@ -222,7 +133,7 @@ class SequenceBase(Object):
         else:
             log.info("Inspecting mesh {mesh}...".format(mesh=mesh_index))
             fig, ax = gp.plots.inspect_mesh(
-                data=mesh,
+                data=mesh_obj,
                 show=show,
                 block=block,
                 save=save,
@@ -298,146 +209,44 @@ class SequenceBase(Object):
             )
 
         # Check mesh_index input.
-        if type(mesh_index) != int:
-            log.error(
-                (
-                    "`mesh_index` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`."
-                ).format(type2=type(mesh_index).__name__)
-            )
-            raise TypeError(
-                (
-                    "`mesh_index` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`."
-                ).format(type2=type(mesh_index).__name__)
-            )
-        elif mesh_index < 0 or mesh_index >= np.shape(self.data["meshes"])[0]:
-            log.error(
-                (
-                    "`mesh_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(self.data["meshes"])[0],
-                    input_value=mesh_index,
-                )
-            )
-            raise IndexError(
-                (
-                    "`mesh_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(self.data["meshes"])[0],
-                    input_value=mesh_index,
-                )
+        self._report(
+            gp.check._check_type(mesh_index, "mesh_index", [int, type(None)]),
+            "TypeError",
+        )
+        if mesh_index:
+            self._report(
+                gp.check._check_index(mesh_index, "mesh_index", 0, self.data["meshes"]),
+                "IndexError",
             )
 
         # Load/access selected mesh object.
-        if self.data["file_settings"]["save_by_reference"]:
-            mesh = gp.io.load(
-                filename=self.data["file_settings"]["mesh_folder"]
-                + self.data["meshes"][mesh_index]
-            ).data
-        else:
-            mesh = self.data["meshes"][mesh_index]
+        mesh_obj = self._load_mesh(mesh_index)
 
         # Check remaining input.
-        if type(subset_index) != int and subset_index is not None:
-            log.error(
-                "`subset_index` keyword argument type invalid. "
-                "Expected an `int` or a `NoneType`, but got a `{type2}`.".format(
-                    type2=type(subset_index).__name__
-                )
+        self._report(
+            gp.check._check_type(subset_index, "subset_index", [int, type(None)]),
+            "TypeError",
+        )
+        if subset_index:
+            self._report(
+                gp.check._check_index(
+                    subset_index, "subset_index", 0, mesh_obj["results"]["subsets"]
+                ),
+                "IndexError",
             )
-            raise TypeError(
-                "`subset_index` keyword argument type invalid. "
-                "Expected an `int` or a `NoneType`, but got a `{type2}`.".format(
-                    type2=type(subset_index).__name__
-                )
+        self._report(
+            gp.check._check_type(quantity, "quantity", [str, type(None)]), "TypeError"
+        )
+        if quantity:
+            self._report(
+                gp.check._check_value(
+                    quantity, "quantity", ["C_ZNCC", "iterations", "norm"]
+                ),
+                "ValueError",
             )
-        elif subset_index is not None and (
-            subset_index < 0 or subset_index >= np.shape(mesh["results"]["subsets"])[0]
-        ):
-            log.error(
-                (
-                    "`subset_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(mesh["results"]["subsets"])[0] - 1,
-                    input_value=subset_index,
-                )
-            )
-            raise IndexError(
-                (
-                    "`subset_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(mesh["results"]["subsets"])[0] - 1,
-                    input_value=subset_index,
-                )
-            )
-        if type(quantity) != str and quantity is not None:
-            log.error(
-                (
-                    "`quantity` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a {type3}."
-                ).format(type3=type(quantity).__name__)
-            )
-            raise TypeError(
-                (
-                    "`quantity` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a {type3}."
-                ).format(type3=type(quantity).__name__)
-            )
-        elif quantity not in ["C_ZNCC", "iterations", "norm"] and quantity is not None:
-            log.error(
-                (
-                    "`quantity` keyword argument value invalid. "
-                    "Expected `C_ZNCC`, `iterations` or `norm`, but got {value}."
-                ).format(value=quantity)
-            )
-            raise ValueError(
-                "`quantity` keyword argument value invalid. "
-                "Expected `C_ZNCC`, `iterations` or `norm`, but got {value}."
-            )
-        if type(show) != bool:
-            log.error(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-            raise TypeError(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-        if type(block) != bool:
-            log.error(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-            raise TypeError(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-        if type(save) != str and save is not None:
-            log.error(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
-            raise TypeError(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Plot convergence.
         if subset_index is not None:
@@ -448,7 +257,7 @@ class SequenceBase(Object):
                 ).format(subset=subset_index, mesh=mesh_index)
             )
             fig, ax = gp.plots.convergence_subset(
-                mesh["results"]["subsets"][subset_index],
+                mesh_obj["results"]["subsets"][subset_index],
                 show=show,
                 block=block,
                 save=save,
@@ -471,7 +280,7 @@ class SequenceBase(Object):
                 ).format(quantity=quantity, mesh=mesh_index)
             )
             fig, ax = gp.plots.convergence_mesh(
-                data=mesh,
+                data=mesh_obj,
                 quantity=quantity,
                 show=show,
                 block=block,
@@ -579,52 +388,20 @@ class SequenceBase(Object):
             )
 
         # Check input.
-        if type(mesh_index) != int:
-            log.error(
-                (
-                    "`mesh_index` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`."
-                ).format(type2=type(mesh_index).__name__)
+        self._report(
+            gp.check._check_type(mesh_index, "mesh_index", [int, type(None)]),
+            "TypeError",
+        )
+        if mesh_index:
+            self._report(
+                gp.check._check_index(mesh_index, "mesh_index", 0, self.data["meshes"]),
+                "IndexError",
             )
-            raise TypeError(
-                (
-                    "`mesh_index` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`."
-                ).format(type2=type(mesh_index).__name__)
-            )
-        elif mesh_index < 0 or mesh_index >= np.shape(self.data["meshes"])[0]:
-            log.error(
-                (
-                    "`mesh_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(np.shape(self.data["meshes"])[0])[0] - 1,
-                    input_value=mesh_index,
-                )
-            )
-            raise IndexError(
-                (
-                    "`mesh_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(np.shape(self.data["meshes"])[0])[0] - 1,
-                    input_value=mesh_index,
-                )
-            )
-        if type(quantity) != str and quantity is not None:
-            log.error(
-                (
-                    "`quantity` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a {type3}."
-                ).format(type3=type(quantity).__name__)
-            )
-            raise TypeError(
-                (
-                    "`quantity` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a {type3}."
-                ).format(type3=type(quantity).__name__)
-            )
-        elif quantity not in [
+
+        self._report(
+            gp.check._check_type(quantity, "quantity", [str, type(None)]), "TypeError"
+        )
+        types = [
             "C_ZNCC",
             "iterations",
             "norm",
@@ -635,250 +412,42 @@ class SequenceBase(Object):
             "u_y",
             "v_y",
             "R",
-        ]:
-            log.error(
-                (
-                    "`quantity` keyword argument value invalid. "
-                    "Expected `C_ZNCC`,`iterations, `norm`, `u`, `v`, `u_x`, "
-                    "`v_x`, u_y`, `v_y` or `R`, but got {value}."
-                ).format(value=quantity)
+        ]
+        if quantity:
+            self._report(
+                gp.check._check_value(quantity, "quantity", types), "ValueError"
             )
-            raise ValueError(
-                (
-                    "`quantity` keyword argument value invalid. "
-                    "Expected `C_ZNCC`, `iterations, `norm`, `u`, `v`, `u_x`, "
-                    "`v_x`, u_y`, `v_y` or `R`, but got {value}."
-                ).format(value=quantity)
-            )
-        if type(imshow) != bool:
-            log.error(
-                (
-                    "`imshow` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(imshow).__name__)
-            )
-            raise TypeError(
-                (
-                    "`imshow` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(imshow).__name__)
-            )
-        if type(colorbar) != bool:
-            log.error(
-                (
-                    "`colorbar` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(colorbar).__name__)
-            )
-            raise TypeError(
-                (
-                    "`colorbar` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(colorbar).__name__)
-            )
-        if isinstance(ticks, (tuple, list, np.ndarray)) is False and ticks is not None:
-            log.error(
-                (
-                    "`ticks` keyword argument type invalid. "
-                    "Expected a `tuple`, `list` or `numpy.ndarray`, "
-                    "but got a `{type2}`."
-                ).format(type2=type(ticks).__name__)
-            )
-            raise TypeError(
-                (
-                    "`ticks` keyword argument type invalid. "
-                    "Expected a `tuple`, `list` or `numpy.ndarray`, "
-                    "but got a `{type2}`."
-                ).format(type2=type(ticks).__name__)
-            )
-        if type(mesh) != bool:
-            log.error(
-                (
-                    "`mesh` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(mesh).__name__)
-            )
-            raise TypeError(
-                (
-                    "`mesh` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(mesh).__name__)
-            )
-        if type(alpha) != float:
-            log.warning(
-                (
-                    "`alpha` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(alpha).__name__)
-            )
+        self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
+        self._report(gp.check._check_type(colorbar, "colorbar", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(ticks, "ticks", types), "TypeError")
+        self._report(gp.check._check_type(mesh, "mesh", [bool]), "TypeError")
+        check = gp.check._check_type(alpha, "alpha", [float])
+        if check:
             try:
                 alpha = float(alpha)
-                log.warning(
-                    (
-                        "`alpha` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=alpha)
-                )
-            except ValueError:
-                log.error(
-                    "`alpha` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-                raise TypeError(
-                    "`alpha` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-        elif alpha < 0.0 or alpha > 1.0:
-            log.error(
-                (
-                    "`alpha` keyword argument value {value} out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=alpha)
-            )
-            raise ValueError(
-                (
-                    "`alpha` keyword argument value {value} out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=alpha)
-            )
-        if (
-            isinstance(levels, (int, tuple, list, np.ndarray)) is False
-            and levels is not None
-        ):
-            log.error(
-                (
-                    "`levels` keyword argument type invalid. "
-                    "Expected an `int`, `tuple`, `list`, "
-                    "`numpy.ndarray` or `NoneType`, but got a {type6}."
-                ).format(type6=type(levels).__name__)
-            )
-            raise TypeError(
-                (
-                    "`levels` keyword argument type invalid. "
-                    "Expected an `int`, `tuple`, `list`, "
-                    "`numpy.ndarray` or `NoneType`, but got a {type6}."
-                ).format(type6=type(levels).__name__)
-            )
-        if type(axis) != bool:
-            log.error(
-                (
-                    "`axis` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(axis).__name__)
-            )
-            raise TypeError(
-                (
-                    "`axis` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(axis).__name__)
-            )
-        if xlim is not None:
-            if isinstance(xlim, (tuple, list, np.ndarray)) is False:
-                log.error(
-                    (
-                        "`xlim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(xlim).__name__)
-                )
-                raise TypeError(
-                    (
-                        "`xlim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(xlim).__name__)
-                )
-            elif np.shape(xlim)[0] != 2:
-                log.error(
-                    (
-                        "`xlim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(xlim)[0])
-                )
-                raise ValueError(
-                    (
-                        "`xlim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(xlim)[0])
-                )
-        if ylim is not None:
-            if isinstance(ylim, (tuple, list, np.ndarray)) is False:
-                log.error(
-                    (
-                        "`ylim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(ylim).__name__)
-                )
-                raise TypeError(
-                    (
-                        "`ylim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(ylim).__name__)
-                )
-            elif np.shape(ylim)[0] != 2:
-                log.error(
-                    (
-                        "`ylim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(ylim)[0])
-                )
-                raise ValueError(
-                    (
-                        "`ylim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(ylim)[0])
-                )
-        if type(show) != bool:
-            log.error(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-            raise TypeError(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-        if type(block) != bool:
-            log.error(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-            raise TypeError(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-        if type(save) != str and save is not None:
-            log.error(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
-            raise TypeError(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
+                self._report(gp.check._conversion(alpha, "alpha", float), "Warning")
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
+        types = [int, tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(levels, "levels", types), "TypeError")
+        self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
+        if xlim:
+            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
+            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
+        if ylim:
+            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
+            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Load/access selected mesh object.
-        if self.data["file_settings"]["save_by_reference"]:
-            mesh_obj = gp.io.load(
-                filename=self.data["file_settings"]["mesh_folder"]
-                + self.data["meshes"][mesh_index]
-            ).data
-        else:
-            mesh_obj = self.data["meshes"][mesh_index]
+        mesh_obj = self._load_mesh(mesh_index)
 
         log.info(
             "Generating {quantity} contour plot for mesh {mesh}...".format(
@@ -983,209 +552,41 @@ class SequenceBase(Object):
             )
 
         # Check input.
-        if type(mesh_index) != int:
-            log.error(
-                (
-                    "`mesh_index` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`."
-                ).format(type2=type(mesh_index).__name__)
+        self._report(
+            gp.check._check_type(mesh_index, "mesh_index", [int, type(None)]),
+            "TypeError",
+        )
+        if mesh_index:
+            self._report(
+                gp.check._check_index(mesh_index, "mesh_index", 0, self.data["meshes"]),
+                "IndexError",
             )
-            raise TypeError(
-                (
-                    "`mesh_index` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`."
-                ).format(type2=type(mesh_index).__name__)
-            )
-        elif mesh_index < 0 or mesh_index >= np.shape(self.data["meshes"])[0]:
-            log.error(
-                (
-                    "`mesh_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(np.shape(self.data["meshes"])[0])[0] - 1,
-                    input_value=mesh_index,
-                )
-            )
-            raise IndexError(
-                (
-                    "`mesh_index` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(np.shape(self.data["meshes"])[0])[0] - 1,
-                    input_value=mesh_index,
-                )
-            )
-        if type(scale) != float:
-            log.error(
-                (
-                    "`scale` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`."
-                ).format(type2=type(scale).__name__)
-            )
-            raise TypeError(
-                (
-                    "`scale` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`."
-                ).format(type2=type(scale).__name__)
-            )
-        elif scale <= 0.0:
-            log.error(
-                (
-                    "`scale` keyword argument value {value} out of range. "
-                    "Input an `float` > 0.0"
-                ).format(value=scale)
-            )
-            raise ValueError(
-                (
-                    "`scale` keyword argument value {value} out of range. "
-                    "Input an `float` > 0.0"
-                ).format(value=scale)
-            )
-        if type(imshow) != bool:
-            log.error(
-                (
-                    "`imshow` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(imshow).__name__)
-            )
-            raise TypeError(
-                (
-                    "`imshow` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(imshow).__name__)
-            )
-        if type(mesh) != bool:
-            log.error(
-                (
-                    "`mesh` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(mesh).__name__)
-            )
-            raise TypeError(
-                (
-                    "`mesh` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(mesh).__name__)
-            )
-        if type(axis) != bool:
-            log.error(
-                (
-                    "`axis` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(axis).__name__)
-            )
-            raise TypeError(
-                (
-                    "`axis` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(axis).__name__)
-            )
-        if xlim is not None:
-            if isinstance(xlim, (tuple, list, np.ndarray)) is False:
-                log.error(
-                    (
-                        "`xlim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(xlim).__name__)
-                )
-                raise TypeError(
-                    (
-                        "`xlim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(xlim).__name__)
-                )
-            elif np.shape(xlim)[0] != 2:
-                log.error(
-                    (
-                        "`xlim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(xlim)[0])
-                )
-                raise ValueError(
-                    (
-                        "`xlim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(xlim)[0])
-                )
-        if ylim is not None:
-            if isinstance(ylim, (tuple, list, np.ndarray)) is False:
-                log.error(
-                    (
-                        "`ylim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(ylim).__name__)
-                )
-                raise TypeError(
-                    (
-                        "`ylim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(ylim).__name__)
-                )
-            elif np.shape(ylim)[0] != 2:
-                log.error(
-                    (
-                        "`ylim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(ylim)[0])
-                )
-                raise ValueError(
-                    (
-                        "`ylim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(ylim)[0])
-                )
-        if type(show) != bool:
-            log.error(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-            raise TypeError(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-        if type(block) != bool:
-            log.error(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-            raise TypeError(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-        if type(save) != str and save is not None:
-            log.error(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
-            raise TypeError(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
+        check = gp.check._check_type(scale, "scale", [float])
+        if check:
+            try:
+                scale = float(scale)
+                self._report(gp.check._conversion(scale, "scale", float), "Warning")
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(scale, "scale", 0.0))
+        self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
+        self._report(gp.check._check_type(mesh, "mesh", [bool]), "TypeError")
+        self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
+        if xlim:
+            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
+            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
+        if ylim:
+            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
+            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Load/access selected mesh object.
-        if self.data["file_settings"]["save_by_reference"]:
-            mesh_obj = gp.io.load(
-                filename=self.data["file_settings"]["mesh_folder"]
-                + self.data["meshes"][mesh_index]
-            ).data
-        else:
-            mesh_obj = self.data["meshes"][mesh_index]
+        mesh_obj = self._load_mesh(mesh_index)
 
         # Plot quiver.
         log.info("Generating quiver plot for mesh {mesh}...".format(mesh=mesh_index))
@@ -1202,6 +603,19 @@ class SequenceBase(Object):
             save=save,
         )
         return fig, ax
+
+    def _report(self, msg, error_type):
+        if msg and error_type != "Warning":
+            log.error(msg)
+        elif msg and error_type == "Warning":
+            log.warning(msg)
+            return True
+        if error_type == "ValueError":
+            raise ValueError(msg)
+        elif error_type == "TypeError":
+            raise TypeError(msg)
+        elif error_type == "IndexError":
+            raise IndexError(msg)
 
 
 class Sequence(SequenceBase):
@@ -1255,286 +669,99 @@ class Sequence(SequenceBase):
         self.initialised = False
 
         # Check types.
-        if type(image_folder) != str:
-            log.error(
-                (
-                    "`image_folder` keyword argument type invalid. "
-                    "Expected a `str`, but got a {type2}."
-                ).format(type2=type(image_folder).__name__)
-            )
-            raise TypeError(
-                (
-                    "`image_folder` keyword argument type invalid. "
-                    "Expected a `str`, but got a {type2}."
-                ).format(type2=type(image_folder).__name__)
-            )
-        elif os.path.isdir(image_folder) is False:
-            log.error(
-                "`image_folder` does not exist at the path supplied:\n{}".format(
-                    image_folder
-                )
-            )
-            gp.io._get_image_folder()
-        if image_folder[-1] != "/":
-            image_folder += "/"
-        if type(image_file_type) != str:
-            log.error(
-                (
-                    "`image_file_type` keyword argument type invalid. "
-                    "Expected a `str`, but got a {type2}."
-                ).format(type2=type(image_file_type).__name__)
-            )
-            raise TypeError(
-                (
-                    "`image_file_type` keyword argument type invalid. "
-                    "Expected a `str`, but got a {type2}."
-                ).format(type2=type(image_file_type).__name__)
-            )
-        elif image_file_type not in [".jpg", ".png", ".bmp"]:
-            log.error(
-                (
-                    "`image_file_type` keyword argument value invalid. "
-                    "Expected `.jpg`, `.png` or `.bmp`, but got {value}."
-                ).format(value=image_file_type)
-            )
-            raise ValueError(
-                (
-                    "`image_file_type` keyword argument value invalid. "
-                    "Expected `.jpg`, `.png` or `.bmp`, but got {value}."
-                ).format(value=image_file_type)
-            )
-        if type(target_nodes) != int:
-            log.warning(
-                (
-                    "`target_nodes` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(target_nodes).__name__)
-            )
+        self._report(
+            gp.check._check_type(image_folder, "image_folder", [str]), "TypeError"
+        )
+        if self._report(gp.check._check_path(image_folder, "image_folder"), "Warning"):
+            image_folder = gp.io._get_image_folder()
+        image_folder = gp.check._check_character(image_folder, "/", -1)
+        self._report(
+            gp.check._check_type(image_file_type, "image_file_type", [str]), "TypeError"
+        )
+        image_file_type = gp.check._check_character(image_file_type, ".", 0)
+        self._report(
+            gp.check._check_value(
+                image_file_type, "image_file_type", [".jpg", ".png", ".bmp"]
+            ),
+            "ValueError",
+        )
+
+        check = gp.check._check_type(target_nodes, "target_nodes", [int])
+        if check:
             try:
                 target_nodes = int(target_nodes)
-                log.warning(
-                    (
-                        "`target_nodes` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=target_nodes)
+                self._report(
+                    gp.check._conversion(target_nodes, "target_nodes", int), "Warning"
                 )
-            except ValueError:
-                log.error(
-                    "`target_nodes` keyword argument type conversion failed. "
-                    "Input an `int` > 0."
-                )
-                raise TypeError(
-                    "`target_nodes` keyword argument type conversion failed. "
-                    "Input an `int` > 0."
-                )
-        elif target_nodes <= 0:
-            log.error(
-                (
-                    "`target_nodes` keyword argument value {value} out of range. "
-                    "Input an `int` > 0."
-                ).format(value=target_nodes)
-            )
-            raise ValueError(
-                (
-                    "`target_nodes` keyword argument value {value} out of range. "
-                    "Input an `int` > 0."
-                ).format(value=target_nodes)
-            )
-        if type(boundary) != np.ndarray:
-            log.warning(
-                (
-                    "`boundary` keyword argument type invalid. "
-                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(boundary).__name__)
-            )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_range(target_nodes, "target_nodes", 1), "ValueError"
+        )
+        check = gp.check._check_type(boundary, "boundary", [np.ndarray])
+        if check:
             try:
                 boundary = np.asarray(boundary)
-                log.warning(
-                    (
-                        "`boundary` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=boundary)
+                self._report(
+                    gp.check._conversion(boundary, "boundary", np.ndarray, False),
+                    "Warning",
                 )
-            except ValueError:
-                log.error(
-                    "`boundary` keyword argument type conversion failed. "
-                    "Input a `numpy.ndarray` of shape (Nx,2)."
-                )
-                raise TypeError(
-                    "`boundary` keyword argument type conversion failed. "
-                    "Input a `numpy.ndarray` of shape (Nx,2)."
-                )
-        elif np.shape(boundary)[1] != 2:
-            log.error(
-                (
-                    "`boundary` keyword argument secondary axis size invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=np.shape(boundary)[1])
-            )
-            raise ValueError(
-                (
-                    "`boundary` keyword argument secondary axis size invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=np.shape(boundary)[1])
-            )
-        elif boundary.ndim != 2:
-            log.error(
-                (
-                    "`boundary` keyword argument dimensions invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=boundary.ndim)
-            )
-            raise ValueError(
-                (
-                    "`boundary` keyword argument dimensions invalid. "
-                    "Expected 2, but got {size}."
-                ).format(size=boundary.ndim)
-            )
-        if type(exclusions) != list:
-            log.warning(
-                (
-                    "`exclusions` keyword argument type invalid. "
-                    "Expected a `list`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(exclusions).__name__)
-            )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_dim(boundary, "boundary", 2), "ValueError")
+        self._report(gp.check._check_axis(boundary, "boundary", 1, [2]), "ValueError")
+        check = gp.check._check_type(exclusions, "exclusions", [list])
+        if check:
             try:
                 exclusions = list(exclusions)
-                log.warning(
-                    (
-                        "`exclusions` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=exclusions)
+                self._report(
+                    gp.check._conversion(exclusions, "exclusions", list, False),
+                    "Warning",
                 )
-            except ValueError:
-                log.error(
-                    "`exclusions` keyword arguement type conversion failed. "
-                    "Input a `list` of `numpy.ndarray` of shape (Nx,2)."
-                )
-                raise TypeError(
-                    "`exclusions` keyword arguement type conversion failed. "
-                    "Input a `list` of `numpy.ndarray` of shape (Nx,2)."
-                )
-        for exclusion in exclusions:
-            if type(exclusion) != np.ndarray:
-                log.error(
-                    (
-                        "`exclusions` keyword argument value type invalid. "
-                        "Expected a `numpy.ndarray`, but got a `{type2}`."
-                    ).format(type2=type(exclusion).__name__)
-                )
-                raise TypeError(
-                    (
-                        "`exclusions` keyword argument value type invalid. "
-                        "Expected a `numpy.ndarray`, but got a `{type2}`."
-                    ).format(type2=type(exclusion).__name__)
-                )
-            elif np.shape(exclusion)[1] != 2:
-                log.error(
-                    (
-                        "`exclusions` keyword argument value secondary axis "
-                        "size invalid. Expected 2, but got {size}."
-                    ).format(size=np.shape(exclusion)[1])
-                )
-                raise ValueError(
-                    (
-                        "`exclusions` keyword argument value secondary axis "
-                        "size invalid. Expected 2, but got {size}."
-                    ).format(size=np.shape(exclusion)[1])
-                )
-            elif exclusion.ndim != 2:
-                log.error(
-                    (
-                        "`exclusions` keyword argument dimensions invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=exclusion.ndim)
-                )
-                raise ValueError(
-                    (
-                        "`exclusions` keyword argument dimensions invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=exclusion.ndim)
-                )
-        if isinstance(size_lower_bound, (int, float)) is False:
-            log.error(
-                (
-                    "`size_lower_bound` keyword argument type invalid. "
-                    "Expected an `int` or a `float`, but got a {type3}."
-                ).format(type3=type(size_lower_bound).__name__)
-            )
-            raise TypeError(
-                (
-                    "`size_lower_bound` keyword argument type invalid. "
-                    "Expected an `int` or a `float`, but got a {type3}."
-                ).format(type3=type(size_lower_bound).__name__)
-            )
-        if isinstance(size_upper_bound, (int, float)) is False:
-            log.error(
-                (
-                    "`size_upper_bound` keyword argument type invalid. "
-                    "Expected an `int` or a `float`, but got a {type3}."
-                ).format(type3=type(size_upper_bound).__name__)
-            )
-            raise TypeError(
-                (
-                    "`size_upper_bound` keyword argument type invalid. "
-                    "Expected an `int` or a `float`, but got a {type3}."
-                ).format(type3=type(size_upper_bound).__name__)
-            )
-        if size_upper_bound < size_lower_bound:
-            log.error(
-                (
-                    "`size_upper_bound`<`size_lower_bound`: {value1}<{value2}. "
-                    "Expected `size_upper_bound`>=`size_lower_bound`."
-                ).format(value1=size_upper_bound, value2=size_lower_bound)
-            )
-            raise ValueError(
-                (
-                    "`size_upper_bound`<`size_lower_bound`: {value1}<{value2}. "
-                    "Expected `size_upper_bound`>=`size_lower_bound`."
-                ).format(value1=size_upper_bound, value2=size_lower_bound)
-            )
-        if type(save_by_reference) != bool:
-            log.error(
-                (
-                    "`save_by_reference` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(save_by_reference).__name__)
-            )
-            raise TypeError(
-                (
-                    "`save_by_reference` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(save_by_reference).__name__)
-            )
-        if type(mesh_folder) != str:
-            log.error(
-                (
-                    "`mesh_folder` keyword argument type invalid. "
-                    "Expected a `str`, but got a {type2}."
-                ).format(type2=type(mesh_folder).__name__)
-            )
-            raise TypeError(
-                (
-                    "`mesh_folder` keyword argument type invalid. "
-                    "Expected a `str`, but got a {type2}."
-                ).format(type2=type(mesh_folder).__name__)
-            )
-        if os.path.isdir(mesh_folder) is False:
-            try:
-                os.mkdir(mesh_folder)
             except Exception:
-                log.error(
-                    (
-                        "`mesh_folder` does not exist at the path supplied and "
-                        "cannot be created at:\n{folder}."
-                    ).format(folder=mesh_folder)
-                )
-                gp.io._get_mesh_folder()
-        if mesh_folder[-1] != "/":
-            mesh_folder += "/"
+                self._report(check, "TypeError")
+        for exclusion in exclusions:
+            check = gp.check._check_type(exclusion, "exclusion", [np.ndarray])
+            if check:
+                try:
+                    exclusion = np.asarray(exclusion)
+                    self._report(
+                        gp.check._conversion(exclusion, "exclusion", np.ndarray, False),
+                        "Warning",
+                    )
+                except Exception:
+                    self._report(check, "TypeError")
+            self._report(gp.check._check_dim(exclusion, "exclusion", 2), "ValueError")
+            self._report(
+                gp.check._check_axis(exclusion, "exclusion", 1, [2]), "ValueError"
+            )
+        self._report(
+            gp.check._check_type(size_lower_bound, "size_lower_bound", [int, float]),
+            "TypeError",
+        )
+        self._report(
+            gp.check._check_type(size_upper_bound, "size_upper_bound", [int, float]),
+            "TypeError",
+        )
+        self._report(
+            gp.check._check_comp(
+                size_lower_bound,
+                "size_lower_bound",
+                size_upper_bound,
+                "size_upper_bound",
+            ),
+            "ValueError",
+        )
+        self._report(
+            gp.check._check_type(save_by_reference, "save_by_reference", [bool]),
+            "TypeError",
+        )
+        self._report(
+            gp.check._check_type(mesh_folder, "mesh_folder", [str]), "TypeError"
+        )
+        if self._report(gp.check._check_path(mesh_folder, "mesh_folder"), "Warning"):
+            mesh_folder = gp.io._get_mesh_folder()
+        mesh_folder = gp.check._check_character(mesh_folder, "/", -1)
 
         # Store variables.
         self._image_folder = image_folder
@@ -1682,412 +909,140 @@ class Sequence(SequenceBase):
             return
 
         # Check inputs.
-        if type(seed_coord) != np.ndarray:
-            log.warning(
-                (
-                    "`seed_coord` keyword argument type invalid. "
-                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
-                    "Selecting `seed_coord`..."
-                ).format(type2=type(seed_coord).__name__)
-            )
+        if self._report(
+            gp.check._check_type(seed_coord, "seed_coord", [np.ndarray]), "Warning"
+        ):
             seed_coord = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif np.shape(seed_coord)[0] != 2:
-            log.warning(
-                (
-                    "`see_coord` keyword argument primary axis size invalid. "
-                    "Expected 2, but got {size}.\nSelecting `seed_coord`..."
-                ).format(size=np.shape(seed_coord)[0])
-            )
+        elif self._report(gp.check._check_dim(seed_coord, "seed_coord", 1), "Warning"):
             seed_coord = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif seed_coord.ndim != 1:
-            log.warning(
-                (
-                    "`seed_coord` keyword argument dimensions invalid. "
-                    "Expected 1, but got {size}."
-                ).format(size=seed_coord.ndim)
-            )
+        elif self._report(
+            gp.check._check_axis(seed_coord, "seed_coord", 0, [2]), "Warning"
+        ):
             seed_coord = gp.gui.selectors.coordinate.CoordinateSelector()
-        if type(adaptive_iterations) != int:
-            log.warning(
-                (
-                    "`adaptive_iterations` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(adaptive_iterations).__name__)
-            )
-            try:
-                adaptive_iterations = int(adaptive_iterations)
-                log.warning(
-                    (
-                        "`adaptive_iterations` keyword argument "
-                        "type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=adaptive_iterations)
-                )
-            except ValueError:
-                log.error(
-                    "`adaptive_iterations` keyword argument type conversion failed. "
-                    "Input an `int` >= 0."
-                )
-                raise TypeError(
-                    "`adaptive_iterations` keyword argument type conversion failed. "
-                    "Input an `int` >= 0."
-                )
-        elif adaptive_iterations < 0:
-            log.error(
-                (
-                    "`adaptive_iterations` keyword argument value {value} "
-                    "out of range. Input an `int` >= 0."
-                ).format(value=adaptive_iterations)
-            )
-            raise ValueError(
-                (
-                    "`adaptive_iterations` keyword argument value {value} "
-                    "out of range. Input an `int` >= 0."
-                ).format(value=adaptive_iterations)
-            )
         if template is None:
             template = gp.templates.Circle(50)
-        elif (
-            type(template) != gp.templates.Circle
-            and type(template) != gp.templates.Square
-        ):
-            log.error(
-                (
-                    "`template` keyword argument value invalid. "
-                    "Expected `gp.templates.Circle` or `gp.templates.Square`, "
-                    "but got {type3}."
-                ).format(type3=type(template).__name__)
-            )
-            raise ValueError(
-                (
-                    "`template` keyword argument value invalid. "
-                    "Expected `gp.templates.Circle` or `gp.templates.Square`, "
-                    "but got {type3}."
-                ).format(type3=type(template).__name__)
-            )
-        if type(max_norm) != float:
-            log.warning(
-                (
-                    "`max_norm` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(max_norm).__name__)
-            )
+        types = [gp.templates.Circle, gp.templates.Square]
+        self._report(gp.check._check_type(template, "template", types), "TypeError")
+        check = gp.check._check_type(max_norm, "max_norm", [float])
+        if check:
             try:
                 max_norm = float(max_norm)
-                log.warning(
-                    (
-                        "`max_norm` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=max_norm)
+                self._report(
+                    gp.check._conversion(max_norm, "max_norm", float), "Warning"
                 )
-            except ValueError:
-                log.error(
-                    "`max_norm` keyword argument type conversion failed. "
-                    "Input a `float` > 0.0."
-                )
-                raise TypeError(
-                    "`max_norm` keyword argument type conversion failed. "
-                    "Input a `float` > 0.0."
-                )
-        elif max_norm <= 0.0:
-            log.error(
-                (
-                    "`max_norm` keyword argument value {value} out of range >0.0. "
-                    "Input a `float` > 0.0."
-                ).format(value=max_norm)
-            )
-            raise ValueError(
-                (
-                    "`max_norm` keyword argument value {value} out of range >0.0. "
-                    "Input a `float` > 0.0."
-                ).format(value=max_norm)
-            )
-        if type(max_iterations) != int:
-            log.warning(
-                (
-                    "`max_iterations` keyword argument type invalid. "
-                    "Expected an `int`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(max_iterations).__name__)
-            )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(max_norm, "max_norm", 1e-10), "ValueError")
+        check = gp.check._check_type(max_iterations, "max_iterations", [int])
+        if check:
             try:
                 max_iterations = int(max_iterations)
-                log.warning(
-                    (
-                        "`max_iterations` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=max_iterations)
+                self._report(
+                    gp.check._conversion(max_iterations, "max_iterations", int),
+                    "Warning",
                 )
-            except ValueError:
-                log.error(
-                    "`max_iterations` keyword argument type conversion failed. "
-                    "Input an `int` > 0."
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_range(max_iterations, "max_iterations", 0.5), "ValueError"
+        )
+        check = gp.check._check_type(subset_order, "subset_order", [int])
+        if check:
+            try:
+                subset_order = int(subset_order)
+                self._report(
+                    gp.check._conversion(subset_order, "subset_order", int), "Warning"
                 )
-                raise TypeError(
-                    "`max_iterations` keyword argument type conversion failed. "
-                    "Input an `int` > 0."
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_value(subset_order, "subset_order", [1, 2]), "ValueError"
+        )
+        check = gp.check._check_type(adaptive_iterations, "adaptive_iterations", [int])
+        if check:
+            try:
+                adaptive_iterations = int(adaptive_iterations)
+                self._report(
+                    gp.check._conversion(
+                        adaptive_iterations, "adaptive_iterations", int
+                    ),
+                    "Warning",
                 )
-        elif max_iterations <= 0:
-            log.error(
-                (
-                    "`max_iterations` keyword argument value {value} out of range. "
-                    "Input an `int` >= 0."
-                ).format(value=max_iterations)
-            )
-            raise ValueError(
-                (
-                    "`max_iterations` keyword argument value {value} out of range. "
-                    "Input an `int` >= 0."
-                ).format(value=max_iterations)
-            )
-        if type(mesh_order) != int:
-            log.error(
-                (
-                    "`mesh_order` keyword argument type invalid. "
-                    "Expected an `int`, but got a {type3}."
-                ).format(type3=type(mesh_order).__name__)
-            )
-            raise TypeError(
-                (
-                    "`mesh_order` keyword argument type invalid. "
-                    "Expected an `int`, but got a {type3}."
-                ).format(type3=type(mesh_order).__name__)
-            )
-        if mesh_order != 1 and mesh_order != 2:
-            log.error(
-                (
-                    "`mesh_order` keyword argument value invalid. "
-                    "Expected 1 or 2, but got {value}."
-                ).format(value=mesh_order)
-            )
-            raise ValueError(
-                (
-                    "`mesh_order` keyword argument value invalid. "
-                    "Expected 1 or 2, but got {value}."
-                ).format(value=mesh_order)
-            )
-        if type(subset_order) != int:
-            log.error(
-                (
-                    "`subset_order` keyword argument type invalid. "
-                    "Expected a `int` , but got a {type3}."
-                ).format(type3=type(subset_order).__name__)
-            )
-            raise TypeError(
-                (
-                    "`subset_order` keyword argument type invalid. "
-                    "Expected a `int`, but got a {type3}."
-                ).format(type3=type(subset_order).__name__)
-            )
-        if subset_order != 1 and subset_order != 2:
-            log.error(
-                (
-                    "`subset_order` keyword argument value invalid. "
-                    "Expected 1 or 2, but got {value}."
-                ).format(value=subset_order)
-            )
-            raise ValueError(
-                (
-                    "`subset_order` keyword argument value invalid. "
-                    "Expected 1 or 2, but got {value}."
-                ).format(value=subset_order)
-            )
-        if type(method) != str:
-            log.error(
-                (
-                    "`method` keyword argument type invalid. "
-                    "Expected a `str` , but got a {type3}."
-                ).format(type3=type(method).__name__)
-            )
-            raise TypeError(
-                (
-                    "`method` keyword argument type invalid. "
-                    "Expected a `str`, but got a {type3}."
-                ).format(type3=type(method).__name__)
-            )
-        elif method not in ["FAGN", "ICGN"]:
-            log.error(
-                (
-                    "`method` keyword argument value invalid. "
-                    "Expected `FAGN` or `ICGN`, but got {value}."
-                ).format(value=method)
-            )
-            raise ValueError(
-                (
-                    "`method` keyword argument value invalid. "
-                    "Expected `FAGN` or `ICGN`, but got {value}."
-                ).format(value=method)
-            )
-        if type(tolerance) != float:
-            log.warning(
-                (
-                    "`tolerance` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(tolerance).__name__)
-            )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_range(adaptive_iterations, "adaptive_iterations", 0),
+            "ValueError",
+        )
+        check = gp.check._check_type(tolerance, "tolerance", [float])
+        if check:
             try:
                 tolerance = float(tolerance)
-                log.warning(
-                    (
-                        "`tolerance` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=tolerance)
+                self._report(
+                    gp.check._conversion(tolerance, "tolerance", float), "Warning"
                 )
-            except ValueError:
-                log.error(
-                    "`tolerance` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-                raise TypeError(
-                    "`tolerance` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-        elif tolerance <= 0.0 or tolerance > 1.0:
-            log.error(
-                (
-                    "`tolerance` keyword argument value {value} out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=tolerance)
-            )
-            raise ValueError(
-                (
-                    "`tolerance` keyword argument value {value} out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=tolerance)
-            )
-        if type(seed_tolerance) != float:
-            log.warning(
-                (
-                    "`seed_tolerance` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(seed_tolerance).__name__)
-            )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_range(tolerance, "tolerance", 0.0, 1.0), "ValueError"
+        )
+        check = gp.check._check_type(seed_tolerance, "seed_tolerance", [float])
+        if check:
             try:
                 seed_tolerance = float(seed_tolerance)
-                log.warning(
-                    (
-                        "`seed_tolerance` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=seed_tolerance)
+                self._report(
+                    gp.check._conversion(seed_tolerance, "seed_tolerance", float),
+                    "Warning",
                 )
-            except ValueError:
-                log.error(
-                    "`seed_tolerance` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_range(seed_tolerance, "seed_tolerance", 0.0, 1.0),
+            "ValueError",
+        )
+        self._report(
+            gp.check._check_comp(
+                tolerance,
+                "tolerance",
+                seed_tolerance,
+                "seed_tolerance",
+            ),
+            "ValueError",
+        )
+        self._report(gp.check._check_type(method, "method", [str]), "TypeError")
+        self._report(
+            gp.check._check_value(method, "method", ["FAGN", "ICGN"]), "ValueError"
+        )
+        check = gp.check._check_type(mesh_order, "mesh_order", [int])
+        if check:
+            try:
+                mesh_order = int(mesh_order)
+                self._report(
+                    gp.check._conversion(mesh_order, "mesh_order", int), "Warning"
                 )
-                raise TypeError(
-                    "`seed_tolerance` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-        elif seed_tolerance <= 0.0 or seed_tolerance > 1.0:
-            log.error(
-                (
-                    "`seed_tolerance` keyword argument value {value} "
-                    "out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=seed_tolerance)
-            )
-            raise ValueError(
-                (
-                    "`seed_tolerance` keyword argument value {value} "
-                    "out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=seed_tolerance)
-            )
-        if seed_tolerance < tolerance:
-            log.error(
-                (
-                    "`seed_tolerance`<`tolerance`: {value1}<{value2}. "
-                    "Expected `seed_tolerance`>=`tolerance`."
-                ).format(value1=seed_tolerance, value2=tolerance)
-            )
-            raise ValueError(
-                (
-                    "`seed_tolerance`<`tolerance`: {value1}<{value2}. "
-                    "Expected `seed_tolerance`>=`tolerance`."
-                ).format(value1=seed_tolerance, value2=tolerance)
-            )
-        if type(alpha) != float:
-            log.warning(
-                (
-                    "`alpha` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(alpha).__name__)
-            )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_value(mesh_order, "mesh_order", [1, 2]), "ValueError"
+        )
+        check = gp.check._check_type(alpha, "alpha", [float])
+        if check:
             try:
                 alpha = float(alpha)
-                log.warning(
-                    (
-                        "`alpha` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=alpha)
-                )
-            except ValueError:
-                log.error(
-                    "`alpha` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-                raise TypeError(
-                    "`alpha` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-        elif alpha < 0.0 or alpha > 1.0:
-            log.error(
-                (
-                    "`alpha` keyword argument value {value} out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=alpha)
-            )
-            raise ValueError(
-                (
-                    "`alpha` keyword argument value {value} out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=alpha)
-            )
-        if type(track) != bool:
-            log.error(
-                (
-                    "`track` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(track).__name__)
-            )
-            raise TypeError(
-                (
-                    "`track` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(track).__name__)
-            )
-        if type(hard_boundary) != bool:
-            log.error(
-                (
-                    "`hard_boundary` keyword argument type invalid. "
-                    "Expected a `bool`, but got a {type3}."
-                ).format(type3=type(hard_boundary).__name__)
-            )
-            raise TypeError(
-                (
-                    "`hard_boundary` keyword argument type invalid. "
-                    "Expected a `bool`, but got a {type3}."
-                ).format(type3=type(hard_boundary).__name__)
-            )
-        if type(subset_size_compensation) != bool:
-            log.error(
-                (
-                    "`subset_size_compensation` keyword argument type invalid. "
-                    "Expected a `bool`, but got a {type3}."
-                ).format(type3=type(subset_size_compensation).__name__)
-            )
-            raise TypeError(
-                (
-                    "`subset_size_compensation` keyword argument type invalid. "
-                    "Expected a `bool`, but got a {type3}."
-                ).format(type3=type(subset_size_compensation).__name__)
-            )
+                self._report(gp.check._conversion(alpha, "alpha", float), "Warning")
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
+        self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
+        self._report(
+            gp.check._check_type(hard_boundary, "hard_boundary", [bool]), "TypeError"
+        )
+        self._report(
+            gp.check._check_type(
+                subset_size_compensation, "subset_size_compensation", [bool]
+            ),
+            "TypeError",
+        )
 
         # Store variables.
         self._seed_coord = seed_coord
@@ -2220,6 +1175,15 @@ class Sequence(SequenceBase):
                 + previous_mesh["results"]["displacements"][self._exclusions_tags[i]]
             )
         self._exclusions = _exclusions
+
+    def _load_mesh(self, mesh_index):
+        if self.data["file_settings"]["save_by_reference"]:
+            return gp.io.load(
+                filename=self.data["file_settings"]["mesh_folder"]
+                + self.data["meshes"][mesh_index]
+            ).data
+        else:
+            return self.data["meshes"][mesh_index]
 
 
 class SequenceResults(SequenceBase):

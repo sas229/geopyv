@@ -1,3 +1,4 @@
+import geopyv.check
 import geopyv.log
 import geopyv.geometry
 import geopyv.gui

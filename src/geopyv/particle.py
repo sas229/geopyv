@@ -93,260 +93,55 @@ class ParticleBase(Object):
             )
 
         # Check input.
-        if type(quantity) != str and quantity is not None:
-            log.error(
-                (
-                    "`quantity` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a {type3}."
-                ).format(type3=type(quantity).__name__)
+        self._report(
+            gp.check._check_type(quantity, "quantity", [str, type(None)]), "TypeError"
+        )
+        if quantity:
+            self._report(
+                gp.check._check_value(
+                    quantity,
+                    "quantity",
+                    [
+                        "coordinates",
+                        "warps",
+                        "volumes",
+                        "stresses",
+                    ],
+                ),
+                "ValueError",
             )
-            raise TypeError(
-                (
-                    "`quantity` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a {type3}."
-                ).format(type3=type(quantity).__name__)
-            )
-        elif quantity not in [
-            "coordinates",
-            "warps",
-            "volumes",
-            "stresses",
-        ]:
-            log.error(
-                (
-                    "`quantity` keyword argument value invalid. "
-                    "Expected `coordinates`, `warps`, `volumes`, `stresses`, "
-                    "but got {value}."
-                ).format(value=quantity)
-            )
-            raise ValueError(
-                (
-                    "`quantity` keyword argument value invalid. "
-                    "Expected `coordinates`, `warps`, `volumes`, `stresses`, "
-                    "but got {value}."
-                ).format(value=quantity)
-            )
-        if type(component) != int:
-            log.error(
-                (
-                    "`component` keyword argument type invalid. "
-                    "Expected a `int`, but got a {type3}."
-                ).format(type3=type(component).__name__)
-            )
-            raise TypeError(
-                (
-                    "`component` keyword argument type invalid. "
-                    "Expected a `int`, but got a {type3}."
-                ).format(type3=type(component).__name__)
-            )
-        if component >= np.shape(self.data["results"][quantity])[1]:
-            log.error(
-                (
-                    "`component` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(self.data["results"][quantity])[1] - 1,
-                    input_value=component,
-                )
-            )
-            raise IndexError(
-                (
-                    "`component` {input_value} is out of bounds for "
-                    "axis 0 with size {max_value}."
-                ).format(
-                    max_value=np.shape(self.data["results"][quantity])[1] - 1,
-                    input_value=component,
-                )
-            )
-        if type(imshow) != bool:
-            log.error(
-                (
-                    "`imshow` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(imshow).__name__)
-            )
-            raise TypeError(
-                (
-                    "`imshow` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(imshow).__name__)
-            )
-        if type(colorbar) != bool:
-            log.error(
-                (
-                    "`colorbar` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(colorbar).__name__)
-            )
-            raise TypeError(
-                (
-                    "`colorbar` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(colorbar).__name__)
-            )
-        if isinstance(ticks, (tuple, list, np.ndarray)) is False and ticks is not None:
-            log.error(
-                (
-                    "`ticks` keyword argument type invalid. "
-                    "Expected a `tuple`, `list` or `numpy.ndarray`, "
-                    "but got a `{type2}`."
-                ).format(type2=type(ticks).__name__)
-            )
-            raise TypeError(
-                (
-                    "`ticks` keyword argument type invalid. "
-                    "Expected a `tuple`, `list` or `numpy.ndarray`, "
-                    "but got a `{type2}`."
-                ).format(type2=type(ticks).__name__)
-            )
-        if type(alpha) != float:
-            log.warning(
-                (
-                    "`alpha` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(alpha).__name__)
-            )
+        self._report(gp.check._check_type(component, "component", [int]), "TypeError")
+        self._report(
+            gp.check._check_index(
+                component, "component", 1, self.data["results"][quantity]
+            ),
+            "IndexError",
+        )
+        self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
+        self._report(gp.check._check_type(colorbar, "colorbar", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(ticks, "ticks", types), "TypeError")
+        check = gp.check._check_type(alpha, "alpha", [float])
+        if check:
             try:
                 alpha = float(alpha)
-                log.warning(
-                    (
-                        "`alpha` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=alpha)
-                )
-            except ValueError:
-                log.error(
-                    "`alpha` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-                raise TypeError(
-                    "`alpha` keyword argument type conversion failed. "
-                    "Input a `float`, 0.0-1.0."
-                )
-        elif alpha < 0.0 or alpha > 1.0:
-            log.error(
-                (
-                    "`alpha` keyword argument value {value} out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=alpha)
-            )
-            raise ValueError(
-                (
-                    "`alpha` keyword argument value {value} out of range 0.0-1.0. "
-                    "Input a `float`, 0.0-1.0."
-                ).format(value=alpha)
-            )
-        if type(axis) != bool:
-            log.error(
-                (
-                    "`axis` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(axis).__name__)
-            )
-            raise TypeError(
-                (
-                    "`axis` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(axis).__name__)
-            )
-        if xlim is not None:
-            if isinstance(xlim, (tuple, list, np.ndarray)) is False:
-                log.error(
-                    (
-                        "`xlim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(xlim).__name__)
-                )
-                raise TypeError(
-                    (
-                        "`xlim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(xlim).__name__)
-                )
-            elif np.shape(xlim)[0] != 2:
-                log.error(
-                    (
-                        "`xlim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(xlim)[0])
-                )
-                raise ValueError(
-                    (
-                        "`xlim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(xlim)[0])
-                )
-        if ylim is not None:
-            if isinstance(ylim, (tuple, list, np.ndarray)) is False:
-                log.error(
-                    (
-                        "`ylim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(ylim).__name__)
-                )
-                raise TypeError(
-                    (
-                        "`ylim` keyword argument type invalid. "
-                        "Expected a `tuple`, `list`, `numpy.ndarray` or `NoneType`, "
-                        "but got a {type5}."
-                    ).format(type5=type(ylim).__name__)
-                )
-            elif np.shape(ylim)[0] != 2:
-                log.error(
-                    (
-                        "`ylim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(ylim)[0])
-                )
-                raise ValueError(
-                    (
-                        "`ylim` keyword argument primary axis size invalid. "
-                        "Expected 2, but got {size}."
-                    ).format(size=np.shape(ylim)[0])
-                )
-        if type(show) != bool:
-            log.error(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-            raise TypeError(
-                (
-                    "`show` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(show).__name__)
-            )
-        if type(block) != bool:
-            log.error(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-            raise TypeError(
-                (
-                    "`block` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(block).__name__)
-            )
-        if type(save) != str and save is not None:
-            log.error(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
-            raise TypeError(
-                (
-                    "`save` keyword argument type invalid. "
-                    "Expected a `str` or `NoneType`, but got a `{type3}`."
-                ).format(type3=type(save).__name__)
-            )
+                self._report(gp.check._conversion(alpha, "alpha", float), "Warning")
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
+        self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
+        if xlim:
+            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
+            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
+        if ylim:
+            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
+            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         fig, ax = gp.plots.trace_particle(
             data=self.data,
@@ -364,6 +159,19 @@ class ParticleBase(Object):
             save=save,
         )
         return fig, ax
+
+    def _report(self, msg, error_type):
+        if msg and error_type != "Warning":
+            log.error(msg)
+        elif msg and error_type == "Warning":
+            log.warning(msg)
+            return True
+        if error_type == "ValueError":
+            raise ValueError(msg)
+        elif error_type == "TypeError":
+            raise TypeError(msg)
+        elif error_type == "IndexError":
+            raise IndexError(msg)
 
 
 class Particle(ParticleBase):
@@ -404,149 +212,53 @@ class Particle(ParticleBase):
         self._initialised = False
 
         # Check inputs.
-        if series.data["type"] not in ["Sequence", "Mesh"]:
-            log.error(
-                (
-                    "`series` keyword argument type invalid. "
-                    "Expected `gp.sequence.Sequence` or `gp.mesh.Mesh, "
-                    "but got {value}."
-                ).format(value=type(series).__name__)
-            )
-            raise ValueError(
-                (
-                    "`series` keyword argument type invalid. "
-                    "Expected `gp.sequence.Sequence` or `gp.mesh.Mesh, "
-                    "but got {value}."
-                ).format(value=type(series).__name__)
-            )
-        if type(coordinate_0) != np.ndarray:
-            log.warning(
-                (
-                    "`coordinate_0` keyword argument type invalid. "
-                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
-                    "Selecting `coordinate_0`..."
-                ).format(type2=type(coordinate_0).__name__)
-            )
+        self._report(
+            gp.check._check_type(
+                series,
+                "series",
+                [
+                    gp.sequence.Sequence,
+                    gp.sequence.SequenceResults,
+                    gp.mesh.Mesh,
+                    gp.mesh.MeshResults,
+                ],
+            ),
+            "TypeError",
+        )
+        if self._report(
+            gp.check._check_type(coordinate_0, "coordinate_0", [np.ndarray]), "Warning"
+        ):
             coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif np.shape(coordinate_0)[0] != 2:
-            log.warning(
-                (
-                    "`see_coord` keyword argument primary axis size invalid. "
-                    "Expected 2, but got {size}.\nSelecting `coordinate_0`..."
-                ).format(size=np.shape(coordinate_0)[0])
-            )
+        elif self._report(
+            gp.check._check_dim(coordinate_0, "coordinate_0", 1), "Warning"
+        ):
             coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif coordinate_0.ndim != 1:
-            log.warning(
-                (
-                    "`coordinate_0` keyword argument dimensions invalid. "
-                    "Expected 1, but got {size}."
-                ).format(size=coordinate_0.ndim)
-            )
+        elif self._report(
+            gp.check._check_axis(coordinate_0, "coordinate_0", 0, [2]), "Warning"
+        ):
             coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
-        if type(warp_0) != np.ndarray:
-            log.warning(
-                (
-                    "`warp_0` keyword argument type invalid. "
-                    "Expected a `numpy.ndarray`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(warp_0).__name__)
-            )
+        check = gp.check._check_type(warp_0, "warp_0", [np.ndarray])
+        if check:
             try:
                 warp_0 = np.asarray(warp_0)
-                log.warning(
-                    (
-                        "`warp_0` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=warp_0)
+                self._report(
+                    gp.check._conversion(warp_0, "warp_0", np.ndarray), "Warning"
                 )
-            except ValueError:
-                log.error(
-                    "`warp_0` keyword argument type conversion failed. "
-                    "Input a `numpy.ndarray` of shape (6,) or (12,)."
-                )
-                raise TypeError(
-                    "`warp_0` keyword argument type conversion failed. "
-                    "Input a `numpy.ndarray` of shape (6,) or (12,)."
-                )
-        elif np.shape(warp_0)[0] != 6 and np.shape(warp_0)[0] != 12:
-            log.error(
-                (
-                    "`warp_0` keyword argument primary axis size invalid. "
-                    "Expected 6 or 12, but got {size}."
-                ).format(size=np.shape(warp_0)[0])
-            )
-            raise ValueError(
-                (
-                    "`warp_0` keyword argument primary axis size invalid. "
-                    "Expected 6 or 12, but got {size}."
-                ).format(size=np.shape(warp_0)[0])
-            )
-        elif warp_0.ndim != 1:
-            log.error(
-                (
-                    "`warp_0` keyword argument dimensions invalid. "
-                    "Expected 1, but got {size}."
-                ).format(size=warp_0.ndim)
-            )
-            raise ValueError(
-                (
-                    "`warp_0` keyword argument dimensions invalid. "
-                    "Expected 1, but got {size}."
-                ).format(size=warp_0.ndim)
-            )
-        if isinstance(volume_0, (float, np.floating)) is False:
-            log.warning(
-                (
-                    "`volume_0` keyword argument type invalid. "
-                    "Expected a `float`, but got a `{type2}`.\n"
-                    "Attempting conversion..."
-                ).format(type2=type(volume_0).__name__)
-            )
-            print(type(volume_0))
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_dim(warp_0, "warp_0", 1), "ValueError")
+        self._report(gp.check._check_axis(warp_0, "warp_0", 0, [12]), "ValueError")
+        check = gp.check._check_type(volume_0, "volume_0", [float, np.floating])
+        if check:
             try:
                 volume_0 = float(volume_0)
-                log.warning(
-                    (
-                        "`volume_0` keyword argument type conversion successful. "
-                        "New value: {value}"
-                    ).format(value=volume_0)
+                self._report(
+                    gp.check._conversion(volume_0, "volume_0", float), "Warning"
                 )
-            except ValueError:
-                log.error(
-                    "`volume_0` keyword argument type conversion failed. "
-                    "Input a `float` > 0.0."
-                )
-                raise TypeError(
-                    "`volume_0` keyword argument type conversion failed. "
-                    "Input a `float` > 0.0."
-                )
-        elif volume_0 <= 0.0:
-            log.error(
-                (
-                    "`volume_0` keyword argument value {value} out of range >0.0. "
-                    "Input a `float` > 0.0."
-                ).format(value=volume_0)
-            )
-            raise ValueError(
-                (
-                    "`volume_0` keyword argument value {value} out of range >0.0. "
-                    "Input a `float` > 0.0."
-                ).format(value=volume_0)
-            )
-        if type(track) != bool:
-            log.error(
-                (
-                    "`track` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(track).__name__)
-            )
-            raise TypeError(
-                (
-                    "`track` keyword argument type invalid. "
-                    "Expected a `bool`, but got a `{type2}`."
-                ).format(type2=type(track).__name__)
-            )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(volume_0, "volume_0", 0.0), "ValueError")
+        self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
 
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
@@ -834,6 +546,10 @@ class Particle(ParticleBase):
             + 2 * K_u[1, 1] * J_zeta[0, 1] * J_zeta[1, 1]
             + K_u[2, 1] * J_zeta[1, 1] ** 2
         )
+
+        print(self._warp_inc[6:])
+        print((K_x_inv @ K_u).flatten())
+        print()
 
     def _strain_path(self):
         """

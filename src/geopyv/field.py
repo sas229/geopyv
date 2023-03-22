@@ -197,11 +197,11 @@ class FieldBase(Object):
         elif msg and error_type == "Warning":
             log.warning(msg)
             return True
-        if error_type == "ValueError":
+        if error_type == "ValueError" and msg:
             raise ValueError(msg)
-        elif error_type == "TypeError":
+        elif error_type == "TypeError" and msg:
             raise TypeError(msg)
-        elif error_type == "IndexError":
+        elif error_type == "IndexError" and msg:
             raise IndexError(msg)
 
 

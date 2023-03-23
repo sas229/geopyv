@@ -604,6 +604,15 @@ class SequenceBase(Object):
         )
         return fig, ax
 
+    def _load_mesh(self, mesh_index):
+        if self.data["file_settings"]["save_by_reference"]:
+            return gp.io.load(
+                filename=self.data["file_settings"]["mesh_folder"]
+                + self.data["meshes"][mesh_index]
+            ).data
+        else:
+            return self.data["meshes"][mesh_index]
+
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":
             log.error(msg)
@@ -1175,15 +1184,6 @@ class Sequence(SequenceBase):
                 + previous_mesh["results"]["displacements"][self._exclusions_tags[i]]
             )
         self._exclusions = _exclusions
-
-    def _load_mesh(self, mesh_index):
-        if self.data["file_settings"]["save_by_reference"]:
-            return gp.io.load(
-                filename=self.data["file_settings"]["mesh_folder"]
-                + self.data["meshes"][mesh_index]
-            ).data
-        else:
-            return self.data["meshes"][mesh_index]
 
 
 class SequenceResults(SequenceBase):

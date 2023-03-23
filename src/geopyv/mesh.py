@@ -1105,8 +1105,6 @@ class Mesh(MeshBase):
             self.data.update({"results": self._results})
 
         except Exception as e:
-            print(e.message)
-            print(e.args)
             print(e.__traceback__)
             log.error("Could not solve mesh. Not a correlation issue.")
             self._update = True
@@ -1256,6 +1254,7 @@ class Mesh(MeshBase):
                 self._mesh_order,
             )
 
+        # minimize_scalar(f)
         minimize_scalar(
             f,
             bounds=(self._size_lower_bound, self._size_upper_bound),
@@ -1329,6 +1328,7 @@ class Mesh(MeshBase):
             Error between target and actual number of nodes.
 
         """
+
         # Make mesh.
         gmsh.model.add("base")  # Create model.
 
@@ -1371,9 +1371,8 @@ class Mesh(MeshBase):
             gmsh.model.mesh.getNodes()
         )  # Extracts: node tags, node coordinates, parametric coordinates.
         nodes = np.column_stack((nc[0::3], nc[1::3]))  # Nodal coordinate array (x,y).
-        number_nodes = len(nodes)
-        # error = target_nodes - number_nodes
-        error = number_nodes - target_nodes
+        error = (np.shape(nodes)[0] - target_nodes) ** 2
+
         return error
 
     @staticmethod
@@ -1849,9 +1848,15 @@ class Mesh(MeshBase):
                             self._store_variables(idx)
                             return True
                         else:
-                            self._C_ZNCC[idx] = np.max(
-                                (self._subsets[idx].data["results"]["C_ZNCC"], 0)
-                            )
+                            try:
+                                self._C_ZNCC[idx] = np.max(
+                                    (self._subsets[idx].data["results"]["C_ZNCC"], 0)
+                                )
+                            except Exception:
+                                log.error(
+                                    "Subset not solved "
+                                    "- correlation could not be retrieved."
+                                )
                             return False
 
     def _store_variables(self, idx, seed=False):

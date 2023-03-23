@@ -547,9 +547,9 @@ class Particle(ParticleBase):
             + K_u[2, 1] * J_zeta[1, 1] ** 2
         )
 
-        print(self._warp_inc[6:])
-        print((K_x_inv @ K_u).flatten())
-        print()
+        # print(self._warp_inc[6:])
+        # print((K_x_inv @ K_u).flatten())
+        # print()
 
     def _strain_path(self):
         """

@@ -32,7 +32,7 @@ subset = gp.io.load(filename="test")
 # Mesh test.
 # Mesh setup.
 ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
-tar = gp.image.Image("./images/T-Bar/IMG_1071.jpg")
+tar = gp.image.Image("./images/T-Bar/IMG_1065.jpg")
 template = gp.templates.Circle(50)
 boundary = np.asarray(
     [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
@@ -55,6 +55,7 @@ mesh = gp.mesh.Mesh(
     exclusions=exclusions,
     hard_boundary=False,
     subset_size_compensation=True,
+    mesh_order=1,
 )
 
 # Mesh inspection.
@@ -67,7 +68,7 @@ gp.io.save(object=mesh, filename="mesh")
 mesh.solve(
     seed_coord=seed,
     template=template,
-    adaptive_iterations=0,
+    adaptive_iterations=3,
     method="ICGN",
     alpha=alpha,
     tolerance=0.7,

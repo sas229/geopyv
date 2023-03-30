@@ -690,11 +690,12 @@ class Sequence(SequenceBase):
         image_file_type = gp.check._check_character(image_file_type, ".", 0)
         self._report(
             gp.check._check_value(
-                image_file_type, "image_file_type", [".jpg", ".png", ".bmp"]
+                image_file_type,
+                "image_file_type",
+                [".jpg", ".png", ".bmp", ".JPG", ".PNG", ".BMP"],
             ),
             "ValueError",
         )
-
         check = gp.check._check_type(target_nodes, "target_nodes", [int])
         if check:
             try:
@@ -789,6 +790,11 @@ class Sequence(SequenceBase):
                 + "*"
                 + self._image_file_type
             )
+            if np.shape(_images)[0] < 2:
+                log.error("Insufficient number of images in specified folder.")
+                raise FileExistsError(
+                    "Insufficient number of images in specified folder."
+                )
             _image_indices_unordered = [int(re.findall(r"\d+", x)[-1]) for x in _images]
             _image_indices_arguments = np.argsort(_image_indices_unordered)
             self._images = [_images[index] for index in _image_indices_arguments]

@@ -5,7 +5,6 @@ Mesh module for geopyv.
 """
 import logging
 import numpy as np
-import scipy as sp
 import geopyv as gp
 from geopyv.object import Object
 import gmsh
@@ -487,7 +486,7 @@ class MeshBase(Object):
                 self._report(gp.check._conversion(scale, "scale", float), "Warning")
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_range(scale, "scale", 0.0))
+        self._report(gp.check._check_range(scale, "scale", 0.0), "ValueError")
         self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
         self._report(gp.check._check_type(mesh, "mesh", [bool]), "TypeError")
         self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
@@ -710,6 +709,16 @@ class Mesh(MeshBase):
             ),
             "TypeError",
         )
+
+        # Pre-processing.
+        size_upper_bound = min(
+            size_upper_bound,
+            np.max(np.sqrt(np.sum(np.square(np.diff(boundary, axis=0)), axis=1))),
+        )
+        minimum_nodes = np.shape(boundary)[0]
+        for exclusion in exclusions:
+            minimum_nodes += np.shape(exclusion)[0]
+        target_nodes = max(target_nodes, minimum_nodes)
 
         # Store.
         self._initialised = False
@@ -1049,7 +1058,6 @@ class Mesh(MeshBase):
                 self._message = "Adaptive iteration {}".format(iteration)
                 self._adaptive_mesh()
                 self._update_mesh()
-                self._adaptive_subset()
                 self._find_seed_node()
                 self._reliability_guided()
                 if self._unsolvable:
@@ -1098,15 +1106,15 @@ class Mesh(MeshBase):
             self._results = {
                 "subsets": subset_data,
                 "displacements": self._displacements,
-                "du": self._du,
-                "d2u": self._d2u,
+                "warps": self._warps,
                 "C_ZNCC": self._C_ZNCC,
             }
             self.data.update({"results": self._results})
 
         except Exception as e:
-            print(e.__traceback__)
             log.error("Could not solve mesh. Not a correlation issue.")
+            print(e.message)
+            print(e.args)
             self._update = True
             self.solved = False
             self._unsolvable = True
@@ -1129,7 +1137,7 @@ class Mesh(MeshBase):
             (nc[0::3], nc[1::3])
         )  # Nodal coordinate array (x,y).
         self._elements = np.reshape(
-            (np.asarray(ent) - 1).flatten(), (-1, 6)
+            (np.asarray(ent) - 1).flatten(), (-1, 3 * self._mesh_order)
         )  # Element connectivity array.
 
     def _find_seed_node(self):
@@ -1271,7 +1279,7 @@ class Mesh(MeshBase):
         message = "Adaptively remeshing..."
         with alive_bar(dual_line=True, bar=None, title=message) as bar:
             D = (
-                abs(self._du[:, 0, 1] + self._du[:, 1, 0]) * self._areas
+                abs(self._warps[:, 3] + self._warps[:, 4]) * self._areas
             )  # Elemental shear strain-area products.
             D_b = np.mean(D)  # Mean elemental shear strain-area product.
             self._areas *= (
@@ -1446,44 +1454,6 @@ class Mesh(MeshBase):
         error = (np.shape(nodes)[0] - target) ** 2
         return error
 
-    def _adaptive_subset(self):
-        """
-
-        Private method to compute adaptive subset size.
-
-        .. warning::
-            * Implementation not yet complete.
-
-        """
-        subset_bgf = sp.interpolate.RBFInterpolator(
-            self._subset_bgf_nodes,
-            self._subset_bgf_values,
-            neighbors=10,
-            kernel="cubic",
-        )
-        subset_bgf(self._nodes)
-
-    def _update_subset_bgf(self):
-        """
-
-        Private method to compute the background mesh.
-
-        """
-        if self._subset_bgf_nodes is not None:
-            self._subset_bgf_nodes = np.append(
-                self._subset_bgf_nodes,
-                np.mean(self._nodes[self._elements], axis=1),
-                axis=0,
-            )
-            self._subset_bgf_values = np.append(
-                self._subset_bgf_values,
-                np.mean(self._d2u, axis=(1, 2)),
-                axis=0,
-            )
-        else:
-            self._subset_bgf_nodes = np.mean(self._nodes[self._elements], axis=1)
-            self._subset_bgf_values = np.mean(self._d2u, axis=(1, 2))
-
     def _element_area(self):
         """
         Private method to calculate the element areas.
@@ -1496,6 +1466,42 @@ class Mesh(MeshBase):
         M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
         self._areas = 0.5 * np.linalg.det(M)
 
+    def _local_coordinates(self):
+        """
+        Private method to define the element centroid in terms of the local
+        coordinate system. Thereotically, this is constant but is calculated in
+        case of rounding error.
+        """
+
+        A = np.ones((np.shape(self._elements)[0], 3, 4))
+        A[:, 1:, 0] = np.mean(self._nodes[self._elements], axis=1)
+        A[:, 1:, 1:] = self._nodes[self._elements][:, :3, :2].transpose(0, 2, 1)
+
+        return A
+        # return zeta, eta, theta, A
+
+    def _shape_function(self):
+        if self._mesh_order == 1:
+            N = np.asarray([1 / 3, 1 / 3, 1 / 3])
+            dN = np.asarray([[1, 0, -1], [0, 1, -1]])
+            d2N = None
+        elif self._mesh_order == 2:
+            N = np.asarray([-1 / 9, -1 / 9, -1 / 9, 4 / 9, 4 / 9, 4 / 9])
+            dN = np.asarray(
+                [
+                    [1 / 3, 0, -1 / 3, 4 / 3, -4 / 3, 0],
+                    [0, 1 / 3, -1 / 3, 4 / 3, 0, -4 / 3],
+                ]
+            )
+            d2N = np.asarray(
+                [
+                    [4, 0, 4, 0, 0, -8],
+                    [0, 0, 4, 4, -4, -4],
+                    [0, 4, 4, 0, -8, 0],
+                ]
+            )
+        return N, dN, d2N
+
     def _element_strains(self):
         """
 
@@ -1503,82 +1509,52 @@ class Mesh(MeshBase):
         relating element node displacements to elemental strain.
 
         """
-        # Local coordinates
-        A = np.ones((len(self._elements), 3, 3))
-        A[:, :, 1:] = self._nodes[self._elements[:, :3]]
 
-        # Weighting function (and derivatives to 2nd order).
-        dN = np.asarray(
-            [
-                [1 / 3, 0, -1 / 3, 4 / 3, -4 / 3, 0],
-                [0, 1 / 3, -1 / 3, 4 / 3, 0, -4 / 3],
-            ]
-        )
-        d2N = np.asarray(
-            [
-                [4, 0, 4, 0, 0, -8],
-                [0, 0, 4, 4, -4, -4],
-                [0, 4, 4, 0, -8, 0],
-            ]
-        )
+        self._warps = np.zeros((np.shape(self._elements)[0], 12))
+        element_nodes = self._nodes[self._elements]
+        displacements = self._displacements[self._elements]
+        # Coordinate matrix.
+        A = self._local_coordinates()
+
+        # Shape function and derivatives.
+        N, dN, d2N = self._shape_function()
+
+        # Displacements.
+        self._warps[:, :2] = N @ displacements
 
         # 1st Order Strains
-        J_x_T = dN @ self._nodes[self._elements]
-        J_u_T = dN @ self._displacements[self._elements]
-        du = np.linalg.inv(J_x_T) @ J_u_T
+        J_x_T = dN @ element_nodes
+        J_u_T = dN @ displacements
+        self._warps[:, 2:6] = (np.linalg.inv(J_x_T) @ J_u_T).reshape(
+            np.shape(self._elements)[0], -1
+        )
 
         # 2nd Order Strains
-        d2udzeta2 = d2N @ self._displacements[self._elements]
-        J_zeta = np.zeros((len(self._elements), 2, 2))
-        J_zeta[:, 0, 0] = (
-            self._nodes[self._elements][:, 1, 1] - self._nodes[self._elements][:, 2, 1]
-        )
-        J_zeta[:, 0, 1] = (
-            self._nodes[self._elements][:, 2, 0] - self._nodes[self._elements][:, 1, 0]
-        )
-        J_zeta[:, 1, 0] = (
-            self._nodes[self._elements][:, 2, 1] - self._nodes[self._elements][:, 0, 1]
-        )
-        J_zeta[:, 1, 1] = (
-            self._nodes[self._elements][:, 0, 0] - self._nodes[self._elements][:, 2, 0]
-        )
-        J_zeta /= np.linalg.det(A)[:, None, None]
-        d2u = np.zeros((len(self._elements), 3, 2))
-        d2u[:, 0, 0] = (
-            d2udzeta2[:, 0, 0] * J_zeta[:, 0, 0] ** 2
-            + 2 * d2udzeta2[:, 1, 0] * J_zeta[:, 0, 0] * J_zeta[:, 1, 0]
-            + d2udzeta2[:, 2, 0] * J_zeta[:, 1, 0] ** 2
-        )
-        d2u[:, 0, 1] = (
-            d2udzeta2[:, 0, 1] * J_zeta[:, 0, 0] ** 2
-            + 2 * d2udzeta2[:, 1, 1] * J_zeta[:, 0, 0] * J_zeta[:, 1, 0]
-            + d2udzeta2[:, 2, 1] * J_zeta[:, 1, 0] ** 2
-        )
-        d2u[:, 1, 0] = (
-            d2udzeta2[:, 0, 0] * J_zeta[:, 0, 0] * J_zeta[:, 0, 1]
-            + d2udzeta2[:, 1, 0]
-            * (J_zeta[:, 0, 0] * J_zeta[:, 1, 1] + J_zeta[:, 1, 0] * J_zeta[:, 0, 1])
-            + d2udzeta2[:, 2, 0] * J_zeta[:, 1, 0] * J_zeta[:, 1, 1]
-        )
-        d2u[:, 1, 1] = (
-            d2udzeta2[:, 0, 1] * J_zeta[:, 0, 0] * J_zeta[:, 0, 1]
-            + d2udzeta2[:, 1, 1]
-            * (J_zeta[:, 0, 0] * J_zeta[:, 1, 1] + J_zeta[:, 1, 0] * J_zeta[:, 0, 1])
-            + d2udzeta2[:, 2, 1] * J_zeta[:, 1, 0] * J_zeta[:, 1, 1]
-        )
-        d2u[:, 2, 0] = (
-            d2udzeta2[:, 0, 0] * J_zeta[:, 0, 1] ** 2
-            + 2 * d2udzeta2[:, 1, 0] * J_zeta[:, 0, 1] * J_zeta[:, 1, 1]
-            + d2udzeta2[:, 2, 0] * J_zeta[:, 1, 1] ** 2
-        )
-        d2u[:, 2, 1] = (
-            d2udzeta2[:, 0, 1] * J_zeta[:, 0, 1] ** 2
-            + 2 * d2udzeta2[:, 1, 1] * J_zeta[:, 0, 1] * J_zeta[:, 1, 1]
-            + d2udzeta2[:, 2, 1] * J_zeta[:, 1, 1] ** 2
-        )
+        if self._mesh_order == 2:
+            K_u = d2N @ displacements
+            J_zeta = np.zeros((np.shape(self._elements)[0], 2, 2))
+            J_zeta[:, 0, 0] = element_nodes[:, 1, 1] - element_nodes[:, 2, 1]
+            J_zeta[:, 0, 1] = element_nodes[:, 2, 0] - element_nodes[:, 1, 0]
+            J_zeta[:, 1, 0] = element_nodes[:, 2, 1] - element_nodes[:, 0, 1]
+            J_zeta[:, 1, 1] = element_nodes[:, 0, 0] - element_nodes[:, 2, 0]
+            J_zeta /= np.linalg.det(A[:, :, [1, 2, 3]])[:, None, None]
 
-        self._du = du
-        self._d2u = d2u
+            K_x_inv = np.zeros((np.shape(self._elements)[0], 3, 3))
+            K_x_inv[:, 0, 0] = J_zeta[:, 0, 0] ** 2
+            K_x_inv[:, 0, 1] = 2 * J_zeta[:, 0, 0] * J_zeta[:, 1, 0]
+            K_x_inv[:, 0, 2] = J_zeta[:, 1, 0] ** 2
+            K_x_inv[:, 1, 0] = J_zeta[:, 0, 0] * J_zeta[:, 0, 1]
+            K_x_inv[:, 1, 1] = (
+                J_zeta[:, 0, 0] * J_zeta[:, 1, 1] + J_zeta[:, 0, 1] * J_zeta[:, 1, 0]
+            )
+            K_x_inv[:, 1, 2] = J_zeta[:, 1, 0] * J_zeta[:, 1, 1]
+            K_x_inv[:, 2, 0] = J_zeta[:, 0, 1] ** 2
+            K_x_inv[:, 2, 1] = 2 * J_zeta[:, 0, 1] * J_zeta[:, 1, 1]
+            K_x_inv[:, 2, 2] = J_zeta[:, 1, 1] ** 2
+
+            self._warps[:, 6:] = (K_x_inv @ K_u).reshape(
+                np.shape(self._elements)[0], -1
+            )
 
     def _reliability_guided(self):
         """
@@ -1703,9 +1679,16 @@ class Mesh(MeshBase):
                     cur_idx = np.argmax(
                         self._subset_solved * self._C_ZNCC
                     )  # Subset with highest correlation coefficient selected.
-                    p_0 = self._subsets[cur_idx].data["results"][
-                        "p"
-                    ]  # Precondition based on selected subset.
+                    try:
+                        p_0 = self._subsets[cur_idx].data["results"][
+                            "p"
+                        ]  # Precondition based on selected subset.
+                    except Exception:
+                        log.error(
+                            "Subset not previously solved. "
+                            "Defaulting preconditioning to seed."
+                        )
+                        p_0 = self._subsets[self._seed_node].data["results"]["p"]
                     self._subset_solved[cur_idx] = -1  # Set as solved.
                     solved = self._neighbours(
                         cur_idx, p_0
@@ -1729,7 +1712,6 @@ class Mesh(MeshBase):
             self._unsolvable = False
             self._element_area()
             self._element_strains()
-            self._update_subset_bgf()
 
     def _connectivity(self, idx):
         """
@@ -1749,22 +1731,30 @@ class Mesh(MeshBase):
             Mesh array.
 
         """
-        element_idxs = np.argwhere(self._elements == idx)
-        pts_idxs = []
-        for i in range(len(element_idxs)):
-            if element_idxs[i, 1] == 0:  # If 1
-                pts_idxs.append(self._elements[element_idxs[i, 0], 3::2])  # Add 4,6
-            elif element_idxs[i, 1] == 1:  # If 2
-                pts_idxs.append(self._elements[element_idxs[i, 0], 3:5])  # Add 4,5
-            elif element_idxs[i, 1] == 2:  # If 3
-                pts_idxs.append(self._elements[element_idxs[i, 0], 4:])  # Add 5,6
-            elif element_idxs[i, 1] == 3:  # If 4
-                pts_idxs.append(self._elements[element_idxs[i, 0], :2])  # Add 1,2
-            elif element_idxs[i, 1] == 4:  # If 5
-                pts_idxs.append(self._elements[element_idxs[i, 0], 1:3])  # Add 2,3
-            elif element_idxs[i, 1] == 5:  # If 6
-                pts_idxs.append(self._elements[element_idxs[i, 0], :3:2])  # Add 1,3
-        pts_idxs = np.unique(pts_idxs)
+
+        if self._mesh_order == 1:
+            element_idxs = np.argwhere(
+                np.any(self._elements == idx, axis=1) is True
+            ).flatten()
+            pts_idxs = np.unique(self._elements[element_idxs])
+            pts_idxs = np.delete(pts_idxs, np.argwhere(pts_idxs == idx))
+        if self._mesh_order == 2:
+            element_idxs = np.argwhere(self._elements == idx)
+            pts_idxs = []
+            for i in range(len(element_idxs)):
+                if element_idxs[i, 1] == 0:  # If 1
+                    pts_idxs.append(self._elements[element_idxs[i, 0], 3::2])  # Add 4,6
+                elif element_idxs[i, 1] == 1:  # If 2
+                    pts_idxs.append(self._elements[element_idxs[i, 0], 3:5])  # Add 4,5
+                elif element_idxs[i, 1] == 2:  # If 3
+                    pts_idxs.append(self._elements[element_idxs[i, 0], 4:])  # Add 5,6
+                elif element_idxs[i, 1] == 3:  # If 4
+                    pts_idxs.append(self._elements[element_idxs[i, 0], :2])  # Add 1,2
+                elif element_idxs[i, 1] == 4:  # If 5
+                    pts_idxs.append(self._elements[element_idxs[i, 0], 1:3])  # Add 2,3
+                elif element_idxs[i, 1] == 5:  # If 6
+                    pts_idxs.append(self._elements[element_idxs[i, 0], :3:2])  # Add 1,3
+            pts_idxs = np.unique(pts_idxs)
 
         return pts_idxs
 

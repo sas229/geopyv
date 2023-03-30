@@ -247,7 +247,7 @@ class Particle(ParticleBase):
             except Exception:
                 self._report(check, "TypeError")
         self._report(gp.check._check_dim(warp_0, "warp_0", 1), "ValueError")
-        self._report(gp.check._check_axis(warp_0, "warp_0", 0, [12]), "ValueError")
+        self._report(gp.check._check_axis(warp_0, "warp_0", 0, [6, 12]), "ValueError")
         check = gp.check._check_type(
             volume_0, "volume_0", [float, np.floating, np.float64, np.float32]
         )
@@ -264,6 +264,7 @@ class Particle(ParticleBase):
 
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
+
             if "file_settings" in series.data:
                 if series.data["file_settings"]["save_by_reference"]:
                     self._series = np.empty(
@@ -281,6 +282,7 @@ class Particle(ParticleBase):
         else:
             self._series_type = "Mesh"
             self._series = np.asarray([series.data])
+        self._mesh_order = self._series[0]["settings"]["mesh_order"]
         self._track = track
 
         if self._series[0]["mask"][int(coordinate_0[1]), int(coordinate_0[0])] == 0:
@@ -291,12 +293,12 @@ class Particle(ParticleBase):
             coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
 
         self._coordinates = np.zeros((len(self._series) + 1, 2))
-        self._warps = np.zeros((len(self._series) + 1, 12))
+        self._warps = np.zeros((len(self._series) + 1, 6 * self._mesh_order))
         self._volumes = np.zeros(len(self._series) + 1)
         self._stresses = np.zeros((len(self._series) + 1, 6))
 
         self._coordinates[0] = coordinate_0
-        self._warps[0] = warp_0
+        self._warps[0] = warp_0[: np.shape(self._warps)[1]]
         self._volumes[0] = volume_0
 
         self._reference_index = 0
@@ -424,43 +426,48 @@ class Particle(ParticleBase):
              [d^2N1/dzeta^2 d^2N2/dzetadeta ...]
              [d^2N1/deta^2  d^2N2/deta^2    ...]]
         """
-        N = np.asarray(
-            [
-                zeta * (2 * zeta - 1),
-                eta * (2 * eta - 1),
-                theta * (2 * theta - 1),
-                4 * zeta * eta,
-                4 * eta * theta,
-                4 * theta * zeta,
-            ]
-        )
-        dN = np.asarray(
-            [
+        if self._mesh_order == 1:
+            N = np.asarray([zeta, eta, theta])
+            dN = np.asarray([[1, 0, -1], [0, 1, -1]])
+            d2N = None
+        elif self._mesh_order == 2:
+            N = np.asarray(
                 [
-                    4 * zeta - 1,
-                    0,
-                    1 - 4 * theta,
-                    4 * eta,
-                    -4 * eta,
-                    4 * (theta - zeta),
-                ],
+                    zeta * (2 * zeta - 1),
+                    eta * (2 * eta - 1),
+                    theta * (2 * theta - 1),
+                    4 * zeta * eta,
+                    4 * eta * theta,
+                    4 * theta * zeta,
+                ]
+            )
+            dN = np.asarray(
                 [
-                    0,
-                    4 * eta - 1,
-                    1 - 4 * theta,
-                    4 * zeta,
-                    4 * (theta - eta),
-                    -4 * zeta,
-                ],
-            ]
-        )
-        d2N = np.asarray(
-            [
-                [4, 0, 4, 0, 0, -8],
-                [0, 0, 4, 4, -4, -4],
-                [0, 4, 4, 0, -8, 0],
-            ]
-        )
+                    [
+                        4 * zeta - 1,
+                        0,
+                        1 - 4 * theta,
+                        4 * eta,
+                        -4 * eta,
+                        4 * (theta - zeta),
+                    ],
+                    [
+                        0,
+                        4 * eta - 1,
+                        1 - 4 * theta,
+                        4 * zeta,
+                        4 * (theta - eta),
+                        -4 * zeta,
+                    ],
+                ]
+            )
+            d2N = np.asarray(
+                [
+                    [4, 0, 4, 0, 0, -8],
+                    [0, 0, 4, 4, -4, -4],
+                    [0, 4, 4, 0, -8, 0],
+                ]
+            )
 
         return N, dN, d2N
 
@@ -478,7 +485,7 @@ class Particle(ParticleBase):
 
         """
 
-        self._warp_inc = np.zeros(12)
+        self._warp_inc = np.zeros(6 * self._mesh_order)
         element_nodes = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
         displacements = self._series[m]["results"]["displacements"][
             self._series[m]["elements"][tri_idx]
@@ -499,26 +506,27 @@ class Particle(ParticleBase):
         self._warp_inc[2:6] = (np.linalg.inv(J_x_T) @ J_u_T).flatten()
 
         # 2nd Order Strains
-        K_u = d2N @ displacements
-        J_zeta = np.zeros((2, 2))
-        J_zeta[0, 0] = element_nodes[1, 1] - element_nodes[2, 1]
-        J_zeta[0, 1] = element_nodes[2, 0] - element_nodes[1, 0]
-        J_zeta[1, 0] = element_nodes[2, 1] - element_nodes[0, 1]
-        J_zeta[1, 1] = element_nodes[0, 0] - element_nodes[2, 0]
-        J_zeta /= np.linalg.det(A[:, [1, 2, 3]])
+        if self._mesh_order == 2:
+            K_u = d2N @ displacements
+            J_zeta = np.zeros((2, 2))
+            J_zeta[0, 0] = element_nodes[1, 1] - element_nodes[2, 1]
+            J_zeta[0, 1] = element_nodes[2, 0] - element_nodes[1, 0]
+            J_zeta[1, 0] = element_nodes[2, 1] - element_nodes[0, 1]
+            J_zeta[1, 1] = element_nodes[0, 0] - element_nodes[2, 0]
+            J_zeta /= np.linalg.det(A[:, [1, 2, 3]])
 
-        K_x_inv = np.zeros((3, 3))
-        K_x_inv[0, 0] = J_zeta[0, 0] ** 2
-        K_x_inv[0, 1] = 2 * J_zeta[0, 0] * J_zeta[1, 0]
-        K_x_inv[0, 2] = J_zeta[1, 0] ** 2
-        K_x_inv[1, 0] = J_zeta[0, 0] * J_zeta[0, 1]
-        K_x_inv[1, 1] = J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[0, 1] * J_zeta[1, 0]
-        K_x_inv[1, 2] = J_zeta[1, 0] * J_zeta[1, 1]
-        K_x_inv[2, 0] = J_zeta[0, 1] ** 2
-        K_x_inv[2, 1] = 2 * J_zeta[0, 1] * J_zeta[1, 1]
-        K_x_inv[2, 2] = J_zeta[1, 1] ** 2
+            K_x_inv = np.zeros((3, 3))
+            K_x_inv[0, 0] = J_zeta[0, 0] ** 2
+            K_x_inv[0, 1] = 2 * J_zeta[0, 0] * J_zeta[1, 0]
+            K_x_inv[0, 2] = J_zeta[1, 0] ** 2
+            K_x_inv[1, 0] = J_zeta[0, 0] * J_zeta[0, 1]
+            K_x_inv[1, 1] = J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[0, 1] * J_zeta[1, 0]
+            K_x_inv[1, 2] = J_zeta[1, 0] * J_zeta[1, 1]
+            K_x_inv[2, 0] = J_zeta[0, 1] ** 2
+            K_x_inv[2, 1] = 2 * J_zeta[0, 1] * J_zeta[1, 1]
+            K_x_inv[2, 2] = J_zeta[1, 1] ** 2
 
-        self._warp_inc[6:] = (K_x_inv @ K_u).flatten()
+            self._warp_inc[6:] = (K_x_inv @ K_u).flatten()
 
     def _strain_path(self):
         """

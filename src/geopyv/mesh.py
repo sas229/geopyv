@@ -1581,7 +1581,6 @@ class Mesh(MeshBase):
         for e in entities:
             tags, _, _ = gmsh.model.mesh.getNodes(e[0], e[1])
             self._node_tags = np.append(self._node_tags, tags.flatten()).astype(int)
-
         # Interior and boundary nodes.
         entities = gmsh.model.getEntities(2)
         self._interior_node_tags = []
@@ -1593,7 +1592,6 @@ class Mesh(MeshBase):
         self._borders_node_tags = (
             np.setdiff1d(self._node_tags, self._interior_node_tags).astype(int) - 1
         )
-
         # Template masking using binary mask.
         for tag in range(len(self._node_tags)):
             if tag in self._borders_node_tags:
@@ -1643,7 +1641,6 @@ class Mesh(MeshBase):
                 tolerance=self._seed_tolerance,
             )  # Solve for seed subset.
             self._bar()
-
             # If seed not solved, log the error, otherwise store
             # the variables and solve neighbours.
             if not self._subsets[self._seed_node].data["solved"]:
@@ -1684,10 +1681,6 @@ class Mesh(MeshBase):
                             "p"
                         ]  # Precondition based on selected subset.
                     except Exception:
-                        log.error(
-                            "Subset not previously solved. "
-                            "Defaulting preconditioning to seed."
-                        )
                         p_0 = self._subsets[self._seed_node].data["results"]["p"]
                     self._subset_solved[cur_idx] = -1  # Set as solved.
                     solved = self._neighbours(
@@ -1733,12 +1726,10 @@ class Mesh(MeshBase):
         """
 
         if self._mesh_order == 1:
-            element_idxs = np.argwhere(
-                np.any(self._elements == idx, axis=1) is True
-            ).flatten()
+            element_idxs = np.argwhere(np.any(self._elements == idx, axis=1)).flatten()
             pts_idxs = np.unique(self._elements[element_idxs])
             pts_idxs = np.delete(pts_idxs, np.argwhere(pts_idxs == idx))
-        if self._mesh_order == 2:
+        elif self._mesh_order == 2:
             element_idxs = np.argwhere(self._elements == idx)
             pts_idxs = []
             for i in range(len(element_idxs)):

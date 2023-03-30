@@ -364,12 +364,16 @@ class Field(FieldBase):
             self._series_type = "Sequence"
             if "file_settings" in series.data:
                 if series.data["file_settings"]["save_by_reference"]:
+                    meshes = []
                     for i in range(np.shape(series.data["meshes"])[0]):
-                        series.data["meshes"][i] = gp.io.load(
-                            filename=series.data["file_settings"]["mesh_folder"]
-                            + series.data["meshes"][i]
-                        ).data
-                series.data["file_settings"]["save_by_reference"] = False
+                        meshes.append(
+                            gp.io.load(
+                                filename=series.data["file_settings"]["mesh_folder"]
+                                + series.data["meshes"][i]
+                            ).data
+                        )
+                    series.data["meshes"] = meshes
+                    series.data["file_settings"]["save_by_reference"] = False
                 mesh_0 = series.data["meshes"][0]
                 self._number_images = np.shape(series.data["meshes"])[0] + 1
         else:
@@ -430,6 +434,13 @@ class Field(FieldBase):
                 self._exclusions = mesh_0["exclusions"]
             self._size_lower_bound = mesh_0["size_lower_bound"]
             self._size_upper_bound = mesh_0["size_upper_bound"]
+
+            self._size_upper_bound = min(
+                self._size_upper_bound,
+                np.max(
+                    np.sqrt(np.sum(np.square(np.diff(self._boundary, axis=0)), axis=1))
+                ),
+            )
 
             # Define region of interest.
             (
@@ -620,13 +631,12 @@ class Field(FieldBase):
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
         gmsh.model.mesh.optimize()
-        gmsh.model.mesh.setOrder(2)
+        gmsh.model.mesh.setOrder(1)
 
         # Get mesh topology.
         _, _, ent = gmsh.model.mesh.getElements(dim=2)
-        elements = np.reshape((np.asarray(ent) - 1).flatten(), (-1, 6))
-        number_particles = len(elements)
-        error = abs(number_particles - target_particles)
+        elements = np.reshape((np.asarray(ent) - 1).flatten(), (-1, 3))
+        error = (np.shape(elements)[0] - target_particles) ** 2
         return error
 
 

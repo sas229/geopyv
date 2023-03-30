@@ -112,7 +112,7 @@ def inspect_subset(data, mask, show, block, save):
 
     # Save
     if save is not None:
-        plt.savefig(save)
+        plt.savefig(save, dpi=600)
 
     # Show or close.
     if show is True:
@@ -218,7 +218,7 @@ def convergence_subset(data, show, block, save):
 
     # Save
     if save is not None:
-        plt.savefig(save)
+        plt.savefig(save, dpi=600)
 
     # Show or close.
     if show is True:
@@ -320,7 +320,7 @@ def convergence_mesh(data, quantity, show, block, save):
 
     # Save
     if save is not None:
-        plt.savefig(save)
+        plt.savefig(save, dpi=600)
 
     # Show or close.
     if show is True:
@@ -407,11 +407,9 @@ def contour_mesh(
     fig, ax = plt.subplots(num=title)
 
     # Triangulation.
-    (
-        mesh_triangulation,
-        x_p,
-        y_p,
-    ) = gp.geometry.utilities.plot_triangulation(elements, x, y)
+    mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+        elements, x, y, data["settings"]["mesh_order"]
+    )
 
     # Plot mesh.
     if mesh is True:
@@ -469,7 +467,7 @@ def contour_mesh(
 
     # Save.
     if save is not None:
-        plt.savefig(save)
+        plt.savefig(save, dpi=600)
 
     # Show or close.
     if show is True:
@@ -530,11 +528,12 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
         title = "Quiver:"
     fig, ax = plt.subplots(num=title)
 
-    # Triangulation.
-    _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
-
     # Plot mesh.
     if mesh is True:
+        # Triangulation.
+        _, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+            elements, x, y, data["settings"]["mesh_order"]
+        )
         for i in range(np.shape(x_p)[0]):
             ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth=0.5)
 
@@ -562,7 +561,7 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
 
     # Save.
     if save is not None:
-        plt.savefig(save)
+        plt.savefig(save, dpi=600)
 
     # Show or close.
     if show is True:
@@ -644,7 +643,9 @@ def inspect_mesh(data, show, block, save):
         title = "Inspect mesh:"
 
     # Triangulation.
-    _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
+    _, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+        elements, x, y, data["settings"]["mesh_order"]
+    )
 
     # Plot figure.
     fig, ax = plt.subplots(num=title)
@@ -671,7 +672,7 @@ def inspect_mesh(data, show, block, save):
 
     # Save
     if save is not None:
-        plt.savefig(save)
+        plt.savefig(save, dpi=600)
 
     # Show or close.
     if show is True:
@@ -772,7 +773,7 @@ def trace_particle(
 
     # Save.
     if save is not None:
-        plt.savefig(save)
+        plt.savefig(save, dpi=600)
 
     # Show or close.
     if show is True:
@@ -820,7 +821,7 @@ def inspect_field(data, mesh, show, block, save):
             value = np.asarray(value)
 
             # Triangulation
-            _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y)
+            _, x_p, y_p = gp.geometry.utilities.plot_triangulation(elements, x, y, 1)
 
             # Plot mesh.
             for i in range(np.shape(x_p)[0]):

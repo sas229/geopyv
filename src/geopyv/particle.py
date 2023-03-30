@@ -248,7 +248,9 @@ class Particle(ParticleBase):
                 self._report(check, "TypeError")
         self._report(gp.check._check_dim(warp_0, "warp_0", 1), "ValueError")
         self._report(gp.check._check_axis(warp_0, "warp_0", 0, [12]), "ValueError")
-        check = gp.check._check_type(volume_0, "volume_0", [float, np.floating])
+        check = gp.check._check_type(
+            volume_0, "volume_0", [float, np.floating, np.float64, np.float32]
+        )
         if check:
             try:
                 volume_0 = float(volume_0)
@@ -507,49 +509,16 @@ class Particle(ParticleBase):
 
         K_x_inv = np.zeros((3, 3))
         K_x_inv[0, 0] = J_zeta[0, 0] ** 2
-        K_x_inv[0, 1] = 2 * J_zeta[0, 0] * J_zeta[0, 1]
-        K_x_inv[0, 2] = J_zeta[0, 1] ** 2
-        K_x_inv[1, 0] = J_zeta[0, 0] * J_zeta[1, 0]
-        K_x_inv[1, 1] = J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[1, 0] * J_zeta[0, 1]
-        K_x_inv[1, 2] = J_zeta[0, 1] * J_zeta[1, 1]
-        K_x_inv[2, 0] = J_zeta[1, 0] ** 2
-        K_x_inv[2, 1] = 2 * J_zeta[1, 0] * J_zeta[1, 1]
+        K_x_inv[0, 1] = 2 * J_zeta[0, 0] * J_zeta[1, 0]
+        K_x_inv[0, 2] = J_zeta[1, 0] ** 2
+        K_x_inv[1, 0] = J_zeta[0, 0] * J_zeta[0, 1]
+        K_x_inv[1, 1] = J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[0, 1] * J_zeta[1, 0]
+        K_x_inv[1, 2] = J_zeta[1, 0] * J_zeta[1, 1]
+        K_x_inv[2, 0] = J_zeta[0, 1] ** 2
+        K_x_inv[2, 1] = 2 * J_zeta[0, 1] * J_zeta[1, 1]
         K_x_inv[2, 2] = J_zeta[1, 1] ** 2
 
-        self._warp_inc[6] = (
-            K_u[0, 0] * J_zeta[0, 0] ** 2
-            + 2 * K_u[1, 0] * J_zeta[0, 0] * J_zeta[1, 0]
-            + K_u[2, 0] * J_zeta[1, 0] ** 2
-        )
-        self._warp_inc[7] = (
-            K_u[0, 1] * J_zeta[0, 0] ** 2
-            + 2 * K_u[1, 1] * J_zeta[0, 0] * J_zeta[1, 0]
-            + K_u[2, 1] * J_zeta[1, 0] ** 2
-        )
-        self._warp_inc[8] = (
-            K_u[0, 0] * J_zeta[0, 0] * J_zeta[0, 1]
-            + K_u[1, 0] * (J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[1, 0] * J_zeta[0, 1])
-            + K_u[2, 0] * J_zeta[1, 0] * J_zeta[1, 1]
-        )
-        self._warp_inc[9] = (
-            K_u[0, 1] * J_zeta[0, 0] * J_zeta[0, 1]
-            + K_u[1, 1] * (J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[1, 0] * J_zeta[0, 1])
-            + K_u[2, 1] * J_zeta[1, 0] * J_zeta[1, 1]
-        )
-        self._warp_inc[10] = (
-            K_u[0, 0] * J_zeta[0, 1] ** 2
-            + 2 * K_u[1, 0] * J_zeta[0, 1] * J_zeta[1, 1]
-            + K_u[2, 0] * J_zeta[1, 1] ** 2
-        )
-        self._warp_inc[11] = (
-            K_u[0, 1] * J_zeta[0, 1] ** 2
-            + 2 * K_u[1, 1] * J_zeta[0, 1] * J_zeta[1, 1]
-            + K_u[2, 1] * J_zeta[1, 1] ** 2
-        )
-
-        # print(self._warp_inc[6:])
-        # print((K_x_inv @ K_u).flatten())
-        # print()
+        self._warp_inc[6:] = (K_x_inv @ K_u).flatten()
 
     def _strain_path(self):
         """

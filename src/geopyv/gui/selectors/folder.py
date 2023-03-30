@@ -32,5 +32,5 @@ class FolderSelector:
             Path to selected folder.
 
         """
-        path, _ = QFileDialog.getExistingDirectory(self.widget, directory, message)
+        path = QFileDialog.getExistingDirectory(self.widget, directory, message)
         return path

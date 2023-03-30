@@ -28,7 +28,7 @@ def area_to_length(area):
     return length
 
 
-def plot_triangulation(elements, x, y):
+def plot_triangulation(elements, x, y, mesh_order):
     """
 
     Method to compute a first order triangulation from a
@@ -55,39 +55,16 @@ def plot_triangulation(elements, x, y):
         Vertical coordinate of triangle vertices.
 
     """
-    plot_elements = []
-    x_p = []
-    y_p = []
-    for element in elements:
-        plot_elements.append([element[0], element[3], element[5]])
-        plot_elements.append([element[1], element[3], element[4]])
-        plot_elements.append([element[2], element[4], element[5]])
-        plot_elements.append([element[3], element[4], element[5]])
-        x_p.append(
-            [
-                x[element[0]],
-                x[element[3]],
-                x[element[1]],
-                x[element[4]],
-                x[element[2]],
-                x[element[5]],
-                x[element[0]],
-            ]
-        )
-        y_p.append(
-            [
-                y[element[0]],
-                y[element[3]],
-                y[element[1]],
-                y[element[4]],
-                y[element[2]],
-                y[element[5]],
-                y[element[0]],
-            ]
-        )
-    mesh_triangulation = np.asarray(plot_elements)
-    x_p = np.asarray(x_p)
-    y_p = np.asarray(y_p)
+    if mesh_order == 1:
+        x_p = x[elements[:, [0, 1, 2, 0]]]
+        y_p = y[elements[:, [0, 1, 2, 0]]]
+        mesh_triangulation = elements
+    elif mesh_order == 2:
+        x_p = x[elements[:, [0, 3, 1, 4, 2, 5, 0]]]
+        y_p = y[elements[:, [0, 3, 1, 4, 2, 5, 0]]]
+        mesh_triangulation = elements[
+            :, [[0, 3, 5], [1, 3, 4], [2, 4, 5], [3, 4, 5]]
+        ].reshape(-1, 3)
 
     return mesh_triangulation, x_p, y_p
 

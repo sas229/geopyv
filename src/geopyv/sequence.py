@@ -435,11 +435,11 @@ class SequenceBase(Object):
         self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
-        if xlim:
+        if xlim is not None:
             self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
             self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
-        if ylim:
+        if ylim is not None:
             self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
             self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
@@ -574,11 +574,11 @@ class SequenceBase(Object):
         self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
-        if xlim:
+        if xlim is not None:
             self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
             self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
-        if ylim:
+        if ylim is not None:
             self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
             self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
@@ -607,7 +607,7 @@ class SequenceBase(Object):
     def _load_mesh(self, mesh_index):
         if self.data["file_settings"]["save_by_reference"]:
             return gp.io.load(
-                filename=self.data["file_settings"]["mesh_folder"]
+                filename=self.data["file_settings"]["mesh_dir"]
                 + self.data["meshes"][mesh_index]
             ).data
         else:
@@ -631,24 +631,24 @@ class Sequence(SequenceBase):
     def __init__(
         self,
         *,
-        image_folder=".",
+        image_dir=".",
         common_name="",
-        image_file_type=".jpg",
+        file_format=".jpg",
         target_nodes=1000,
         boundary=None,
         exclusions=[],
         size_lower_bound=1.0,
         size_upper_bound=1000.0,
         save_by_reference=False,
-        mesh_folder=".",
+        mesh_dir=".",
     ):
         """Initialisation of geopyv sequence object.
 
         Parameters
         ----------
-        image_folder : str, optional
+        image_dir : str, optional
             Directory of images. Defaults to current working directory.
-        image_file_type : str, optional
+        file_format : str, optional
             Image file type. Options are ".jpg", ".png" or ".bmp". Defaults to .jpg.
         target_nodes : int
             Target node number. Defaults to 1000.
@@ -678,20 +678,18 @@ class Sequence(SequenceBase):
         self.initialised = False
 
         # Check types.
+        self._report(gp.check._check_type(image_dir, "image_dir", [str]), "TypeError")
+        if self._report(gp.check._check_path(image_dir, "image_dir"), "Warning"):
+            image_dir = gp.io._get_image_dir()
+        image_dir = gp.check._check_character(image_dir, "/", -1)
         self._report(
-            gp.check._check_type(image_folder, "image_folder", [str]), "TypeError"
+            gp.check._check_type(file_format, "file_format", [str]), "TypeError"
         )
-        if self._report(gp.check._check_path(image_folder, "image_folder"), "Warning"):
-            image_folder = gp.io._get_image_folder()
-        image_folder = gp.check._check_character(image_folder, "/", -1)
-        self._report(
-            gp.check._check_type(image_file_type, "image_file_type", [str]), "TypeError"
-        )
-        image_file_type = gp.check._check_character(image_file_type, ".", 0)
+        file_format = gp.check._check_character(file_format, ".", 0)
         self._report(
             gp.check._check_value(
-                image_file_type,
-                "image_file_type",
+                file_format,
+                "file_format",
                 [".jpg", ".png", ".bmp", ".JPG", ".PNG", ".BMP"],
             ),
             "ValueError",
@@ -766,16 +764,14 @@ class Sequence(SequenceBase):
             gp.check._check_type(save_by_reference, "save_by_reference", [bool]),
             "TypeError",
         )
-        self._report(
-            gp.check._check_type(mesh_folder, "mesh_folder", [str]), "TypeError"
-        )
-        if self._report(gp.check._check_path(mesh_folder, "mesh_folder"), "Warning"):
-            mesh_folder = gp.io._get_mesh_folder()
-        mesh_folder = gp.check._check_character(mesh_folder, "/", -1)
+        self._report(gp.check._check_type(mesh_dir, "mesh_dir", [str]), "TypeError")
+        if self._report(gp.check._check_path(mesh_dir, "mesh_dir"), "Warning"):
+            mesh_dir = gp.io._get_mesh_dir()
+        mesh_dir = gp.check._check_character(mesh_dir, "/", -1)
 
         # Store variables.
-        self._image_folder = image_folder
-        self._image_file_type = image_file_type
+        self._image_dir = image_dir
+        self._file_format = file_format
         self._common_name = common_name
         platform = sys.platform
         if platform == "linux" or platform == "linux2" or platform == "darwin":
@@ -784,11 +780,7 @@ class Sequence(SequenceBase):
             split = r"\\"
         try:
             _images = glob.glob(
-                self._image_folder
-                + split
-                + self._common_name
-                + "*"
-                + self._image_file_type
+                self._image_dir + split + self._common_name + "*" + self._file_format
             )
             if np.shape(_images)[0] < 2:
                 log.error("Insufficient number of images in specified folder.")
@@ -812,7 +804,7 @@ class Sequence(SequenceBase):
         self._size_lower_bound = size_lower_bound
         self._size_upper_bound = size_upper_bound
         self._save_by_reference = save_by_reference
-        self._mesh_folder = mesh_folder
+        self._mesh_dir = mesh_dir
         if self._save_by_reference:
             meshes = []
         else:
@@ -822,12 +814,12 @@ class Sequence(SequenceBase):
 
         # Data.
         file_settings = {
-            "image_folder": self._image_folder,
+            "image_dir": self._image_dir,
             "images": self._images,
-            "image_file_type": self._image_file_type,
+            "file_format": self._file_format,
             "image_indices": self._image_indices,
             "save_by_reference": self._save_by_reference,
-            "mesh_folder": self._mesh_folder,
+            "mesh_dir": self._mesh_dir,
         }
         mesh_settings = {
             "target_nodes": self._target_nodes,
@@ -1116,7 +1108,7 @@ class Sequence(SequenceBase):
                 if self._save_by_reference:
                     gp.io.save(
                         object=mesh,
-                        filename=self._mesh_folder
+                        filename=self._mesh_dir
                         + "mesh_"
                         + str(self._image_indices[_f_index])
                         + "_"
@@ -1175,7 +1167,7 @@ class Sequence(SequenceBase):
         log.info("Tracing boundary and exclusion displacements.")
         if self._save_by_reference:
             previous_mesh = gp.io.load(
-                filename=self._mesh_folder + self.data["meshes"][_f_index - 1]
+                filename=self._mesh_dir + self.data["meshes"][_f_index - 1]
             ).data
         else:
             previous_mesh = self.data["meshes"][_f_index - 1]

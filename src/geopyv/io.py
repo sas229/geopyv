@@ -227,21 +227,21 @@ def _get_folder(message):
     return folder_path
 
 
-def _get_image_folder():
+def _get_image_dir():
     """
 
-    Private method to get the `image_folder`.
+    Private method to get the `image_dir`.
 
     """
-    log.warn("No `image_folder` supplied. Please select the `image_folder`.")
-    return _get_folder("Select image folder.")
+    log.warn("No `image_dir` supplied. Please select the `image_dir`.")
+    return _get_folder("Select image directory.")
 
 
-def _get_mesh_folder():
+def _get_mesh_dir():
     """
 
-    Private method to get the `image_folder`.
+    Private method to get the `mesh_dir`.
 
     """
     log.warn("No `mesh_folder` supplied. Please select the `mesh_folder`.")
-    return _get_folder("Select mesh folder.")
+    return _get_folder("Select mesh directory.")

@@ -1,4 +1,5 @@
 import geopyv.check
+import geopyv.calibration
 import geopyv.log
 import geopyv.geometry
 import geopyv.gui
@@ -11,9 +12,11 @@ import geopyv.object
 import geopyv.particle
 import geopyv.plots
 import geopyv.sequence
+import geopyv.speckle
 import geopyv.subset
 import geopyv._subset_extensions
 import geopyv.templates
+import geopyv.validation
 import logging
 
 # Initialise log at default settings.

@@ -8,6 +8,8 @@ import sys
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
+import pandas as pd
+import seaborn as sns
 
 # import matplotlib.collections.LineCollection as LineCollection
 from matplotlib.collections import LineCollection
@@ -865,5 +867,239 @@ def inspect_field(data, mesh, show, block, save):
         plt.show(block=block)
     else:
         plt.close(fig)
+
+    return fig, ax
+
+
+def error_validation(
+    data, component, metric, zero, position, xlim, ylim, logscale, show, block, save
+):
+    labels = [
+        r"$u$ ($px$)",
+        r"$v$ ($px$)",
+        r"$du/dx$ ($-$)",
+        r"$dv/dx$ ($-$)",
+        r"$du/dy$ ($-$)",
+        r"$dv/dy$ ($-$)",
+        r"$d^2u/dx^2$ ($-$)",
+        r"$d^2v/dx^2$ ($-$)",
+        r"$d^2u/dxdy$ ($-$)",
+        r"$d^2v/dxdy$ ($-$)",
+        r"$d^2u/dy^2$ ($-$)",
+        r"$d^2v/dy^2$ ($-$)",
+    ]
+    metrics = {
+        "se": r"Standard error, $rho$ ($-$)",
+        "kde": r"Kernel density estimation, $z$ ($-$)",
+        "pf": r"Polyfit",
+    }
+    colours = [
+        "r",
+        "b",
+        "g",
+        "c",
+        "m",
+        "y",
+    ]
+    cmaps = ["Reds", "Blues", "Greens"]
+    markers = [
+        "o",
+        "^",
+        "s",
+        "v",
+        ">",
+        "<",
+    ]
+    title = r"Error: metric = {metric}, variable = {var}".format(
+        metric=metrics[metric], var=labels[component]
+    )
+    fig, ax = plt.subplots(num=title)
+
+    if metric == "se":
+        for i in range(np.shape(data["applied"])[0]):
+            series = np.zeros((np.shape(data["applied"][i])[0], 2))
+            for j in range(np.shape(data["applied"][i])[0]):
+                series[j, 0] = abs(data["speckle"].data["pm"][j + 1, component])
+                if position:
+                    series[j, 1] = np.std(
+                        np.sqrt(
+                            np.sum(
+                                (
+                                    data["applied"][i][j, :, :2]
+                                    - data["observed"][i][j, :, :2]
+                                )
+                                ** 2,
+                                axis=1,
+                            )
+                        )
+                    )
+                else:
+                    series[j, 1] = np.std(
+                        np.sqrt(
+                            np.sum(
+                                (data["applied"][i][j] - data["observed"][i][j]) ** 2,
+                                axis=1,
+                            )
+                        )
+                    )
+            if logscale:
+                ax.scatter(
+                    series[:, 0],
+                    series[:, 1],
+                    facecolors="none",
+                    edgecolors=colours[i],
+                    marker=markers[i],
+                    label=data["labels"][i],
+                )
+            else:
+                ax.scatter(
+                    series[:, 0],
+                    series[:, 1],
+                    facecolors="none",
+                    edgecolors=colours[i],
+                    marker=markers[i],
+                    label=data["labels"][i],
+                )
+    elif metric == "pf":
+        for i in range(np.shape(data["applied"])[0]):
+            if zero:
+                error = (
+                    data["observed"][i][:, :, component]
+                    - data["applied"][i][:, :, component]
+                ).flatten()
+            else:
+                error = (data["observed"][i][:, :, component]).flatten()
+            z = np.polyfit(
+                (data["applied"][i][:, :, component]).flatten(), error, deg=10
+            )
+            lobf = np.poly1d(z)
+            x = np.linspace(
+                np.min(data["applied"][i][:, :, component]),
+                np.max(data["applied"][i][:, :, component]),
+                1000,
+            )
+
+            if logscale:
+                ax.plot(abs(x), lobf(x), color=colours[i], label=data["labels"][i])
+            else:
+                ax.plot(x, lobf(x), color=colours[i], label=data["labels"][i])
+
+            if zero:
+                ax.plot(
+                    [
+                        np.min(data["applied"][i][:, :, component]),
+                        np.max(data["applied"][i][:, :, component]),
+                    ],
+                    [0.0, 0.0],
+                    color="k",
+                )
+            else:
+                ax.plot(
+                    [
+                        np.min(data["applied"][i][:, :, component]),
+                        np.max(data["applied"][i][:, :, component]),
+                    ],
+                    [
+                        np.min(data["applied"][i][:, :, component]),
+                        np.max(data["applied"][i][:, :, component]),
+                    ],
+                    color="k",
+                )
+    else:
+        df = [
+            pd.DataFrame(
+                np.transpose(
+                    [
+                        abs(data["applied"][i][:, :, component].flatten()),
+                        abs(data["observed"][i][:, :, component].flatten()),
+                    ]
+                ),
+                columns=["applied", "observed"],
+            )
+            for i in range(np.shape(data["applied"])[0])
+        ]
+        ax.plot(
+            [
+                abs(np.min(data["applied"][0][:, :, component])),
+                abs(np.max(data["applied"][0][:, :, component])),
+            ],
+            [
+                abs(np.min(data["applied"][0][:, :, component])),
+                abs(np.max(data["applied"][0][:, :, component])),
+            ],
+            color="k",
+        )
+        for i in range(np.shape(data["applied"])[0]):
+            sns.kdeplot(
+                df[i],
+                x="applied",
+                y="observed",
+                ax=ax,
+                cmap=cmaps[i],
+                alpha=0.75,
+                log_scale=logscale,
+                n_levels=5,
+                fill=False,
+            )
+
+    # General formatting.
+    # Legend.
+    plt.legend(bbox_to_anchor=(1.05, 0.5), loc="center left", borderaxespad=0)
+
+    # Logscale.
+    if logscale:
+        ax.set_xscale("log")
+        if metric != "pf":
+            ax.set_yscale("log")
+    if metric == "se":
+        ax.set_yscale("log")
+
+    # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    # Axis labels.
+    ax.set_xlabel(r"Applied warp, {}".format(labels[component]))
+    if metric == "se":
+        if position:
+            ax.set_ylabel(r"Standard error, $\rho_{px}$ ($px$)")
+        else:
+            ax.set_ylabel(r"Standard error, $\rho$ ($-$)")
+    else:
+        if zero:
+            ax.set_ylabel(r"Error, ($-$)")
+        else:
+            ax.set_ylabel(r"Observed warp, {}".format(labels[component]))
+
+    # Save.
+    if save is not None:
+        plt.savefig(save, bbox_inches="tight", dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def inspect_calibration(data, image_index):
+    fig, ax = plt.subplots()
+    frame = cv2.imread(data["file_settings"]["calibration_images"][image_index])
+    print(data["calibration"]["corners"][image_index])
+    print(data["calibration"]["ids"][image_index])
+
+    # cv2.aruco.drawDetectedMarkers(frame, data["calibration"]["corners"][image_index],
+    # data["calibration"]["ids"][image_index])
+    ax.imshow(frame)
+    ax.scatter(
+        data["calibration"]["corners"][image_index][:, :, 0],
+        data["calibration"]["corners"][image_index][:, :, 1],
+        color="r",
+    )
+    plt.show()
 
     return fig, ax

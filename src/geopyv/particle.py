@@ -132,11 +132,11 @@ class ParticleBase(Object):
         self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
-        if xlim:
+        if xlim is not None:
             self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
             self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
-        if ylim:
+        if ylim is not None:
             self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
             self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")

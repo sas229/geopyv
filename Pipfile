@@ -18,6 +18,8 @@ sphinx-autoapi = "*"
 pre-commit = "*"
 numpy = "*"
 pip = "*"
+pandas = "*"
+seaborn = "*"
 
 [dev-packages]
 ipykernel = "*"

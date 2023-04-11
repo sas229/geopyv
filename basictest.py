@@ -137,12 +137,12 @@ alpha = 0.2
 
 # Sequence instantiation.
 sequence = gp.sequence.Sequence(
-    image_folder="images/T-Bar/",
+    image_dir="images/T-Bar/",
     target_nodes=1000,
     boundary=boundary,
     exclusions=exclusions,
     save_by_reference=True,
-    mesh_folder="images/T-Bar/meshes/",
+    mesh_dir="images/T-Bar/meshes/",
 )
 
 # Sequence solving.

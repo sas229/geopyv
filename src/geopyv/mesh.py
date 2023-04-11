@@ -368,11 +368,11 @@ class MeshBase(Object):
         self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
-        if xlim:
+        if xlim is not None:
             self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
             self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
-        if ylim:
+        if ylim is not None:
             self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
             self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
@@ -492,11 +492,11 @@ class MeshBase(Object):
         self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
-        if xlim:
+        if xlim is not None:
             self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
             self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
-        if ylim:
+        if ylim is not None:
             self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
             self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
@@ -1111,10 +1111,8 @@ class Mesh(MeshBase):
             }
             self.data.update({"results": self._results})
 
-        except Exception as e:
+        except Exception:
             log.error("Could not solve mesh. Not a correlation issue.")
-            print(e.message)
-            print(e.args)
             self._update = True
             self.solved = False
             self._unsolvable = True
@@ -1756,7 +1754,7 @@ class Mesh(MeshBase):
         warp functions of the neighbouring nodes.
 
         Parameters
-        __________
+        ----------
         p_0 : `numpy.ndarray` (N)
             Preconditioning warp function.
 

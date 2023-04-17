@@ -282,7 +282,7 @@ class Particle(ParticleBase):
         else:
             self._series_type = "Mesh"
             self._series = np.asarray([series.data])
-        self._mesh_order = self._series[0]["settings"]["mesh_order"]
+        self._mesh_order = self._series[0]["mesh_order"]
         self._track = track
 
         if self._series[0]["mask"][int(coordinate_0[1]), int(coordinate_0[0])] == 0:

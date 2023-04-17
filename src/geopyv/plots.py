@@ -11,13 +11,133 @@ import matplotlib.tri as tri
 import pandas as pd
 import seaborn as sns
 
-# import matplotlib.collections.LineCollection as LineCollection
 from matplotlib.collections import LineCollection
+import scipy as sp
 import numpy as np
 import re
 import geopyv as gp
+import alphashape
 
 log = logging.getLogger(__name__)
+
+
+def warp_visualiser(template, warp, show, block, save):
+    title = "Visualise warp"
+
+    f_coord = np.zeros(2)
+    f_coords = template.coords
+    g_coords = gp._subset_extensions._g_coords(f_coord, warp, f_coords)
+
+    f_alpha = alphashape.alphashape(f_coords, 1)
+    f_x, f_y = f_alpha.exterior.xy
+    g_alpha = alphashape.alphashape(g_coords, 1)
+    g_x, g_y = g_alpha.exterior.xy
+
+    fig, ax = plt.subplots(num=title)
+
+    ax.fill(f_x, f_y, alpha=0.5, color="b")
+    ax.fill(g_x, g_y, alpha=0.5, color="r")
+
+    ax.set_axis_off()
+    ax.axis("equal")
+    plt.tight_layout()
+
+    # Save
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def inspect_subset_warp(data, mask, show, block, save):
+    image = cv2.imread(data["images"]["f_img"], cv2.IMREAD_COLOR)
+    image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+    x = data["position"]["x"]
+    y = data["position"]["y"]
+    template_size = data["template"]["size"]
+    title = "Inspect subset: f_coord = ({x},{y}) (px)".format(x=x, y=y)
+
+    f_coord = np.asarray([x, y])
+    if data["template"]["shape"] == "circle":
+        template = gp.templates.Circle(template_size)
+    elif data["template"]["shape"] == "square":
+        template = gp.templates.Square(template_size)
+    f_img = gp.image.Image(data["images"]["f_img"])
+    f_coords = gp._subset_extensions._init_reference(
+        f_coord, template.coords, f_img.QCQT
+    )[0]
+    g_coords = gp._subset_extensions._g_coords(f_coord, data["results"]["p"], f_coords)
+
+    # Crop image and mask.
+    x_min = (np.round(min(np.min(f_coords[:, 0]), np.min(g_coords[:, 0])), 0)).astype(
+        int
+    )
+    x_max = (np.round(max(np.max(f_coords[:, 0]), np.max(g_coords[:, 0])), 0)).astype(
+        int
+    )
+    y_min = (np.round(min(np.min(f_coords[:, 1]), np.min(g_coords[:, 1])), 0)).astype(
+        int
+    )
+    y_max = (np.round(max(np.max(f_coords[:, 1]), np.max(g_coords[:, 1])), 0)).astype(
+        int
+    )
+
+    # image = image_gs.astype(np.float32)[y_min : y_max + 1, x_min : x_max + 1]
+    if not isinstance(mask, type(None)):
+        if type(mask) == np.ndarray:
+            if np.shape(mask) == np.shape(image_gs):
+                mask = mask.astype(np.float32)[y_min : y_max + 1, x_min : x_max + 1]
+                invert_mask = np.abs(mask - 1) * 255
+                image = np.maximum(image, invert_mask)
+
+    f_hull = sp.spatial.ConvexHull(f_coords)
+    g_hull = sp.spatial.ConvexHull(g_coords)
+
+    fig, ax = plt.subplots(num=title)
+    ax.imshow(
+        image,
+        cmap="gist_gray",
+        interpolation="nearest",
+        aspect="equal",
+    )
+    ax.fill(
+        f_coords[f_hull.vertices, 0], f_coords[f_hull.vertices, 1], alpha=0.5, color="b"
+    )
+    ax.fill(
+        g_coords[g_hull.vertices, 0], g_coords[g_hull.vertices, 1], alpha=0.5, color="r"
+    )
+
+    ax.text(
+        3.0,
+        -1.0,
+        "warp vector: " + str(data["results"]["p"]),
+        horizontalalignment="center",
+    )
+
+    ax.set_xlim(x_min - 5, x_max + 5)
+    ax.set_ylim(y_max + 5, y_min - 5)
+
+    ax.set_axis_off()
+    plt.tight_layout()
+
+    # Save
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
 
 
 def inspect_subset(data, mask, show, block, save):
@@ -410,7 +530,7 @@ def contour_mesh(
 
     # Triangulation.
     mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
-        elements, x, y, data["settings"]["mesh_order"]
+        elements, x, y, data["mesh_order"]
     )
 
     # Plot mesh.
@@ -534,7 +654,7 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
     if mesh is True:
         # Triangulation.
         _, x_p, y_p = gp.geometry.utilities.plot_triangulation(
-            elements, x, y, data["settings"]["mesh_order"]
+            elements, x, y, data["mesh_order"]
         )
         for i in range(np.shape(x_p)[0]):
             ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth=0.5)
@@ -574,7 +694,7 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
     return fig, ax
 
 
-def inspect_mesh(data, show, block, save):
+def inspect_mesh(data, show, block, save, solved):
     """
 
     Function to inspect Mesh topology.
@@ -646,7 +766,7 @@ def inspect_mesh(data, show, block, save):
 
     # Triangulation.
     _, x_p, y_p = gp.geometry.utilities.plot_triangulation(
-        elements, x, y, data["settings"]["mesh_order"]
+        elements, x, y, data["mesh_order"]
     )
 
     # Plot figure.
@@ -942,24 +1062,14 @@ def error_validation(
                             )
                         )
                     )
-            if logscale:
-                ax.scatter(
-                    series[:, 0],
-                    series[:, 1],
-                    facecolors="none",
-                    edgecolors=colours[i],
-                    marker=markers[i],
-                    label=data["labels"][i],
-                )
-            else:
-                ax.scatter(
-                    series[:, 0],
-                    series[:, 1],
-                    facecolors="none",
-                    edgecolors=colours[i],
-                    marker=markers[i],
-                    label=data["labels"][i],
-                )
+            ax.scatter(
+                series[:, 0],
+                series[:, 1],
+                facecolors="none",
+                edgecolors=colours[i],
+                marker=markers[i],
+                label=data["labels"][i],
+            )
     elif metric == "pf":
         for i in range(np.shape(data["applied"])[0]):
             if zero:

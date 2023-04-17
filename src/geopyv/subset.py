@@ -27,7 +27,7 @@ class SubsetBase(Object):
 
         """
 
-    def inspect(self, show=True, block=True, save=None):
+    def inspect(self, warp=False, show=True, block=True, save=None):
         """
 
         Method to show the subset and associated quality metrics using
@@ -62,18 +62,39 @@ class SubsetBase(Object):
         """
 
         # Check input.
+        self._report(gp.check._check_type(warp, "warp", [bool]), "TypeError")
+        if warp:
+            # Check if solved.
+            if self.data["solved"] is not True:
+                log.error(
+                    "Subset not yet solved therefore no warp data to plot. "
+                    "First, run :meth:`~geopyv.subset.Subset.solve()` to solve."
+                )
+                raise ValueError(
+                    "Mesh not yet solved therefore no warp data to plot. "
+                    "First, run :meth:`~geopyv.subset.Subset.solve()` to solve."
+                )
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
         self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
         self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Inspect subset.
-        fig, ax = gp.plots.inspect_subset(
-            data=self.data,
-            mask=None,
-            show=show,
-            block=block,
-            save=save,
-        )
+        if warp:
+            fig, ax = gp.plots.inspect_subset_warp(
+                data=self.data,
+                mask=None,
+                show=show,
+                block=block,
+                save=save,
+            )
+        else:
+            fig, ax = gp.plots.inspect_subset(
+                data=self.data,
+                mask=None,
+                show=show,
+                block=block,
+                save=save,
+            )
         return fig, ax
 
     def convergence(self, show=True, block=True, save=None):
@@ -479,7 +500,6 @@ class Subset(SubsetBase):
             self._p = self._p_init
         else:
             self._p = warp_0
-
         # Call appropriate iterative solver:
         try:
             if self._method == "ICGN" and np.mod(self._p.shape[0], 2) == 0:

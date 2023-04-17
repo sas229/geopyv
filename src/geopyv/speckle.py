@@ -38,7 +38,7 @@ class SpeckleBase(Object):
             + self.data["pm"][i][4] * delta[:, 1]
             + 0.5 * self.data["pm"][i][6] * delta[:, 0] ** 2
             + self.data["pm"][i][8] * delta[:, 0] * delta[:, 1]
-            + self.data["pm"][i][10] * delta[:, 1] ** 2
+            + 0.5 * self.data["pm"][i][10] * delta[:, 1] ** 2
         )
         _warp[:, 1] = (
             self.data["pm"][i][1]
@@ -46,7 +46,7 @@ class SpeckleBase(Object):
             + self.data["pm"][i][5] * delta[:, 1]
             + 0.5 * self.data["pm"][i][7] * delta[:, 0] ** 2
             + self.data["pm"][i][9] * delta[:, 0] * delta[:, 1]
-            + self.data["pm"][i][11] * delta[:, 1] ** 2
+            + 0.5 * self.data["pm"][i][11] * delta[:, 1] ** 2
         )
         _warp[:, 2] = (
             self.data["pm"][i][2]
@@ -175,10 +175,9 @@ class Speckle(SpeckleBase):
     ):
         [self.X, self.Y] = np.meshgrid(range(self._image_size), range(self._image_size))
         self._ref_speckle = self._speckle_distribution()
-
         self._mult()
-        self._image_generation()
         self.data.update({"ref_speckle": self._ref_speckle, "pm": self._pm})
+        self._image_generation()
         self.solved = True
         self.data["solved"] = True
 

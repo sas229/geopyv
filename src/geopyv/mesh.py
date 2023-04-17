@@ -108,7 +108,11 @@ class MeshBase(Object):
         else:
             log.info("Inspecting mesh...")
             fig, ax = gp.plots.inspect_mesh(
-                data=self.data, show=show, block=block, save=save
+                data=self.data,
+                show=show,
+                block=block,
+                save=save,
+                solved=self._subset_solved,
             )
             return fig, ax
 
@@ -770,6 +774,7 @@ class Mesh(MeshBase):
                 "g_img": self._g_img.filepath,
             },
             "target_nodes": self._target_nodes,
+            "mesh_order": self._mesh_order,
             "boundary": self._boundary,
             "exclusions": self._exclusions,
             "size_lower_bound": self._size_lower_bound,
@@ -1092,7 +1097,6 @@ class Mesh(MeshBase):
                 "max_norm": self._max_norm,
                 "adaptive_iterations": self._adaptive_iterations,
                 "method": self._method,
-                "mesh_order": self._mesh_order,
                 "tolerance": self._tolerance,
             }
             self.data.update({"settings": self._settings})
@@ -1294,7 +1298,7 @@ class Mesh(MeshBase):
                     self._mesh_order,
                 )
 
-            minimize_scalar(f)
+            minimize_scalar(f, bounds=(0.1, 5))
             bar()
 
     @staticmethod
@@ -1792,7 +1796,7 @@ class Mesh(MeshBase):
                             + p[2] * diff[0]
                             + p[4] * diff[1]
                             + 0.5 * p[6] * diff[0] ** 2
-                            + 0.5 * p[8] * diff[0] * diff[1]
+                            + p[8] * diff[0] * diff[1]
                             + 0.5 * p[10] * diff[1] ** 2
                         )
                         p_0[1] = (
@@ -1800,9 +1804,14 @@ class Mesh(MeshBase):
                             + p[3] * diff[0]
                             + p[5] * diff[1]
                             + 0.5 * p[7] * diff[0] ** 2
-                            + 0.5 * p[9] * diff[0] * diff[1]
+                            + p[9] * diff[0] * diff[1]
                             + 0.5 * p[11] * diff[1] ** 2
                         )
+                        p_0[2] = p[2] + p[6] * diff[0] + p[8] * diff[1]
+                        p_0[3] = p[3] + p[7] * diff[0] + p[9] * diff[1]
+                        p_0[4] = p[4] + p[8] * diff[1] + p[10] * diff[1]
+                        p_0[5] = p[5] + p[9] * diff[1] + p[11] * diff[1]
+
                     self._subsets[idx].solve(
                         max_norm=self._max_norm,
                         max_iterations=self._max_iterations,
@@ -1825,7 +1834,6 @@ class Mesh(MeshBase):
                         )
                         if self._subsets[idx].data["solved"]:
                             self._store_variables(idx)
-                            return True
                         else:
                             try:
                                 self._C_ZNCC[idx] = np.max(

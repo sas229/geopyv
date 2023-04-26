@@ -27,16 +27,17 @@ class ValidationBase(Object):
 
         """
 
-    def error(
+    def standard_error(
         self,
         *,
         component=None,
-        metric="se",
-        zero=True,
-        position=True,
+        observing=None,
         xlim=None,
         ylim=None,
-        logscale=True,
+        scale=True,
+        prev_series=None,
+        prev_series_label=None,
+        plot="scatter",
         show=True,
         block=True,
         save=None
@@ -44,26 +45,20 @@ class ValidationBase(Object):
         # Check if solved.
         if self.data["solved"] is not True:
             log.error(
-                "Validation not yet solved therefore no convergence data to plot. "
+                "Validation not yet solved therefore no standard error data to plot. "
                 "First, run :meth:`~geopyv.validation.Validation.solve()` to solve."
             )
             raise ValueError(
-                "Validation not yet solved therefore no convergence data to plot. "
+                "Validation not yet solved therefore no standard error data to plot. "
                 "First, run :meth:`~geopyv.validation.Validation.solve()` to solve."
             )
 
         # Check input.
         self._report(gp.check._check_type(component, "component", [int]), "TypeError")
         self._report(
-            gp.check._check_range(component, "component", 0, ub=11),
+            gp.check._check_range(component, "component", 0, ub=13),
             "IndexError",
         )
-        self._report(gp.check._check_type(metric, "metric", [str]), "TypeError")
-        self._report(
-            gp.check._check_value(metric, "metric", ["se", "kde", "pf"]), "ValueError"
-        )
-        self._report(gp.check._check_type(zero, "zero", [bool]), "TypeError")
-        self._report(gp.check._check_type(position, "position", [bool]), "TypeError")
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
         if xlim is not None:
@@ -73,20 +68,28 @@ class ValidationBase(Object):
         if ylim is not None:
             self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
             self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
-        self._report(gp.check._check_type(logscale, "logscale", [bool]), "TypeError")
+        self._report(gp.check._check_type(scale, "scale", [str]), "TypeError")
+        self._report(
+            gp.check._check_value(scale, "scale", ["linear", "log"]), "ValueError"
+        )
+        self._report(gp.check._check_type(plot, "plot", [str]), "TypeError")
+        self._report(
+            gp.check._check_value(plot, "plot", ["scatter", "line"]), "ValueError"
+        )
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
         self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
         self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
-        fig, ax = gp.plots.error_validation(
+        fig, ax = gp.plots.standard_error_validation(
             data=self.data,
             component=component,
-            metric=metric,
-            zero=zero,
-            position=position,
+            observing=observing,
             xlim=xlim,
             ylim=ylim,
-            logscale=logscale,
+            scale=scale,
+            prev_series=prev_series,
+            prev_series_label=prev_series_label,
+            plot=plot,
             show=show,
             block=block,
             save=save,
@@ -141,7 +144,7 @@ class Validation(ValidationBase):
             "fields": self._fields,
         }
 
-    def solve(self):
+    def solve(self, *, rot=False):
         self._applied = []  # field, image,point, warp
         self._observed = []
 
@@ -162,7 +165,7 @@ class Validation(ValidationBase):
             )
             for i in range(1, self._speckle.data["image_no"]):
                 applied[i - 1] = self._speckle._warp(
-                    i, field.data["field"]["coordinates"]
+                    i, field.data["field"]["coordinates"], rot=rot
                 )
             for i in range(np.shape(field.data["particles"])[0]):
                 if np.shape(field.data["particles"][i]["warps"])[1] == 6:

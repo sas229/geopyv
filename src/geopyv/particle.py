@@ -9,6 +9,7 @@ import geopyv as gp
 from geopyv.object import Object
 import re
 import matplotlib.path as path
+from alive_progress import alive_bar
 
 log = logging.getLogger(__name__)
 
@@ -147,11 +148,113 @@ class ParticleBase(Object):
             data=self.data,
             quantity=quantity,
             component=component,
+            obj_type="Particle",
             imshow=imshow,
             colorbar=True,
             ticks=ticks,
             alpha=alpha,
             axis=axis,
+            xlim=xlim,
+            ylim=ylim,
+            show=show,
+            block=block,
+            save=save,
+        )
+        return fig, ax
+
+    def history(
+        self,
+        quantity="warps",
+        components=None,
+        xlim=None,
+        ylim=None,
+        show=True,
+        block=True,
+        save=None,
+    ):
+        """
+        Method to plot particle time history.
+
+        Parameters
+        ----------
+        quantity : str, optional
+            Specifier for which metric to plot along the particle path.
+        component : int, optional
+            Specifier for which components of the metric to plot.
+        xlim : array-like, optional
+            Set the plot x-limits (lower_limit,upper_limit).
+            Defaults to None.
+        ylim : array-like, optional
+            Set the plot y-limits (lower_limit,upper_limit).
+            Defaults to None.
+        show : bool, optional
+            Control whether the plot is displayed.
+            Defaults to True.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+            Defaults to False.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
+        """
+
+        # Check if solved.
+        if self.data["solved"] is not True:
+            log.error(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+            raise ValueError(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+
+        # Check input.
+        self._report(
+            gp.check._check_type(quantity, "quantity", [str, type(None)]), "TypeError"
+        )
+        if quantity:
+            self._report(
+                gp.check._check_value(
+                    quantity,
+                    "quantity",
+                    [
+                        "coordinates",
+                        "warps",
+                        "volumes",
+                        "stresses",
+                    ],
+                ),
+                "ValueError",
+            )
+        self._report(
+            gp.check._check_type(components, "components", [list, type(None)]),
+            "TypeError",
+        )
+        if components:
+            for component in components:
+                self._report(
+                    gp.check._check_index(
+                        component, "component", 1, self.data["results"][quantity]
+                    ),
+                    "IndexError",
+                )
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
+        if xlim is not None:
+            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
+            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
+        if ylim is not None:
+            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
+            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
+
+        fig, ax = gp.plots.history_particle(
+            data=self.data,
+            quantity=quantity,
+            components=components,
             xlim=xlim,
             ylim=ylim,
             show=show,
@@ -264,17 +367,20 @@ class Particle(ParticleBase):
 
         if series.data["type"] == "Sequence":
             self._series_type = "Sequence"
-
             if "file_settings" in series.data:
                 if series.data["file_settings"]["save_by_reference"]:
-                    self._series = np.empty(
-                        np.shape(series.data["meshes"])[0], dtype=object
-                    )
-                    for i in range(np.shape(series.data["meshes"])[0]):
-                        self._series[i] = gp.io.load(
-                            filename=series.data["file_settings"]["mesh_folder"]
-                            + series.data["meshes"][i]
-                        ).data
+                    mesh_no = np.shape(series.data["meshes"])[0]
+                    self._series = np.empty(mesh_no, dtype=object)
+                    with alive_bar(
+                        mesh_no, dual_line=True, bar="blocks", title="Loading meshes..."
+                    ) as bar:
+                        for i in range(mesh_no):
+                            self._series[i] = gp.io.load(
+                                filename=series.data["file_settings"]["mesh_dir"]
+                                + series.data["meshes"][i],
+                                verbose=False,
+                            ).data
+                            bar()
                 else:
                     self._series = series.data["meshes"]
             else:
@@ -486,45 +592,46 @@ class Particle(ParticleBase):
         """
 
         self._warp_inc = np.zeros(6 * self._mesh_order)
-        element_nodes = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
-        displacements = self._series[m]["results"]["displacements"][
+        x = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
+        u = self._series[m]["results"]["displacements"][
             self._series[m]["elements"][tri_idx]
         ]
 
         # Get local coordinates.
-        zeta, eta, theta, A = self._local_coordinates(element_nodes)
+        zeta, eta, theta, A = self._local_coordinates(x)
 
         # Shape function and derivatives.
         N, dN, d2N = self._shape_function(zeta, eta, theta)
 
         # Displacements
-        self._warp_inc[:2] = N @ displacements
+        self._warp_inc[:2] = N @ u
 
         # 1st Order Strains
-        J_x_T = dN @ element_nodes
-        J_u_T = dN @ displacements
+        J_x_T = dN @ x
+        J_u_T = dN @ u
         self._warp_inc[2:6] = (np.linalg.inv(J_x_T) @ J_u_T).flatten()
 
         # 2nd Order Strains
         if self._mesh_order == 2:
-            K_u = d2N @ displacements
-            J_zeta = np.zeros((2, 2))
-            J_zeta[0, 0] = element_nodes[1, 1] - element_nodes[2, 1]
-            J_zeta[0, 1] = element_nodes[2, 0] - element_nodes[1, 0]
-            J_zeta[1, 0] = element_nodes[2, 1] - element_nodes[0, 1]
-            J_zeta[1, 1] = element_nodes[0, 0] - element_nodes[2, 0]
-            J_zeta /= np.linalg.det(A[:, [1, 2, 3]])
-
-            K_x_inv = np.zeros((3, 3))
-            K_x_inv[0, 0] = J_zeta[0, 0] ** 2
-            K_x_inv[0, 1] = 2 * J_zeta[0, 0] * J_zeta[1, 0]
-            K_x_inv[0, 2] = J_zeta[1, 0] ** 2
-            K_x_inv[1, 0] = J_zeta[0, 0] * J_zeta[0, 1]
-            K_x_inv[1, 1] = J_zeta[0, 0] * J_zeta[1, 1] + J_zeta[0, 1] * J_zeta[1, 0]
-            K_x_inv[1, 2] = J_zeta[1, 0] * J_zeta[1, 1]
-            K_x_inv[2, 0] = J_zeta[0, 1] ** 2
-            K_x_inv[2, 1] = 2 * J_zeta[0, 1] * J_zeta[1, 1]
-            K_x_inv[2, 2] = J_zeta[1, 1] ** 2
+            K_u = d2N @ u
+            dz = np.asarray(
+                [
+                    [x[1, 1] - x[2, 1], x[2, 1] - x[0, 1]],
+                    [x[2, 0] - x[1, 0], x[0, 0] - x[2, 0]],
+                ]
+            )
+            dz /= np.linalg.det(A[:, [1, 2, 3]])
+            K_x_inv = np.asarray(
+                [
+                    [dz[0, 0] ** 2, 2 * dz[0, 0] * dz[0, 1], dz[0, 1] ** 2],
+                    [
+                        dz[0, 0] * dz[1, 0],
+                        dz[0, 0] * dz[1, 1] + dz[0, 1] * dz[1, 0],
+                        dz[0, 1] * dz[1, 1],
+                    ],
+                    [dz[1, 0] ** 2, 2 * dz[1, 0] * dz[1, 1], dz[1, 1] ** 2],
+                ]
+            )
 
             self._warp_inc[6:] = (K_x_inv @ K_u).flatten()
 

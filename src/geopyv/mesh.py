@@ -13,6 +13,8 @@ from scipy.optimize import minimize_scalar
 import PIL.Image as ImagePIL
 import PIL.ImageDraw as ImageDrawPIL
 from alive_progress import alive_bar
+import traceback
+import re
 
 log = logging.getLogger(__name__)
 
@@ -112,7 +114,6 @@ class MeshBase(Object):
                 show=show,
                 block=block,
                 save=save,
-                solved=self._subset_solved,
             )
             return fig, ax
 
@@ -841,11 +842,12 @@ class Mesh(MeshBase):
         self,
         *,
         seed_coord=None,
+        seed_warp=None,
         template=None,
-        max_norm=1e-3,
-        max_iterations=15,
+        max_norm=1e-5,
+        max_iterations=50,
         subset_order=1,
-        tolerance=0.7,
+        tolerance=0.75,
         seed_tolerance=0.9,
         method="ICGN",
         adaptive_iterations=0,
@@ -865,17 +867,17 @@ class Mesh(MeshBase):
         max_norm : float, optional
             Exit criterion for norm of increment in warp function.
             Defaults to value of
-            :math:`1 \cdot 10^{-3}`.
+            :math:`1 \cdot 10^{-5}`.
         max_iterations : int, optional
             Exit criterion for number of Gauss-Newton iterations.
             Defaults to value
-            of 15.
+            of 50.
         subset_order : int
             Warp function order. Options are 1 and 2.
             Defaults to a value of 1.
         tolerance: float, optional
             Correlation coefficient tolerance.
-            Defaults to a value of 0.7.
+            Defaults to a value of 0.75.
         seed_tolerance: float, optional
             Correlation coefficient tolerance for the seed subset.
             Defaults to a value of 0.9.
@@ -929,7 +931,7 @@ class Mesh(MeshBase):
                 )
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_range(max_norm, "max_norm", 1e-10), "ValueError")
+        self._report(gp.check._check_range(max_norm, "max_norm", 1e-20), "ValueError")
         check = gp.check._check_type(max_iterations, "max_iterations", [int])
         if check:
             try:
@@ -1018,6 +1020,24 @@ class Mesh(MeshBase):
             except Exception:
                 self._report(check, "TypeError")
         self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
+        if seed_warp is not None:
+            check = gp.check._check_type(seed_warp, "seed_warp", [np.ndarray])
+            if check:
+                try:
+                    seed_warp = np.asarray(seed_warp)
+                    self._report(
+                        gp.check._conversion(seed_warp, "seed_warp", np.ndarray),
+                        "Warning",
+                    )
+                except Exception:
+                    self._report(check, "TypeError")
+            self._report(gp.check._check_dim(seed_warp, "seed_warp", 1), "ValueError")
+            self._report(
+                gp.check._check_axis(seed_warp, "seed_warp", 0, [6 * subset_order]),
+                "ValueError",
+            )
+        else:
+            seed_warp = np.zeros(12)
 
         # Store variables.
         self._seed_coord = seed_coord
@@ -1033,7 +1053,7 @@ class Mesh(MeshBase):
         self._subset_bgf_nodes = None
         self._subset_bgf_values = None
         self._update = False
-        self._p_0 = np.zeros(6 * self._subset_order)
+        self._seed_warp = seed_warp
 
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
@@ -1112,11 +1132,13 @@ class Mesh(MeshBase):
                 "displacements": self._displacements,
                 "warps": self._warps,
                 "C_ZNCC": self._C_ZNCC,
+                "seed": self._seed_node,
             }
             self.data.update({"results": self._results})
 
         except Exception:
             log.error("Could not solve mesh. Not a correlation issue.")
+            print(traceback.format_exc())
             self._update = True
             self.solved = False
             self._unsolvable = True
@@ -1513,8 +1535,8 @@ class Mesh(MeshBase):
         """
 
         self._warps = np.zeros((np.shape(self._elements)[0], 12))
-        element_nodes = self._nodes[self._elements]
-        displacements = self._displacements[self._elements]
+        x = self._nodes[self._elements]
+        u = self._displacements[self._elements]
         # Coordinate matrix.
         A = self._local_coordinates()
 
@@ -1522,37 +1544,36 @@ class Mesh(MeshBase):
         N, dN, d2N = self._shape_function()
 
         # Displacements.
-        self._warps[:, :2] = N @ displacements
+        self._warps[:, :2] = N @ u
 
         # 1st Order Strains
-        J_x_T = dN @ element_nodes
-        J_u_T = dN @ displacements
+        J_x_T = dN @ x
+        J_u_T = dN @ u
+
         self._warps[:, 2:6] = (np.linalg.inv(J_x_T) @ J_u_T).reshape(
             np.shape(self._elements)[0], -1
         )
 
         # 2nd Order Strains
         if self._mesh_order == 2:
-            K_u = d2N @ displacements
-            J_zeta = np.zeros((np.shape(self._elements)[0], 2, 2))
-            J_zeta[:, 0, 0] = element_nodes[:, 1, 1] - element_nodes[:, 2, 1]
-            J_zeta[:, 0, 1] = element_nodes[:, 2, 0] - element_nodes[:, 1, 0]
-            J_zeta[:, 1, 0] = element_nodes[:, 2, 1] - element_nodes[:, 0, 1]
-            J_zeta[:, 1, 1] = element_nodes[:, 0, 0] - element_nodes[:, 2, 0]
-            J_zeta /= np.linalg.det(A[:, :, [1, 2, 3]])[:, None, None]
+            K_u = d2N @ u
+            dz = np.zeros((np.shape(self._elements)[0], 2, 2))
+            dz[:, 0, 0] = x[:, 1, 1] - x[:, 2, 1]
+            dz[:, 0, 1] = x[:, 2, 1] - x[:, 0, 1]
+            dz[:, 1, 0] = x[:, 2, 0] - x[:, 1, 0]
+            dz[:, 1, 1] = x[:, 0, 0] - x[:, 2, 0]
+            dz /= np.linalg.det(A[:, :, [1, 2, 3]])[:, None, None]
 
             K_x_inv = np.zeros((np.shape(self._elements)[0], 3, 3))
-            K_x_inv[:, 0, 0] = J_zeta[:, 0, 0] ** 2
-            K_x_inv[:, 0, 1] = 2 * J_zeta[:, 0, 0] * J_zeta[:, 1, 0]
-            K_x_inv[:, 0, 2] = J_zeta[:, 1, 0] ** 2
-            K_x_inv[:, 1, 0] = J_zeta[:, 0, 0] * J_zeta[:, 0, 1]
-            K_x_inv[:, 1, 1] = (
-                J_zeta[:, 0, 0] * J_zeta[:, 1, 1] + J_zeta[:, 0, 1] * J_zeta[:, 1, 0]
-            )
-            K_x_inv[:, 1, 2] = J_zeta[:, 1, 0] * J_zeta[:, 1, 1]
-            K_x_inv[:, 2, 0] = J_zeta[:, 0, 1] ** 2
-            K_x_inv[:, 2, 1] = 2 * J_zeta[:, 0, 1] * J_zeta[:, 1, 1]
-            K_x_inv[:, 2, 2] = J_zeta[:, 1, 1] ** 2
+            K_x_inv[:, 0, 0] = dz[:, 0, 0] ** 2
+            K_x_inv[:, 0, 1] = 2 * dz[:, 0, 0] * dz[:, 0, 1]
+            K_x_inv[:, 0, 2] = dz[:, 0, 1] ** 2
+            K_x_inv[:, 1, 0] = dz[:, 0, 0] * dz[:, 1, 0]
+            K_x_inv[:, 1, 1] = dz[:, 0, 0] * dz[:, 1, 1] + dz[:, 0, 1] * dz[:, 1, 0]
+            K_x_inv[:, 1, 2] = dz[:, 0, 1] * dz[:, 1, 1]
+            K_x_inv[:, 2, 0] = dz[:, 1, 0] ** 2
+            K_x_inv[:, 2, 1] = 2 * dz[:, 1, 0] * dz[:, 1, 1]
+            K_x_inv[:, 2, 2] = dz[:, 1, 1] ** 2
 
             self._warps[:, 6:] = (K_x_inv @ K_u).reshape(
                 np.shape(self._elements)[0], -1
@@ -1566,7 +1587,7 @@ class Mesh(MeshBase):
         """
         # Set up.
         m = np.shape(self._nodes)[0]
-        n = np.shape(self._p_0)[0]
+        n = np.shape(self._seed_warp)[0]
         self._subset_solved = np.zeros(
             m, dtype=int
         )  # Solved/unsolved reference array (1 if unsolved, -1 if solved).
@@ -1637,30 +1658,44 @@ class Mesh(MeshBase):
             self._subsets[self._seed_node].solve(
                 max_norm=self._max_norm,
                 max_iterations=self._max_iterations,
-                warp_0=self._p_0,
+                warp_0=self._seed_warp,
                 order=self._subset_order,
                 method=self._method,
                 tolerance=self._seed_tolerance,
             )  # Solve for seed subset.
             self._bar()
-            # If seed not solved, log the error, otherwise store
-            # the variables and solve neighbours.
-            if not self._subsets[self._seed_node].data["solved"]:
-                self._update = True
-                log.error(
-                    "Specified seed correlation coefficient tolerance not met."
-                    "Minimum seed correlation coefficient:"
-                    "{seed_C:.2f}; tolerance: {seed_tolerance:.2f}.".format(
-                        seed_C=self._subsets[self._seed_node].data["results"]["C_ZNCC"],
-                        seed_tolerance=self._seed_tolerance,
-                    )
+            if not self._subsets[self._seed_node].data["solved"]:  # If seed unsolved.
+                self._subsets[self._seed_node].solve(
+                    max_norm=self._max_norm,
+                    max_iterations=self._max_iterations,
+                    warp_0=np.zeros(np.shape(self._seed_warp)),
+                    order=self._subset_order,
+                    method=self._method,
+                    tolerance=self._seed_tolerance,
                 )
-                self._C_ZNCC[self._seed_node] = self._subsets[self._seed_node].data[
-                    "results"
-                ]["C_ZNCC"]
-            else:
+                if not self._subsets[self._seed_node].data["solved"]:
+                    self._subsets[self._seed_node].convergence(
+                        show=False,
+                        save="convergence_"
+                        + re.findall(r"\d+", self.data["images"]["g_img"])[-1],
+                    )
+                    self._update = True
+                    log.error(
+                        "Specified seed correlation coefficient tolerance not met."
+                        "Minimum seed correlation coefficient:"
+                        "{seed_C:.2f}; tolerance: {seed_tolerance:.2f}.".format(
+                            seed_C=self._subsets[self._seed_node].data["results"][
+                                "C_ZNCC"
+                            ],
+                            seed_tolerance=self._seed_tolerance,
+                        )
+                    )
+                    self._C_ZNCC[self._seed_node] = self._subsets[self._seed_node].data[
+                        "results"
+                    ]["C_ZNCC"]
+            if self._subsets[self._seed_node].data["solved"]:
+                # Store if solved.
                 self._store_variables(self._seed_node, seed=True)
-
                 # Solve for neighbours of the seed subset.
                 p_0 = self._subsets[self._seed_node].data["results"][
                     "p"
@@ -1783,8 +1818,10 @@ class Mesh(MeshBase):
                 )
                 if self._subsets[idx].data["solved"]:  # Check against tolerance.
                     self._store_variables(idx)
+                elif self._subsets[idx].data["unsolvable"]:
+                    return False
                 else:
-                    # Try more extrapolated pre-conditioning.
+                    # Use projected pre-conditioning.
                     diff = self._nodes[idx] - self._nodes[cur_idx]
                     p = self._subsets[cur_idx].data["results"]["p"]
                     if np.shape(p)[0] == 6:
@@ -1811,7 +1848,6 @@ class Mesh(MeshBase):
                         p_0[3] = p[3] + p[7] * diff[0] + p[9] * diff[1]
                         p_0[4] = p[4] + p[8] * diff[1] + p[10] * diff[1]
                         p_0[5] = p[5] + p[9] * diff[1] + p[11] * diff[1]
-
                     self._subsets[idx].solve(
                         max_norm=self._max_norm,
                         max_iterations=self._max_iterations,
@@ -1820,7 +1856,7 @@ class Mesh(MeshBase):
                         tolerance=self._tolerance,
                         order=self._subset_order,
                     )
-                    if self._subsets[idx].data["solved"]:
+                    if self._subsets[idx].data["solved"]:  # Check.
                         self._store_variables(idx)
                     else:
                         # Finally, try the NCC initial guess.
@@ -1835,15 +1871,9 @@ class Mesh(MeshBase):
                         if self._subsets[idx].data["solved"]:
                             self._store_variables(idx)
                         else:
-                            try:
-                                self._C_ZNCC[idx] = np.max(
-                                    (self._subsets[idx].data["results"]["C_ZNCC"], 0)
-                                )
-                            except Exception:
-                                log.error(
-                                    "Subset not solved "
-                                    "- correlation could not be retrieved."
-                                )
+                            self._C_ZNCC[idx] = np.max(
+                                (self._subsets[idx].data["results"]["C_ZNCC"], 0)
+                            )
                             return False
 
     def _store_variables(self, idx, seed=False):

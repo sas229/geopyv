@@ -365,11 +365,11 @@ class Subset(SubsetBase):
     def solve(
         self,
         *,
-        max_norm=1e-3,
-        max_iterations=15,
+        max_norm=1e-5,
+        max_iterations=50,
         order=1,
         warp_0=np.zeros(6),
-        tolerance=0.7,
+        tolerance=0.75,
         method="ICGN",
     ):
         r"""
@@ -428,7 +428,7 @@ class Subset(SubsetBase):
                 )
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_range(max_norm, "max_norm", 1e-10), "ValueError")
+        self._report(gp.check._check_range(max_norm, "max_norm", 1e-20), "ValueError")
         check = gp.check._check_type(max_iterations, "max_iterations", [int])
         if check:
             try:
@@ -462,7 +462,6 @@ class Subset(SubsetBase):
             except Exception:
                 self._report(check, "TypeError")
         self._report(gp.check._check_value(order, "order", [1, 2]), "ValueError")
-
         check = gp.check._check_type(warp_0, "warp_0", [np.ndarray])
         if check:
             try:
@@ -549,33 +548,9 @@ class Subset(SubsetBase):
             # Check for tolerance.
             if self._C_ZNCC > self._tolerance:
                 self.solved = True
-                log.debug("Subset solved.")
-                log.debug(
-                    "Initial horizontal coordinate: {x_i} (px); "
-                    "Initial vertical coordinate: {y_i} (px)".format(
-                        x_i=self._x, y_i=self._y
-                    )
-                )
-                log.debug(
-                    "Horizontal displacement: {u} (px); "
-                    "Vertical displacement: {v} (px)".format(u=self._u, v=self._v)
-                )
-                log.debug(
-                    "Correlation coefficient: "
-                    "CC = {C_ZNCC} (-), SSD = {C_ZNSSD} (-)".format(
-                        C_ZNCC=self._C_ZNCC, C_ZNSSD=self._C_ZNSSD
-                    )
-                )
-                log.debug(
-                    "Final horizontal coordinate: {x_f} (px); "
-                    "Final vertical coordinate: {y_f} (px)".format(
-                        x_f=self._x_f, y_f=self._y_f
-                    )
-                )
-
+            else:
+                self.solved = False
             # Pack results.
-            self.data["solved"] = self.solved
-            self.data["unsolvable"] = self._unsolvable
             self._results = {
                 "u": self._u,
                 "v": self._v,
@@ -587,14 +562,17 @@ class Subset(SubsetBase):
                 "C_ZNSSD": self._C_ZNSSD,
             }
             self.data.update({"results": self._results})
-
-            # Return solved boolean.
-            log.debug("Solved geopyv Subset object.")
-            return self.solved
-
         except Exception:
-            log.error("Subset not solved.")
-            return False
+            log.error("Subset unsolvable.")
+            print(self._f_coord)
+            self.solved = False
+            self._unsolvable = True
+
+        # Pack results.
+        self.data["solved"] = self.solved
+        self.data["unsolvable"] = self._unsolvable
+
+        return self.solved
 
     def _get_initial_guess_size(self):
         """

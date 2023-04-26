@@ -15,7 +15,7 @@ from alive_progress import alive_bar
 log = logging.getLogger(__name__)
 
 
-def load(*, filename=None, old_format=False):
+def load(*, filename=None, old_format=False, verbose=True):
     """
 
     Function to load a geopyv data object into the workspace. If no filename
@@ -49,14 +49,29 @@ def load(*, filename=None, old_format=False):
     else:
         ext = ".pyv"
         # filepath = filename + ext
-        filepath = directory + "/" + filename + ext
+        if ext in filename:
+            filepath = directory + "/" + filename
+        else:
+            filepath = directory + "/" + filename + ext
     try:
         with open(filepath, "rb") as infile:
-            message = "Loading geopyv object"
-            with alive_bar(dual_line=True, bar=None, title=message) as bar:
-                bar.text = "-> Loading object from {filepath}...".format(
-                    filepath=filepath
-                )
+            if verbose:
+                message = "Loading geopyv object"
+                with alive_bar(dual_line=True, bar=None, title=message) as bar:
+                    bar.text = "-> Loading object from {filepath}...".format(
+                        filepath=filepath
+                    )
+                    if old_format:
+                        log.warning(
+                            "json file storage deprecated. "
+                            "Load and save objects to convert to new format."
+                        )
+                        data = json.load(infile)
+                        data = _convert_list_to_ndarray(data)
+                    else:
+                        data = pickle.load(infile)
+                    bar()
+            else:
                 if old_format:
                     log.warning(
                         "json file storage deprecated. "
@@ -66,13 +81,13 @@ def load(*, filename=None, old_format=False):
                     data = _convert_list_to_ndarray(data)
                 else:
                     data = pickle.load(infile)
-                bar()
             object_type = data["type"]
-            log.info(
-                "Loaded {object_type} object from {filepath}.".format(
-                    object_type=object_type, filepath=filepath
+            if verbose:
+                log.info(
+                    "Loaded {object_type} object from {filepath}.".format(
+                        object_type=object_type, filepath=filepath
+                    )
                 )
-            )
             class_name = data["type"] + "Results"
             module = importlib.import_module("geopyv." + object_type.lower())
             results_instance = getattr(module, class_name)
@@ -115,7 +130,7 @@ def save(*, object, filename=None):
         return False
     if isinstance(object, gp.object.Object):
         solved = object.data["solved"]
-        if solved is True:
+        if solved is True or object.data["type"] == "sequence":
             ext = ".pyv"
             filepath = directory + "/" + filename + ext
             with open(filepath, "wb") as outfile:

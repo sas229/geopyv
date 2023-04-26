@@ -9,7 +9,7 @@ import geopyv as gp
 from geopyv.object import Object
 import gmsh
 from scipy.optimize import minimize_scalar
-
+from alive_progress import alive_bar
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +58,9 @@ class FieldBase(Object):
 
     def trace(
         self,
+        *,
         quantity="warps",
+        particle_index=None,
         component=0,
         imshow=True,
         colorbar=True,
@@ -170,11 +172,19 @@ class FieldBase(Object):
         self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
         self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
-        log.info("Tracing field...")
+        if particle_index is None:
+            log.info("Tracing field...")
+            obj_type = "Field"
+            data = self.data
+        else:
+            log.info("Tracing particle...")
+            obj_type = "Particle"
+            data = self.data["particles"][particle_index]
         fig, ax = gp.plots.trace_particle(
-            data=self.data,
+            data=data,
             quantity=quantity,
             component=component,
+            obj_type=obj_type,
             imshow=imshow,
             colorbar=True,
             ticks=ticks,
@@ -361,25 +371,33 @@ class Field(FieldBase):
             self._series_type = "Sequence"
             if "file_settings" in series.data:
                 if series.data["file_settings"]["save_by_reference"]:
-                    meshes = []
-                    for i in range(np.shape(series.data["meshes"])[0]):
-                        meshes.append(
-                            gp.io.load(
-                                filename=series.data["file_settings"]["mesh_folder"]
-                                + series.data["meshes"][i]
+                    mesh_no = np.shape(series.data["meshes"])[0]
+                    _meshes = np.empty(mesh_no, dtype=object)
+                    with alive_bar(
+                        mesh_no, dual_line=True, bar="blocks", title="Loading meshes..."
+                    ) as bar:
+                        for i in range(mesh_no):
+                            _meshes[i] = gp.io.load(
+                                filename=series.data["file_settings"]["mesh_dir"]
+                                + series.data["meshes"][i],
+                                verbose=False,
                             ).data
-                        )
-                    series.data["meshes"] = meshes
-                    series.data["file_settings"]["save_by_reference"] = False
-                mesh_0 = series.data["meshes"][0]
-                self._number_images = np.shape(series.data["meshes"])[0] + 1
+                            bar()
+                else:
+                    _meshes = series.data["meshes"]
+            else:
+                _meshes = series.data["meshes"]
+            series.data["meshes"] = _meshes
+            series.data["file_settings"]["save_by_reference"] = False
+            mesh_0 = series.data["meshes"][0]
+            self._number_images = np.shape(series.data["meshes"])[0] + 1
         else:
             self._series_type = "Mesh"
             mesh_0 = series.data
-            self._number_images = 1
+            self._number_images = 2
         self._image_0 = mesh_0["images"]["f_img"]
-        self._track = track
         self._series = series
+        self._track = track
         self.solved = False
         self._unsolvable = False
 
@@ -528,7 +546,7 @@ class Field(FieldBase):
             (nc[0::3], nc[1::3])
         )  # Nodal coordinate array (x,y).
         self._elements = np.reshape(
-            (np.asarray(ent) - 1).flatten(), (-1, 6)
+            (np.asarray(ent) - 1).flatten(), (-1, 3)
         )  # Element connectivity array.
 
     def _distribute_particles(self):
@@ -547,22 +565,26 @@ class Field(FieldBase):
         solved : bool
             Boolean to indicate if the particle instances have been solved.
         """
-
-        self._particles = np.empty(len(self._coordinates), dtype=dict)
-        for i in range(len(self._coordinates)):
-            particle = gp.particle.Particle(
-                series=self._series,
-                coordinate_0=self._coordinates[i],
-                volume_0=self._volumes[i],
-                track=self._track,
-            )
-            _particle_solved = particle.solve()
-            if _particle_solved is False:
-                self._unsolvable = True
-                self.data["unsolvable"] = self._unsolvable
-                return self.solved
-            self._particles[i] = particle.data["results"]
-            del particle
+        particle_no = np.shape(self._coordinates)[0]
+        self._particles = np.empty(particle_no, dtype=dict)
+        with alive_bar(
+            particle_no, dual_line=True, bar="blocks", title="Solving particles..."
+        ) as bar:
+            for i in range(particle_no):
+                particle = gp.particle.Particle(
+                    series=self._series,
+                    coordinate_0=self._coordinates[i],
+                    volume_0=self._volumes[i],
+                    track=self._track,
+                )
+                _particle_solved = particle.solve()
+                if _particle_solved is False:
+                    self._unsolvable = True
+                    self.data["unsolvable"] = self._unsolvable
+                    return self.solved
+                self._particles[i] = particle.data
+                del particle
+                bar()
         self.data.update({"particles": self._particles})
         self.solved = True
         self.data["solved"] = self.solved

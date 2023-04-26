@@ -8,7 +8,6 @@ import numpy as np
 import geopyv as gp
 from geopyv.object import Object
 import re
-import sys
 import glob
 
 log = logging.getLogger(__name__)
@@ -568,7 +567,7 @@ class SequenceBase(Object):
                 self._report(gp.check._conversion(scale, "scale", float), "Warning")
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_range(scale, "scale", 0.0))
+        self._report(gp.check._check_range(scale, "scale", 0.0), "ValueError")
         self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
         self._report(gp.check._check_type(mesh, "mesh", [bool]), "TypeError")
         self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
@@ -773,14 +772,9 @@ class Sequence(SequenceBase):
         self._image_dir = image_dir
         self._file_format = file_format
         self._common_name = common_name
-        platform = sys.platform
-        if platform == "linux" or platform == "linux2" or platform == "darwin":
-            split = "/"
-        elif platform == "win32":
-            split = r"\\"
         try:
             _images = glob.glob(
-                self._image_dir + split + self._common_name + "*" + self._file_format
+                self._common_name + "*" + self._file_format, root_dir=self._image_dir
             )
             if np.shape(_images)[0] < 2:
                 log.error("Insufficient number of images in specified folder.")
@@ -843,19 +837,21 @@ class Sequence(SequenceBase):
         self,
         *,
         seed_coord=None,
+        seed_warp=None,
         template=None,
-        max_norm=1e-3,
-        max_iterations=15,
+        max_norm=1e-5,
+        max_iterations=50,
         adaptive_iterations=0,
         method="ICGN",
         mesh_order=2,
         subset_order=1,
-        tolerance=0.7,
+        tolerance=0.75,
         seed_tolerance=0.9,
         alpha=0.5,
         track=False,
         hard_boundary=True,
         subset_size_compensation=False,
+        guide=False,
     ):
         """
         Method to solve for the sequence.
@@ -939,7 +935,7 @@ class Sequence(SequenceBase):
                 )
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_range(max_norm, "max_norm", 1e-10), "ValueError")
+        self._report(gp.check._check_range(max_norm, "max_norm", 1e-20), "ValueError")
         check = gp.check._check_type(max_iterations, "max_iterations", [int])
         if check:
             try:
@@ -1050,6 +1046,24 @@ class Sequence(SequenceBase):
             ),
             "TypeError",
         )
+        if seed_warp is not None:
+            check = gp.check._check_type(seed_warp, "seed_warp", [np.ndarray])
+            if check:
+                try:
+                    seed_warp = np.asarray(seed_warp)
+                    self._report(
+                        gp.check._conversion(seed_warp, "seed_warp", np.ndarray),
+                        "Warning",
+                    )
+                except Exception:
+                    self._report(check, "TypeError")
+            self._report(gp.check._check_dim(seed_warp, "seed_warp", 1), "ValueError")
+            self._report(
+                gp.check._check_axis(seed_warp, "seed_warp", 0, [6 * subset_order]),
+                "ValueError",
+            )
+        else:
+            seed_warp = np.zeros(12)
 
         # Store variables.
         self._seed_coord = seed_coord
@@ -1066,13 +1080,13 @@ class Sequence(SequenceBase):
         self._track = track
         self._hard_boundary = hard_boundary
         self._subset_size_compensation = subset_size_compensation
-        self._p_0 = np.zeros(6 * self._subset_order)
+        self._seed_warp = np.zeros(6 * self._subset_order)
 
         # Solve.
         _f_index = 0
         _g_index = 1
-        _f_img = gp.image.Image(self._images[_f_index])
-        _g_img = gp.image.Image(self._images[_g_index])
+        _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
+        _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
         while _g_index < len(self._image_indices):
             log.info(
                 "Solving for image pair {}-{}.".format(
@@ -1094,6 +1108,7 @@ class Sequence(SequenceBase):
             )  # Initialise mesh object.
             mesh.solve(
                 seed_coord=self._seed_coord,
+                seed_warp=self._seed_warp,
                 template=self._template,
                 max_iterations=self._max_iterations,
                 max_norm=self._max_norm,
@@ -1125,10 +1140,20 @@ class Sequence(SequenceBase):
                 if track:
                     self._boundary_tags = mesh._boundary_tags
                     self._exclusions_tags = mesh._exclusions_tags
+                if guide:
+                    seed = gp.particle.Particle(
+                        series=mesh, coordinate_0=self._seed_coord
+                    )
+                    seed.solve()
+                    self._seed_warp[
+                        : 6 * min(self._mesh_order, self._subset_order)
+                    ] = seed.data["results"]["warps"][
+                        1, : 6 * min(self._mesh_order, self._subset_order)
+                    ]
                 _g_index += 1  # Iterate the target image index.
                 del _g_img
                 if _g_index != len(self._image_indices):
-                    _g_img = gp.image.Image(self._images[_g_index])
+                    _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
                 else:
                     self.solved = True
             elif _f_index + 1 < _g_index:
@@ -1136,7 +1161,7 @@ class Sequence(SequenceBase):
                 if self._track:
                     self._tracking(_f_index)
                 del _f_img
-                _f_img = gp.image.Image(self._images[_f_index])
+                _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
             else:
                 log.error(
                     "Mesh for consecutive image pair {a}-{b} is unsolvable. "
@@ -1182,6 +1207,25 @@ class Sequence(SequenceBase):
                 + previous_mesh["results"]["displacements"][self._exclusions_tags[i]]
             )
         self._exclusions = _exclusions
+
+    def load(self):
+        try:
+            _meshes = glob.glob("*.pyv", root_dir=self._mesh_dir)
+            _mesh_tars = [int(re.findall(r"\d+", x)[-1]) for x in _meshes]
+            _mesh_indices_arguments = np.argsort(_mesh_tars)
+            self._meshes = np.asarray(
+                [_meshes[index] for index in _mesh_indices_arguments], dtype=object
+            )
+        except Exception:
+            log.error(
+                "Issues encountered recognising mesh file names. "
+                "Please refer to the documentation for naming guidance."
+            )
+        self._images = self._images[: np.shape(self._meshes)[0] + 1]
+        self.data["solved"] = True
+        self.data["unsolvable"] = False
+        self.data["meshes"] = self._meshes
+        self.data["file_settings"]["images"]
 
 
 class SequenceResults(SequenceBase):

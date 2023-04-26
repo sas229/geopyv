@@ -29,7 +29,7 @@ class SpeckleBase(Object):
 
         """
 
-    def _warp(self, i, ref):
+    def _warp(self, i, ref, rot=False):
         _warp = np.zeros((np.shape(ref)[0], np.shape(self.data["comp"])[0]))
         delta = ref - self.data["origin"]
         _warp[:, 0] = (
@@ -70,6 +70,8 @@ class SpeckleBase(Object):
         )
         _warp[:, 6:] = self.data["pm"][i][6:]
 
+        if rot:
+            _warp[:, :2] -= delta
         return _warp
 
     def _report(self, msg, error_type):
@@ -260,7 +262,7 @@ class Speckle(SpeckleBase):
 
         """
         im = Im.fromarray(np.uint8(grid))
-        im.save(self._image_dir + self._name + "_" + str(i) + "." + self._file_format)
+        im.save(self._image_dir + self._name + "_" + str(i) + self._file_format)
         im.close()
 
 

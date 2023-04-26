@@ -8,8 +8,6 @@ import sys
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
-import pandas as pd
-import seaborn as sns
 
 from matplotlib.collections import LineCollection
 import scipy as sp
@@ -18,6 +16,9 @@ import re
 import geopyv as gp
 import alphashape
 
+plt.rcParams["axes.prop_cycle"] = plt.cycler(
+    "color", plt.cm.tab20(np.linspace(0, 1, 20))
+)
 log = logging.getLogger(__name__)
 
 
@@ -694,7 +695,7 @@ def quiver_mesh(data, scale, imshow, mesh, axis, xlim, ylim, show, block, save):
     return fig, ax
 
 
-def inspect_mesh(data, show, block, save, solved):
+def inspect_mesh(data, show, block, save):
     """
 
     Function to inspect Mesh topology.
@@ -809,6 +810,7 @@ def trace_particle(
     data,
     quantity,
     component,
+    obj_type,
     imshow,
     colorbar,
     ticks,
@@ -838,7 +840,7 @@ def trace_particle(
 
     fig, ax = plt.subplots(num=title)
 
-    if data["type"] == "Particle":
+    if obj_type == "Particle":
         points = data["results"]["coordinates"].reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         values = np.diff(data["results"][quantity][:, component], axis=0)
@@ -847,11 +849,11 @@ def trace_particle(
         lc.set_array(values)
         lines = ax.add_collection(lc)
 
-    elif data["type"] == "Field":
+    elif obj_type == "Field":
         values = np.empty(
             (
                 len(data["particles"]),
-                len(data["particles"][0][quantity]) - 1,
+                len(data["particles"][0]["results"][quantity]) - 1,
             )
         )
         if data["number_images"] > 1:
@@ -866,8 +868,10 @@ def trace_particle(
         else:
             segments = np.empty((len(data["particles"]), 2, 2))
         for i in range(len(data["particles"])):
-            values[i] = np.diff(data["particles"][i][quantity][:, component], axis=0)
-            points = data["particles"][i]["coordinates"].reshape(-1, 1, 2)
+            values[i] = np.diff(
+                data["particles"][i]["results"][quantity][:, component], axis=0
+            )
+            points = data["particles"][i]["results"]["coordinates"].reshape(-1, 1, 2)
             segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
         values = values.flatten()
         norm = plt.Normalize(values.min(), values.max())
@@ -896,6 +900,64 @@ def trace_particle(
     # Save.
     if save is not None:
         plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def history_particle(data, quantity, components, xlim, ylim, show, block, save):
+    title = "History; {quantity}".format(quantity=quantity)
+    labels = [
+        r"$u$ ($px$)",
+        r"$v$ ($px$)",
+        r"$du/dx$ ($-$)",
+        r"$dv/dx$ ($-$)",
+        r"$du/dy$ ($-$)",
+        r"$dv/dy$ ($-$)",
+        r"$d^2u/dx^2$ ($-$)",
+        r"$d^2v/dx^2$ ($-$)",
+        r"$d^2u/dxdy$ ($-$)",
+        r"$d^2v/dxdy$ ($-$)",
+        r"$d^2u/dy^2$ ($-$)",
+        r"$d^2v/dy^2$ ($-$)",
+    ]
+
+    fig, ax = plt.subplots(num=title)
+    if components is None:
+        components = range(np.shape(data["results"][quantity])[1])
+    for component in components:
+        ax.plot(
+            range(np.shape(data["results"][quantity])[0]),
+            data["results"][quantity][:, component],
+            label=labels[component],
+        )
+
+    # General formatting.
+    # Legend.
+    plt.legend(bbox_to_anchor=(1.05, 0.5), loc="center left", borderaxespad=0)
+
+    # Logscale.
+    ax.set_xscale("linear")
+    ax.set_yscale("linear")
+
+    # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    # Axis labels.
+    ax.set_xlabel(r"Image Number, $i$ ($-$)")
+    ax.set_ylabel(r"Value")
+
+    # Save.
+    if save is not None:
+        plt.savefig(save, bbox_inches="tight", dpi=600)
 
     # Show or close.
     if show is True:
@@ -991,8 +1053,19 @@ def inspect_field(data, mesh, show, block, save):
     return fig, ax
 
 
-def error_validation(
-    data, component, metric, zero, position, xlim, ylim, logscale, show, block, save
+def standard_error_validation(
+    data,
+    component,
+    observing,
+    xlim,
+    ylim,
+    scale,
+    prev_series,
+    prev_series_label,
+    plot,
+    show,
+    block,
+    save,
 ):
     labels = [
         r"$u$ ($px$)",
@@ -1007,61 +1080,58 @@ def error_validation(
         r"$d^2v/dxdy$ ($-$)",
         r"$d^2u/dy^2$ ($-$)",
         r"$d^2v/dy^2$ ($-$)",
+        r"$\theta$ ($^o$)",
+        r"$\epsilon_{\gamma}$ ($-$)",
     ]
-    metrics = {
-        "se": r"Standard error, $rho$ ($-$)",
-        "kde": r"Kernel density estimation, $z$ ($-$)",
-        "pf": r"Polyfit",
-    }
     colours = [
         "r",
         "b",
         "g",
-        "c",
-        "m",
-        "y",
+        "orange",
     ]
-    cmaps = ["Reds", "Blues", "Greens"]
     markers = [
         "o",
         "^",
         "s",
         "v",
-        ">",
-        "<",
     ]
-    title = r"Error: metric = {metric}, variable = {var}".format(
-        metric=metrics[metric], var=labels[component]
-    )
+    title = r"Error: component = {component}".format(component=labels[component])
     fig, ax = plt.subplots(num=title)
-
-    if metric == "se":
-        for i in range(np.shape(data["applied"])[0]):
-            series = np.zeros((np.shape(data["applied"][i])[0], 2))
-            for j in range(np.shape(data["applied"][i])[0]):
+    for i in range(np.shape(data["applied"])[0]):
+        series = np.zeros((np.shape(data["applied"][i])[0], 2))
+        for j in range(np.shape(data["applied"][i])[0]):
+            if component == 12:
+                series[j, 0] = (
+                    180 / np.pi * abs(np.arccos(data["speckle"].data["pm"][j + 1, 2]))
+                )
+            elif component == 13:
+                series[j, 0] = abs(data["speckle"].data["pm"][j + 1, 3])
+            else:
                 series[j, 0] = abs(data["speckle"].data["pm"][j + 1, component])
-                if position:
-                    series[j, 1] = np.std(
-                        np.sqrt(
-                            np.sum(
-                                (
-                                    data["applied"][i][j, :, :2]
-                                    - data["observed"][i][j, :, :2]
-                                )
-                                ** 2,
-                                axis=1,
+            if observing is not None:
+                series[j, 1] = np.std(
+                    np.sqrt(
+                        (
+                            data["applied"][i][j, :, observing]
+                            - data["observed"][i][j, :, observing]
+                        )
+                        ** 2
+                    )
+                )
+            else:
+                series[j, 1] = np.std(
+                    np.sqrt(
+                        np.sum(
+                            (
+                                data["applied"][i][j, :, :2]
+                                - data["observed"][i][j, :, :2]
                             )
+                            ** 2,
+                            axis=1,
                         )
                     )
-                else:
-                    series[j, 1] = np.std(
-                        np.sqrt(
-                            np.sum(
-                                (data["applied"][i][j] - data["observed"][i][j]) ** 2,
-                                axis=1,
-                            )
-                        )
-                    )
+                )
+        if plot == "scatter":
             ax.scatter(
                 series[:, 0],
                 series[:, 1],
@@ -1070,99 +1140,22 @@ def error_validation(
                 marker=markers[i],
                 label=data["labels"][i],
             )
-    elif metric == "pf":
-        for i in range(np.shape(data["applied"])[0]):
-            if zero:
-                error = (
-                    data["observed"][i][:, :, component]
-                    - data["applied"][i][:, :, component]
-                ).flatten()
-            else:
-                error = (data["observed"][i][:, :, component]).flatten()
-            z = np.polyfit(
-                (data["applied"][i][:, :, component]).flatten(), error, deg=10
-            )
-            lobf = np.poly1d(z)
-            x = np.linspace(
-                np.min(data["applied"][i][:, :, component]),
-                np.max(data["applied"][i][:, :, component]),
-                1000,
+        elif plot == "line":
+            ax.plot(
+                series[:, 0],
+                series[:, 1],
+                color=colours[i],
+                label=data["labels"][i],
             )
 
-            if logscale:
-                ax.plot(abs(x), lobf(x), color=colours[i], label=data["labels"][i])
-            else:
-                ax.plot(x, lobf(x), color=colours[i], label=data["labels"][i])
-
-            if zero:
-                ax.plot(
-                    [
-                        np.min(data["applied"][i][:, :, component]),
-                        np.max(data["applied"][i][:, :, component]),
-                    ],
-                    [0.0, 0.0],
-                    color="k",
-                )
-            else:
-                ax.plot(
-                    [
-                        np.min(data["applied"][i][:, :, component]),
-                        np.max(data["applied"][i][:, :, component]),
-                    ],
-                    [
-                        np.min(data["applied"][i][:, :, component]),
-                        np.max(data["applied"][i][:, :, component]),
-                    ],
-                    color="k",
-                )
-    else:
-        df = [
-            pd.DataFrame(
-                np.transpose(
-                    [
-                        abs(data["applied"][i][:, :, component].flatten()),
-                        abs(data["observed"][i][:, :, component].flatten()),
-                    ]
-                ),
-                columns=["applied", "observed"],
-            )
-            for i in range(np.shape(data["applied"])[0])
-        ]
-        ax.plot(
-            [
-                abs(np.min(data["applied"][0][:, :, component])),
-                abs(np.max(data["applied"][0][:, :, component])),
-            ],
-            [
-                abs(np.min(data["applied"][0][:, :, component])),
-                abs(np.max(data["applied"][0][:, :, component])),
-            ],
-            color="k",
-        )
-        for i in range(np.shape(data["applied"])[0]):
-            sns.kdeplot(
-                df[i],
-                x="applied",
-                y="observed",
-                ax=ax,
-                cmap=cmaps[i],
-                alpha=0.75,
-                log_scale=logscale,
-                n_levels=5,
-                fill=False,
-            )
-
+    ax.plot(prev_series[:, 0], prev_series[:, 1], color="k", label=prev_series_label)
     # General formatting.
     # Legend.
     plt.legend(bbox_to_anchor=(1.05, 0.5), loc="center left", borderaxespad=0)
 
     # Logscale.
-    if logscale:
-        ax.set_xscale("log")
-        if metric != "pf":
-            ax.set_yscale("log")
-    if metric == "se":
-        ax.set_yscale("log")
+    ax.set_xscale(scale)
+    ax.set_yscale("log")
 
     # Limit control.
     if xlim is not None:
@@ -1172,16 +1165,10 @@ def error_validation(
 
     # Axis labels.
     ax.set_xlabel(r"Applied warp, {}".format(labels[component]))
-    if metric == "se":
-        if position:
-            ax.set_ylabel(r"Standard error, $\rho_{px}$ ($px$)")
-        else:
-            ax.set_ylabel(r"Standard error, $\rho$ ($-$)")
+    if observing is not None:
+        ax.set_ylabel(r"Error, $\Delta$" + labels[observing])
     else:
-        if zero:
-            ax.set_ylabel(r"Error, ($-$)")
-        else:
-            ax.set_ylabel(r"Observed warp, {}".format(labels[component]))
+        ax.set_ylabel(r"Standard error, $\rho_{px}$ ($px$)")
 
     # Save.
     if save is not None:

@@ -543,12 +543,13 @@ def contour_mesh(
     # Set levels and extend.
     extend = "neither"
     if not isinstance(levels, type(None)):
-        if np.max(value) > np.max(levels):
+        if np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
+            extend = "both"
+        elif np.max(value) > np.max(levels):
             extend = "max"
         elif np.min(value) < np.min(levels):
             extend = "min"
-        elif np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
-            extend = "both"
+    extend = "both"
 
     # Show image in background.
     if imshow is True:
@@ -1127,10 +1128,15 @@ def standard_error_validation(
                                 - data["observed"][i][j, :, :2]
                             )
                             ** 2,
-                            axis=1,
+                            axis=-1,
                         )
                     )
                 )
+        # print("func")
+        # print(np.std(np.sqrt(np.sum((data["applied"][i][-1,:,:2]
+        # -data["observed"][i][-1,:,:2])**2, axis = -1))))
+        # print(np.mean(np.sqrt(np.sum((data["applied"][i][-1,:,:2]
+        # -data["observed"][i][-1,:,:2])**2, axis = -1))))
         if plot == "scatter":
             ax.scatter(
                 series[:, 0],
@@ -1147,7 +1153,9 @@ def standard_error_validation(
                 color=colours[i],
                 label=data["labels"][i],
             )
-
+        # ax.vlines(x = series[data["fields"][i].
+        # data["particles"][0]["reference_update_register"],0],
+        # ymin = ylim[0], ymax = ylim[1], color = colours[i], ls = "--")
     ax.plot(prev_series[:, 0], prev_series[:, 1], color="k", label=prev_series_label)
     # General formatting.
     # Legend.

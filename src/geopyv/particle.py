@@ -438,6 +438,7 @@ class Particle(ParticleBase):
             "stresses": self._stresses,
         }
         self.data.update({"results": self._results})
+        self.data.update({"reference_update_register": self._reference_update_register})
         self.data["solved"] = bool(self.solved)
         return self.solved
 
@@ -640,7 +641,7 @@ class Particle(ParticleBase):
         Private method to calculate the particle strain path.
 
         """
-
+        self._reference_update_register = []
         for m in range(len(self._series)):
             if int(
                 re.findall(
@@ -649,6 +650,7 @@ class Particle(ParticleBase):
                 )[-1]
             ) != int(re.findall(r"\d+", self._series[m]["images"]["f_img"])[-1]):
                 self._reference_index = m
+                self._reference_update_register.append(m)
             tri_idx = self._triangulation_locator(
                 m
             )  # Identify the relevant element of the mesh.

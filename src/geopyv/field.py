@@ -142,7 +142,10 @@ class FieldBase(Object):
         self._report(gp.check._check_type(component, "component", [int]), "TypeError")
         self._report(
             gp.check._check_index(
-                component, "component", 1, self.data["particles"][0][quantity]
+                component,
+                "component",
+                1,
+                self.data["particles"][0]["results"][quantity],
             ),
             "IndexError",
         )

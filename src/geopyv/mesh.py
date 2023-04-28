@@ -1037,7 +1037,7 @@ class Mesh(MeshBase):
                 "ValueError",
             )
         else:
-            seed_warp = np.zeros(12)
+            seed_warp = np.zeros(6 * subset_order)
 
         # Store variables.
         self._seed_coord = seed_coord
@@ -1069,14 +1069,20 @@ class Mesh(MeshBase):
         try:
             self._reliability_guided()
             if self._unsolvable:
-                log.error(
-                    "Specified correlation coefficient tolerance not met. "
-                    "Minimum correlation coefficient: "
-                    "{min_C:.2f}; tolerance: {tolerance:.2f}.".format(
-                        min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]),
-                        tolerance=self._tolerance,
+                if (
+                    np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)])
+                    < self._tolerance
+                ):
+                    log.error(
+                        "Specified correlation coefficient tolerance not met. "
+                        "Minimum correlation coefficient: "
+                        "{min_C:.2f}; tolerance: {tolerance:.2f}.".format(
+                            min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]),
+                            tolerance=self._tolerance,
+                        )
                     )
-                )
+                else:
+                    log.error("Mesh unsolvable.")
                 return self.solved
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations + 1):
@@ -1588,6 +1594,7 @@ class Mesh(MeshBase):
         # Set up.
         m = np.shape(self._nodes)[0]
         n = np.shape(self._seed_warp)[0]
+        self._solvables = []
         self._subset_solved = np.zeros(
             m, dtype=int
         )  # Solved/unsolved reference array (1 if unsolved, -1 if solved).

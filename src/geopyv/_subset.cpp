@@ -149,10 +149,20 @@ VectorXd _intensity(
     {
         x_floor = std::floor(coords(i,0));
         y_floor = std::floor(coords(i,1));
-        if ((x_floor < 0 || x_floor > QCQT.cols() / 6) || (y_floor < 0 || y_floor > QCQT.rows() / 6))
-        {
-            throw std::invalid_argument("Warp strayed outside of image boundary.");
-        }
+        if (x_floor < 0)
+            {
+                x_floor = 0;
+            } else if (x_floor > QCQT.cols()/6 - 1)
+            {
+                x_floor = QCQT.cols()/6 - 1;
+            }
+        if (y_floor < 0)
+            {
+                y_floor = 0;
+            } else if (y_floor > QCQT.rows()/6 - 1)
+            {
+                y_floor = QCQT.rows()/6 - 1;
+            }
         delta_x = coords(i,0) - x_floor;
         delta_y = coords(i,1) - y_floor;
         delta_x_vec(0) = one;
@@ -556,13 +566,11 @@ double _ZNSSD(
     // Define variables.
     int n = f.rows(), i;
     double znssd = 0;
-
     // Compute the normalised sum of square differences.
     for(int i = 0; i < n;  i++)
     {
         znssd += pow((((f(i)-f_m)/Delta_f)-((g(i)-g_m)/Delta_g)),2);
     }
-
     return znssd;
 }
 

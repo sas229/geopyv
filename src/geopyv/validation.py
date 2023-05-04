@@ -95,6 +95,66 @@ class ValidationBase(Object):
             save=save,
         )
 
+        return fig, ax
+
+    def spatial_error(
+        self,
+        *,
+        field_index=0,
+        imshow=True,
+        colorbar=True,
+        component=None,
+        xlim=None,
+        ylim=None,
+        show=True,
+        block=True,
+        save=None
+    ):
+        # Check if solved.
+        if self.data["solved"] is not True:
+            log.error(
+                "Validation not yet solved therefore no standard error data to plot. "
+                "First, run :meth:`~geopyv.validation.Validation.solve()` to solve."
+            )
+            raise ValueError(
+                "Validation not yet solved therefore no standard error data to plot. "
+                "First, run :meth:`~geopyv.validation.Validation.solve()` to solve."
+            )
+
+        # Check input.
+        self._report(gp.check._check_type(component, "component", [int]), "TypeError")
+        self._report(
+            gp.check._check_range(component, "component", 0, ub=13),
+            "IndexError",
+        )
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
+        if xlim is not None:
+            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
+            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
+        if ylim is not None:
+            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
+            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
+
+        fig, ax = gp.plots.spatial_error_validation(
+            data=self.data,
+            field_index=field_index,
+            imshow=imshow,
+            colorbar=colorbar,
+            component=component,
+            xlim=xlim,
+            ylim=ylim,
+            show=show,
+            block=block,
+            save=save,
+        )
+
+        return fig, ax
+
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":
             log.error(msg)

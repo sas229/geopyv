@@ -1132,11 +1132,6 @@ def standard_error_validation(
                         )
                     )
                 )
-        # print("func")
-        # print(np.std(np.sqrt(np.sum((data["applied"][i][-1,:,:2]
-        # -data["observed"][i][-1,:,:2])**2, axis = -1))))
-        # print(np.mean(np.sqrt(np.sum((data["applied"][i][-1,:,:2]
-        # -data["observed"][i][-1,:,:2])**2, axis = -1))))
         if plot == "scatter":
             ax.scatter(
                 series[:, 0],
@@ -1153,13 +1148,13 @@ def standard_error_validation(
                 color=colours[i],
                 label=data["labels"][i],
             )
-        # ax.vlines(x = series[data["fields"][i].
-        # data["particles"][0]["reference_update_register"],0],
-        # ymin = ylim[0], ymax = ylim[1], color = colours[i], ls = "--")
-    ax.plot(prev_series[:, 0], prev_series[:, 1], color="k", label=prev_series_label)
+    if prev_series is not None:
+        ax.plot(
+            prev_series[:, 0], prev_series[:, 1], color="k", label=prev_series_label
+        )
     # General formatting.
     # Legend.
-    plt.legend(bbox_to_anchor=(1.05, 0.5), loc="center left", borderaxespad=0)
+    plt.legend(bbox_to_anchor=(0.05, 0.95), loc="upper left", borderaxespad=0)
 
     # Logscale.
     ax.set_xscale(scale)
@@ -1181,6 +1176,115 @@ def standard_error_validation(
     # Save.
     if save is not None:
         plt.savefig(save, bbox_inches="tight", dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def spatial_error_validation(
+    data,
+    field_index,
+    component,
+    imshow,
+    colorbar,
+    xlim,
+    ylim,
+    show,
+    block,
+    save,
+):
+    labels = [
+        r"$u$ ($px$)",
+        r"$v$ ($px$)",
+        r"$du/dx$ ($-$)",
+        r"$dv/dx$ ($-$)",
+        r"$du/dy$ ($-$)",
+        r"$dv/dy$ ($-$)",
+        r"$d^2u/dx^2$ ($-$)",
+        r"$d^2v/dx^2$ ($-$)",
+        r"$d^2u/dxdy$ ($-$)",
+        r"$d^2v/dxdy$ ($-$)",
+        r"$d^2u/dy^2$ ($-$)",
+        r"$d^2v/dy^2$ ($-$)",
+        r"$\theta$ ($^o$)",
+        r"$\epsilon_{\gamma}$ ($-$)",
+    ]
+
+    title = r"Error: component = {component}".format(component=labels[component])
+    fig, ax = plt.subplots(num=title)
+    values = np.empty(
+        (
+            len(data["fields"][field_index].data["particles"]),
+            len(
+                data["fields"][field_index].data["particles"][0]["results"][
+                    "coordinates"
+                ]
+            )
+            - 1,
+        )
+    )
+    if data["fields"][field_index].data["number_images"] > 1:
+        segments = np.empty(
+            (
+                len(data["fields"][field_index].data["particles"]),
+                data["fields"][field_index].data["number_images"] - 1,
+                2,
+                2,
+            )
+        )
+    else:
+        segments = np.empty((len(data["fields"][field_index].data["particles"]), 2, 2))
+    for i in range(len(data["fields"][field_index].data["particles"])):
+        values[i] = np.sqrt(
+            np.sum(
+                (
+                    data["applied"][field_index][:, i, :2]
+                    - data["observed"][field_index][:, i, :2]
+                )
+                ** 2,
+                axis=-1,
+            )
+        )
+        points = (
+            data["fields"][field_index]
+            .data["particles"][i]["results"]["coordinates"]
+            .reshape(-1, 1, 2)
+        )
+        segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
+    values = values.flatten()
+    norm = plt.Normalize(values.min(), values.max())
+    lc = LineCollection(segments.reshape(-1, 2, 2), cmap="viridis", norm=norm)
+    lc.set_array(values.flatten())
+    lines = ax.add_collection(lc)
+
+    # Show image in background.
+    if imshow is True:
+        image = cv2.imread(
+            data["fields"][field_index].data["image_0"], cv2.IMREAD_COLOR
+        )
+        image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+        plt.imshow(image_gs, cmap="gray")
+    else:
+        ax.set_aspect("equal", "box")
+
+    if colorbar is True:
+        fig.colorbar(lines, label=labels[component])
+
+        # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    # Save.
+    if save is not None:
+        plt.savefig(save, dpi=600)
 
     # Show or close.
     if show is True:

@@ -564,7 +564,6 @@ class Subset(SubsetBase):
             self.data.update({"results": self._results})
         except Exception:
             log.error("Subset unsolvable.")
-            print(self._f_coord)
             self.solved = False
             self._unsolvable = True
 

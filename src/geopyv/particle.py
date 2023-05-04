@@ -464,13 +464,24 @@ class Particle(ParticleBase):
         tri_idxs = np.argwhere(
             np.any(self._series[m]["elements"] == np.argmin(dist), axis=1)
         ).flatten()  # Retrieve relevant element_nodes indices.
-        for i in range(len(tri_idxs)):
-            if path.Path(
-                self._series[m]["nodes"][self._series[m]["elements"][tri_idxs[i]]]
-            ).contains_point(
-                self._coordinates[self._reference_index]
-            ):  # Check if the element_nodes includes the particle coordinates.
-                break  # If the correct element_nodes is identified, stop the search.
+        if self._mesh_order == 1:
+            for i in range(len(tri_idxs)):
+                if path.Path(
+                    self._series[m]["nodes"][self._series[m]["elements"][tri_idxs[i]]]
+                ).contains_point(
+                    self._coordinates[self._reference_index]
+                ):  # Check inclusion.
+                    break  # Break if within.
+        elif self._mesh_order == 2:
+            for i in range(len(tri_idxs)):
+                if path.Path(
+                    self._series[m]["nodes"][
+                        self._series[m]["elements"][tri_idxs[i], [0, 3, 1, 4, 2, 5]]
+                    ]
+                ).contains_point(
+                    self._coordinates[self._reference_index]
+                ):  # Check inclusion.
+                    break  # Break if within.
 
         return tri_idxs[i]  # Return the element_nodes index.
 

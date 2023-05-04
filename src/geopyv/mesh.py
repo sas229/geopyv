@@ -1815,6 +1815,8 @@ class Mesh(MeshBase):
         for idx in neighbours:
             if self._subset_solved[idx] == 0:  # If not previously solved.
                 # Use nearest-neighbout pre-conditioning.
+                # print(idx)
+                # print(self._nodes[idx])
                 self._subsets[idx].solve(
                     max_norm=self._max_norm,
                     max_iterations=self._max_iterations,

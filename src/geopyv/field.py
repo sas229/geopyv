@@ -344,7 +344,7 @@ class Field(FieldBase):
                 )
             except Exception:
                 self._report(check, "TypeError")
-        if coordinates:
+        if coordinates is not None:
             self._report(
                 gp.check._check_dim(coordinates, "coordinates", 2), "ValueError"
             )

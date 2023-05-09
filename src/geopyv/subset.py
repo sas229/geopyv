@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import geopyv as gp
 from geopyv.object import Object
+import traceback
 
 log = logging.getLogger(__name__)
 
@@ -564,6 +565,7 @@ class Subset(SubsetBase):
             self.data.update({"results": self._results})
         except Exception:
             log.error("Subset unsolvable.")
+            print(traceback.format_exc())
             self.solved = False
             self._unsolvable = True
 

@@ -842,6 +842,7 @@ class Sequence(SequenceBase):
         max_norm=1e-5,
         max_iterations=50,
         adaptive_iterations=0,
+        corrective_iterations=0,
         method="ICGN",
         mesh_order=2,
         subset_order=1,
@@ -1071,6 +1072,7 @@ class Sequence(SequenceBase):
         self._max_iterations = max_iterations
         self._max_norm = max_norm
         self._adaptive_iterations = adaptive_iterations
+        self._corrective_iterations = corrective_iterations
         self._method = method
         self._subset_order = subset_order
         self._mesh_order = mesh_order
@@ -1113,6 +1115,7 @@ class Sequence(SequenceBase):
                 max_iterations=self._max_iterations,
                 max_norm=self._max_norm,
                 adaptive_iterations=self._adaptive_iterations,
+                corrective_iterations=self._corrective_iterations,
                 method=self._method,
                 subset_order=self._subset_order,
                 tolerance=self._tolerance,

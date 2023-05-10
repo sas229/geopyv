@@ -8,7 +8,7 @@ import numpy as np
 import geopyv as gp
 from geopyv.object import Object
 import re
-import matplotlib.path as path
+import shapely
 from alive_progress import alive_bar
 
 log = logging.getLogger(__name__)
@@ -464,24 +464,26 @@ class Particle(ParticleBase):
         tri_idxs = np.argwhere(
             np.any(self._series[m]["elements"] == np.argmin(dist), axis=1)
         ).flatten()  # Retrieve relevant element_nodes indices.
+        flag = False
         if self._mesh_order == 1:
             for i in range(len(tri_idxs)):
-                if path.Path(
+                if shapely.Polygon(
                     self._series[m]["nodes"][self._series[m]["elements"][tri_idxs[i]]]
-                ).contains_point(
-                    self._coordinates[self._reference_index]
-                ):  # Check inclusion.
+                ).intersects(shapely.Point(self._coordinates[self._reference_index])):
+                    flag = True
                     break  # Break if within.
         elif self._mesh_order == 2:
             for i in range(len(tri_idxs)):
-                if path.Path(
+                if shapely.Polygon(
                     self._series[m]["nodes"][
                         self._series[m]["elements"][tri_idxs[i], [0, 3, 1, 4, 2, 5]]
                     ]
-                ).contains_point(
-                    self._coordinates[self._reference_index]
-                ):  # Check inclusion.
+                ).intersects(shapely.Point(self._coordinates[self._reference_index])):
+                    flag = True
                     break  # Break if within.
+        if flag is False:
+            log.error("Particle outside of boundary.")
+            raise ValueError("Particle outside of boundary.")
 
         return tri_idxs[i]  # Return the element_nodes index.
 

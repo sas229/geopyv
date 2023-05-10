@@ -201,6 +201,108 @@ class FieldBase(Object):
         )
         return fig, ax
 
+    def history(
+        self,
+        particle_index,
+        quantity="warps",
+        components=None,
+        xlim=None,
+        ylim=None,
+        show=True,
+        block=True,
+        save=None,
+    ):
+        """
+        Method to plot particle time history.
+
+        Parameters
+        ----------
+        quantity : str, optional
+            Specifier for which metric to plot along the particle path.
+        component : int, optional
+            Specifier for which components of the metric to plot.
+        xlim : array-like, optional
+            Set the plot x-limits (lower_limit,upper_limit).
+            Defaults to None.
+        ylim : array-like, optional
+            Set the plot y-limits (lower_limit,upper_limit).
+            Defaults to None.
+        show : bool, optional
+            Control whether the plot is displayed.
+            Defaults to True.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+            Defaults to False.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
+        """
+
+        # Check if solved.
+        if self.data["solved"] is not True:
+            log.error(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+            raise ValueError(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+
+        # Check input.
+        self._report(
+            gp.check._check_type(quantity, "quantity", [str, type(None)]), "TypeError"
+        )
+        if quantity:
+            self._report(
+                gp.check._check_value(
+                    quantity,
+                    "quantity",
+                    [
+                        "coordinates",
+                        "warps",
+                        "volumes",
+                        "stresses",
+                    ],
+                ),
+                "ValueError",
+            )
+        self._report(
+            gp.check._check_type(components, "components", [list, type(None)]),
+            "TypeError",
+        )
+        if components:
+            for component in components:
+                self._report(
+                    gp.check._check_index(
+                        component, "component", 1, self.data["results"][quantity]
+                    ),
+                    "IndexError",
+                )
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
+        if xlim is not None:
+            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
+            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
+        if ylim is not None:
+            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
+            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
+
+        fig, ax = gp.plots.history_particle(
+            data=self.data["particles"][particle_index],
+            quantity=quantity,
+            components=components,
+            xlim=xlim,
+            ylim=ylim,
+            show=show,
+            block=block,
+            save=save,
+        )
+        return fig, ax
+
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":
             log.error(msg)

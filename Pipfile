@@ -22,6 +22,7 @@ pandas = "*"
 seaborn = "*"
 alphashape = "*"
 geopyv = {path = "."}
+shapely = "*"
 
 [dev-packages]
 ipykernel = "*"

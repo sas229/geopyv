@@ -851,6 +851,7 @@ class Mesh(MeshBase):
         seed_tolerance=0.9,
         method="ICGN",
         adaptive_iterations=0,
+        corrective_iterations=0,
         alpha=0.5,
     ):
         r"""
@@ -1045,6 +1046,7 @@ class Mesh(MeshBase):
         self._max_iterations = max_iterations
         self._max_norm = max_norm
         self._adaptive_iterations = adaptive_iterations
+        self._corrective_iterations = corrective_iterations
         self._method = method
         self._subset_order = subset_order
         self._tolerance = tolerance
@@ -1743,12 +1745,47 @@ class Mesh(MeshBase):
             self.solved = False
             self._unsolvable = True
         else:
+            self._corrections()
             # Compute element areas and strains.
             self._update = False
             self.solved = True
             self._unsolvable = False
             self._element_area()
             self._element_strains()
+
+    def _corrections(self):
+        for corrective_iteration in range(1, self._corrective_iterations + 1):
+            sorted_correlation = np.argsort(self._C_ZNCC)
+            j = 0
+            with alive_bar(
+                np.shape(self._subsets)[0],
+                dual_line=True,
+                bar="blocks",
+                title="Performing corrections...",
+            ) as bar:
+                for idx in range(np.shape(sorted_correlation)[0]):
+                    subset = gp.subset.Subset(
+                        f_coord=self._nodes[idx],
+                        f_img=self._f_img,
+                        g_img=self._g_img,
+                        template=self._subsets[idx]._template,
+                    )
+                    warp = np.mean(self._p[self._connectivity(idx)], axis=0)
+                    subset.solve(
+                        max_norm=self._max_norm,
+                        max_iterations=self._max_iterations,
+                        warp_0=warp,
+                        order=self._subset_order,
+                        method=self._method,
+                        tolerance=self._seed_tolerance,
+                    )
+                    if subset._C_ZNCC > self._subsets[idx]._C_ZNCC and subset.solved:
+                        j += 1
+                        self._subsets[idx] = subset
+                        self._store_variables(idx)
+                    bar()
+                    bar.text = "{} corrections accepted".format(round(j / (idx + 1), 3))
+            log.info("{} corrections accepted".format(round(j / (idx + 1), 3)))
 
     def _connectivity(self, idx):
         """
@@ -1815,8 +1852,6 @@ class Mesh(MeshBase):
         for idx in neighbours:
             if self._subset_solved[idx] == 0:  # If not previously solved.
                 # Use nearest-neighbout pre-conditioning.
-                # print(idx)
-                # print(self._nodes[idx])
                 self._subsets[idx].solve(
                     max_norm=self._max_norm,
                     max_iterations=self._max_iterations,

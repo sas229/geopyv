@@ -1096,7 +1096,9 @@ def standard_error_validation(
         "s",
         "v",
     ]
-    title = r"Error: component = {component}".format(component=labels[component])
+    title = r"Standard error: component = {component}".format(
+        component=labels[component]
+    )
     fig, ax = plt.subplots(num=title)
     for i in range(np.shape(data["applied"])[0]):
         series = np.zeros((np.shape(data["applied"][i])[0], 2))
@@ -1172,6 +1174,120 @@ def standard_error_validation(
         ax.set_ylabel(r"Error, $\Delta$" + labels[observing])
     else:
         ax.set_ylabel(r"Standard error, $\rho_{px}$ ($px$)")
+
+    # Save.
+    if save is not None:
+        plt.savefig(save, bbox_inches="tight", dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def mean_error_validation(
+    data,
+    component,
+    xlim,
+    ylim,
+    scale,
+    prev_series,
+    prev_series_label,
+    plot,
+    show,
+    block,
+    save,
+):
+    labels = [
+        r"$u$ ($px$)",
+        r"$v$ ($px$)",
+        r"$du/dx$ ($-$)",
+        r"$dv/dx$ ($-$)",
+        r"$du/dy$ ($-$)",
+        r"$dv/dy$ ($-$)",
+        r"$d^2u/dx^2$ ($-$)",
+        r"$d^2v/dx^2$ ($-$)",
+        r"$d^2u/dxdy$ ($-$)",
+        r"$d^2v/dxdy$ ($-$)",
+        r"$d^2u/dy^2$ ($-$)",
+        r"$d^2v/dy^2$ ($-$)",
+        r"$\theta$ ($^o$)",
+        r"$\epsilon_{\gamma}$ ($-$)",
+    ]
+    colours = [
+        "r",
+        "b",
+        "g",
+        "orange",
+    ]
+    markers = [
+        "o",
+        "^",
+        "s",
+        "v",
+    ]
+    title = r"Mean error: component = {component}".format(component=labels[component])
+    fig, ax = plt.subplots(num=title)
+    for i in range(np.shape(data["applied"])[0]):
+        series = np.zeros((np.shape(data["applied"][i])[0], 2))
+        for j in range(np.shape(data["applied"][i])[0]):
+            if component == 12:
+                series[j, 0] = (
+                    180 / np.pi * abs(np.arccos(data["speckle"].data["pm"][j + 1, 2]))
+                )
+            elif component == 13:
+                series[j, 0] = abs(data["speckle"].data["pm"][j + 1, 3])
+            else:
+                series[j, 0] = abs(data["speckle"].data["pm"][j + 1, component])
+            series[j, 1] = np.mean(
+                np.sqrt(
+                    np.sum(
+                        (data["applied"][i][j, :, :2] - data["observed"][i][j, :, :2])
+                        ** 2,
+                        axis=-1,
+                    )
+                )
+            )
+        if plot == "scatter":
+            ax.scatter(
+                series[:, 0],
+                series[:, 1],
+                facecolors="none",
+                edgecolors=colours[i],
+                marker=markers[i],
+                label=data["labels"][i],
+            )
+        elif plot == "line":
+            ax.plot(
+                series[:, 0],
+                series[:, 1],
+                color=colours[i],
+                label=data["labels"][i],
+            )
+    if prev_series is not None:
+        ax.plot(
+            prev_series[:, 0], prev_series[:, 1], color="k", label=prev_series_label
+        )
+    # General formatting.
+    # Legend.
+    plt.legend(bbox_to_anchor=(0.05, 0.95), loc="upper left", borderaxespad=0)
+
+    # Logscale.
+    ax.set_xscale(scale)
+    ax.set_yscale("log")
+
+    # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    # Axis labels.
+    ax.set_xlabel(r"Applied warp, {}".format(labels[component]))
+    ax.set_ylabel(r"Mean error, $\mu_{px}$ ($px$)")
 
     # Save.
     if save is not None:

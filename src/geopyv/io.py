@@ -15,7 +15,7 @@ from alive_progress import alive_bar
 log = logging.getLogger(__name__)
 
 
-def load(*, filename=None, old_format=False, verbose=True):
+def load(*, filename=None, directory=None, old_format=False, verbose=True):
     """
 
     Function to load a geopyv data object into the workspace. If no filename
@@ -42,7 +42,8 @@ def load(*, filename=None, old_format=False, verbose=True):
           data from a `Subset` instance will be loaded into a `SubsetResults` instance.
 
     """
-    directory = os.getcwd()
+    if directory is None:
+        directory = os.getcwd()
     if filename is None:
         dialog = gp.gui.selectors.file.FileSelector()
         filepath = dialog.get_path("Select geopyv data file", directory)

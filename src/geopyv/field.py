@@ -661,7 +661,7 @@ class Field(FieldBase):
         M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
         self._volumes = abs(0.5 * np.linalg.det(M))
 
-    def solve(self):
+    def solve(self, *, model=None, statev=None, props=None):
         """
         Method to solve for the field.
 
@@ -672,6 +672,7 @@ class Field(FieldBase):
         """
         particle_no = np.shape(self._coordinates)[0]
         self._particles = np.empty(particle_no, dtype=dict)
+        self._vol_totals = np.zeros(self.data["number_images"])
         with alive_bar(
             particle_no, dual_line=True, bar="blocks", title="Solving particles..."
         ) as bar:
@@ -682,17 +683,28 @@ class Field(FieldBase):
                     volume_0=self._volumes[i],
                     track=self._track,
                 )
-                _particle_solved = particle.solve()
+                _particle_solved = particle.solve(
+                    model=model, statev=statev, props=props
+                )
                 if _particle_solved is False:
                     self._unsolvable = True
                     self.data["unsolvable"] = self._unsolvable
                     return self.solved
                 self._particles[i] = particle.data
+                self._vol_totals += self._particles[i]["results"]["volumes"]
                 del particle
                 bar()
-        self.data.update({"particles": self._particles})
+
+        if model is not None:
+            self._works = np.zeros(self.data["number_images"])
+            for i in range(particle_no):
+                self._works += self._particles[i]["results"]["works"]
+            self.data.update({"works": self._works})
+
+        self.data.update({"particles": self._particles, "volumes": self._vol_totals})
         self.solved = True
         self.data["solved"] = self.solved
+        return self.solved
 
     @staticmethod
     def _uniform_remesh(

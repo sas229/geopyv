@@ -10,6 +10,7 @@ from geopyv.object import Object
 import re
 import shapely
 from alive_progress import alive_bar
+import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -291,6 +292,7 @@ class Particle(ParticleBase):
         series=None,
         coordinate_0=np.zeros(2),
         warp_0=np.zeros(12),
+        stress_0=np.zeros(3),
         volume_0=1.0,
         track=True,
     ):
@@ -401,13 +403,18 @@ class Particle(ParticleBase):
         self._coordinates = np.zeros((len(self._series) + 1, 2))
         self._warps = np.zeros((len(self._series) + 1, 6 * self._mesh_order))
         self._volumes = np.zeros(len(self._series) + 1)
-        self._stresses = np.zeros((len(self._series) + 1, 6))
+        self._stresses = np.zeros((len(self._series) + 1, 3))
+        self._works = np.zeros(len(self._series) + 1)
 
         self._coordinates[0] = coordinate_0
         self._warps[0] = warp_0[: np.shape(self._warps)[1]]
         self._volumes[0] = volume_0
+        self._stresses[0] = stress_0
 
         self._reference_index = 0
+        self._centroids = np.mean(
+            self._series[0]["nodes"][self._series[0]["elements"]], axis=-2
+        )
         self.solved = False
 
         self._initialised = True
@@ -422,27 +429,29 @@ class Particle(ParticleBase):
             "image_0": self._series[0]["images"]["f_img"],
         }
 
-    def solve(self):  # model, statev, props):
+    def solve(self, *, model=None, statev=None, props=None):  # model, statev, props):
         """
 
         Method to solve for the particle.
 
         """
-
+        self.data.update({"props": props, "statev": statev})
         self.solved += self._strain_path()
-        # self.solved += self._stress_path(model, statev, props)
+        if model:
+            self.solved += self._stress_path(model, statev, props)
         self._results = {
             "coordinates": self._coordinates,
             "warps": self._warps,
             "volumes": self._volumes,
             "stresses": self._stresses,
+            "works": self._works,
         }
         self.data.update({"results": self._results})
         self.data.update({"reference_update_register": self._reference_update_register})
         self.data["solved"] = bool(self.solved)
         return self.solved
 
-    def _triangulation_locator(self, m):
+    def _element_locator(self, m):
         """
 
         Private method to identify the current element index
@@ -454,38 +463,50 @@ class Particle(ParticleBase):
             Series index.
 
         """
-
-        diff = (
-            self._series[m]["nodes"] - self._coordinates[self._reference_index]
-        )  # Particle-mesh node positional vector.
-        dist = np.einsum(
-            "ij,ij->i", diff, diff
-        )  # Particle-mesh node "distances" (truly distance^2).
-        tri_idxs = np.argwhere(
-            np.any(self._series[m]["elements"] == np.argmin(dist), axis=1)
-        ).flatten()  # Retrieve relevant element_nodes indices.
+        elements = self._series[m]["elements"]
+        nodes = self._series[m]["nodes"]
         flag = False
-        if self._mesh_order == 1:
-            for i in range(len(tri_idxs)):
-                if shapely.Polygon(
-                    self._series[m]["nodes"][self._series[m]["elements"][tri_idxs[i]]]
-                ).intersects(shapely.Point(self._coordinates[self._reference_index])):
-                    flag = True
-                    break  # Break if within.
-        elif self._mesh_order == 2:
-            for i in range(len(tri_idxs)):
-                if shapely.Polygon(
-                    self._series[m]["nodes"][
-                        self._series[m]["elements"][tri_idxs[i], [0, 3, 1, 4, 2, 5]]
-                    ]
-                ).intersects(shapely.Point(self._coordinates[self._reference_index])):
-                    flag = True
-                    break  # Break if within.
+        diff = self._centroids - self._coordinates[self._reference_index]
+        dist = np.einsum("ij,ij->i", diff, diff)
+        dist_sorted = np.argpartition(dist, 10)
+        for index in dist_sorted:
+            poly = shapely.Polygon(nodes[elements[index]][:3])
+            point = shapely.Point(self._coordinates[self._reference_index])
+            if poly.intersects(point):
+                flag = True
+                break
         if flag is False:
-            log.error("Particle outside of boundary.")
+            # for index in dist_sorted:
+            #    print(self._coordinates[self._reference_index])
+            #    print(nodes[elements[index]][:3])
+            #    poly = shapely.Polygon(nodes[elements[index]][:3])
+            #    point = shapely.Point(self._coordinates[self._reference_index])
+            #    print(poly.intersects(point))
+            #    print()
+            #    input()
+            for j in range(len(self._coordinates)):
+                print(j, self._coordinates[j])
+            print(self._reference_index)
+            print(self._coordinates[self._reference_index])
+            print(self._reference_update_register)
+            fig, ax = plt.subplots()
+            ax.scatter(self._coordinates[:m, 0], self._coordinates[:m, 1])
+            for j in range(np.shape(self._series)[0]):
+                ax.plot(
+                    self._series[j]["boundary"][[0, 1, 2, 3, 0], 0],
+                    self._series[j]["boundary"][[0, 1, 2, 3, 0], 1],
+                )
+            plt.show()
+            log.error(
+                "Particle {particle} is outside of boundary {boundary}.\n"
+                " Check for convex boundary update.".format(
+                    particle=self._coordinates[self._reference_index],
+                    boundary=self._series[m]["boundary"],
+                )
+            )
             raise ValueError("Particle outside of boundary.")
 
-        return tri_idxs[i]  # Return the element_nodes index.
+        return index
 
     def _local_coordinates(self, element_nodes):
         """
@@ -655,7 +676,8 @@ class Particle(ParticleBase):
 
         """
         self._reference_update_register = []
-        for m in range(len(self._series)):
+        for m in range(np.shape(self._series)[0]):
+            # Reference update check.
             if int(
                 re.findall(
                     r"\d+",
@@ -664,24 +686,58 @@ class Particle(ParticleBase):
             ) != int(re.findall(r"\d+", self._series[m]["images"]["f_img"])[-1]):
                 self._reference_index = m
                 self._reference_update_register.append(m)
-            tri_idx = self._triangulation_locator(
-                m
-            )  # Identify the relevant element of the mesh.
-            self._warp_increment(m, tri_idx)  # Calculate the nodal weightings.
+                self._centroids = np.mean(
+                    self._series[m]["nodes"][self._series[m]["elements"]], axis=-2
+                )
+            # Mesh bearings.
+            tri_idx = self._element_locator(m)
+            # Interpolation.
+            self._warp_increment(m, tri_idx)
+            # Updates.
             self._coordinates[m + 1] = self._coordinates[
                 self._reference_index
-            ] + self._warp_inc[:2] * int(
-                self._track
-            )  # Update the particle positional coordinate.
-            # i.e. (reference + mesh interpolation).
+            ] + self._warp_inc[:2] * int(self._track)
             self._warps[m + 1] = self._warps[self._reference_index] + self._warp_inc
             self._volumes[m + 1] = (
                 self._volumes[m]
                 * (1 + (self._warps[m + 1, 2] - self._warps[m, 2]))
                 * (1 + (self._warps[m + 1, 5] - self._warps[m, 5]))
             )
-            # Update the particle volume.
-            # i.e. (reference*(1 + volume altering strain components)).
+
+        return True
+
+    def _stress_path(self, model, statev, props):
+        if model == "Hooke":
+            self._E = props["E"]
+            self._G = props["G"]
+            self._nu = props["nu"]
+            stiffness = np.asarray(
+                [
+                    [
+                        self._E / (1 - self._nu**2),
+                        self._E * self._nu / (1 - self._nu**2),
+                        0,
+                    ],
+                    [
+                        self._E * self._nu / (1 - self._nu**2),
+                        self._E / (1 - self._nu**2),
+                        0,
+                    ],
+                    [0, 0, self._G],
+                ]
+            )
+            delta_ep = np.zeros((np.shape(self._warps)[0] - 1, 3))
+            delta_ep[:, 0] = np.diff(self._warps[:, 2])
+            delta_ep[:, 1] = np.diff(self._warps[:, 5])
+            delta_ep[:, 2] = np.diff((self._warps[:, 3] + self._warps[:, 4]))
+            # delta_vol = np.diff(self._volumes)
+            self._stresses[1:] = self._stresses[0] + np.cumsum(
+                delta_ep @ stiffness, axis=0
+            )
+            self._works[1:] = (
+                np.sum(self._stresses[1:] * delta_ep, axis=-1) * self._volumes[1:]
+            )
+
         return True
 
 

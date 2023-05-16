@@ -9,6 +9,7 @@ import geopyv as gp
 from geopyv.object import Object
 import re
 import glob
+import traceback
 
 log = logging.getLogger(__name__)
 
@@ -788,9 +789,17 @@ class Sequence(SequenceBase):
 
         except Exception:
             log.error(
-                "Issues encountered recognising image file names. "
-                "Please refer to the documentation for naming guidance."
+                (
+                    "No files found under: \n{address}"
+                    "Please check file names and directories."
+                ).format(
+                    address=self._image_dir
+                    + self._common_name
+                    + "*"
+                    + self._file_format
+                )
             )
+            print(traceback.format_exc())
             return
         self._target_nodes = target_nodes
         self._boundary = boundary

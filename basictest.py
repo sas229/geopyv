@@ -118,7 +118,7 @@ mesh.inspect(subset_index=0)
 mesh.convergence(subset_index=0)
 
 # If you supply a subset index that is out of range you get a ValueError.
-mesh.convergence(subset_index=4000)
+# mesh.convergence(subset_index=4000)
 
 # Sequence test.
 # Sequence setup.

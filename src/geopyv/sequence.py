@@ -860,6 +860,7 @@ class Sequence(SequenceBase):
         alpha=0.5,
         track=False,
         hard_boundary=True,
+        rigid=False,
         subset_size_compensation=False,
         guide=False,
     ):
@@ -1047,6 +1048,7 @@ class Sequence(SequenceBase):
                 self._report(check, "TypeError")
         self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
         self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
+        self._report(gp.check._check_type(rigid, "rigid", [bool]), "TypeError")
         self._report(
             gp.check._check_type(hard_boundary, "hard_boundary", [bool]), "TypeError"
         )
@@ -1090,6 +1092,7 @@ class Sequence(SequenceBase):
         self._alpha = alpha
         self._track = track
         self._hard_boundary = hard_boundary
+        self._rigid = rigid
         self._subset_size_compensation = subset_size_compensation
         self._seed_warp = np.zeros(6 * self._subset_order)
 
@@ -1213,11 +1216,38 @@ class Sequence(SequenceBase):
             + previous_mesh["results"]["displacements"][self._boundary_tags]
         )
         _exclusions = []
-        for i in range(np.shape(self._exclusions)[0]):
-            _exclusions.append(
-                previous_mesh["nodes"][self._exclusions_tags[i]]
-                + previous_mesh["results"]["displacements"][self._exclusions_tags[i]]
-            )
+        if self._rigid:
+            for i in range(np.shape(self._exclusions)[0]):
+                centre = np.mean(self._exclusions[i], axis=0)
+                local_coordinates = self._exclusions[i] - centre
+                f_img = gp.image.Image(
+                    filepath=previous_mesh["images"]["f_img"],
+                )
+                g_img = gp.image.Image(
+                    filepath=previous_mesh["images"]["g_img"],
+                )
+                subset = gp.subset.Subset(
+                    f_img=f_img,
+                    g_img=g_img,
+                    f_coord=centre,
+                    template=gp.templates.Circle(50),
+                )
+                subset.solve()
+                warp = subset.data["results"]["p"].flatten()
+                theta = (warp[3] - warp[4]) / 2
+                rot = np.asarray(
+                    [[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]]
+                )
+                centre += warp[:2]
+                _exclusions.append(centre + local_coordinates @ rot)
+        else:
+            for i in range(np.shape(self._exclusions)[0]):
+                _exclusions.append(
+                    previous_mesh["nodes"][self._exclusions_tags[i]]
+                    + previous_mesh["results"]["displacements"][
+                        self._exclusions_tags[i]
+                    ]
+                )
         self._exclusions = _exclusions
 
     def load(self):

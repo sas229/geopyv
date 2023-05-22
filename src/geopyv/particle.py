@@ -10,7 +10,6 @@ from geopyv.object import Object
 import re
 import shapely
 from alive_progress import alive_bar
-import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -412,9 +411,6 @@ class Particle(ParticleBase):
         self._stresses[0] = stress_0
 
         self._reference_index = 0
-        self._centroids = np.mean(
-            self._series[0]["nodes"][self._series[0]["elements"]], axis=-2
-        )
         self.solved = False
 
         self._initialised = True
@@ -465,8 +461,9 @@ class Particle(ParticleBase):
         """
         elements = self._series[m]["elements"]
         nodes = self._series[m]["nodes"]
+        centroids = self._series[m]["centroids"]
         flag = False
-        diff = self._centroids - self._coordinates[self._reference_index]
+        diff = centroids - self._coordinates[self._reference_index]
         dist = np.einsum("ij,ij->i", diff, diff)
         dist_sorted = np.argpartition(dist, 10)
         for index in dist_sorted:
@@ -476,27 +473,6 @@ class Particle(ParticleBase):
                 flag = True
                 break
         if flag is False:
-            # for index in dist_sorted:
-            #    print(self._coordinates[self._reference_index])
-            #    print(nodes[elements[index]][:3])
-            #    poly = shapely.Polygon(nodes[elements[index]][:3])
-            #    point = shapely.Point(self._coordinates[self._reference_index])
-            #    print(poly.intersects(point))
-            #    print()
-            #    input()
-            for j in range(len(self._coordinates)):
-                print(j, self._coordinates[j])
-            print(self._reference_index)
-            print(self._coordinates[self._reference_index])
-            print(self._reference_update_register)
-            fig, ax = plt.subplots()
-            ax.scatter(self._coordinates[:m, 0], self._coordinates[:m, 1])
-            for j in range(np.shape(self._series)[0]):
-                ax.plot(
-                    self._series[j]["boundary"][[0, 1, 2, 3, 0], 0],
-                    self._series[j]["boundary"][[0, 1, 2, 3, 0], 1],
-                )
-            plt.show()
             log.error(
                 "Particle {particle} is outside of boundary {boundary}.\n"
                 " Check for convex boundary update.".format(
@@ -686,22 +662,20 @@ class Particle(ParticleBase):
             ) != int(re.findall(r"\d+", self._series[m]["images"]["f_img"])[-1]):
                 self._reference_index = m
                 self._reference_update_register.append(m)
-                self._centroids = np.mean(
-                    self._series[m]["nodes"][self._series[m]["elements"]], axis=-2
-                )
             # Mesh bearings.
             tri_idx = self._element_locator(m)
             # Interpolation.
             self._warp_increment(m, tri_idx)
+            # print(self._warp_inc)
             # Updates.
             self._coordinates[m + 1] = self._coordinates[
                 self._reference_index
             ] + self._warp_inc[:2] * int(self._track)
             self._warps[m + 1] = self._warps[self._reference_index] + self._warp_inc
             self._volumes[m + 1] = (
-                self._volumes[m]
-                * (1 + (self._warps[m + 1, 2] - self._warps[m, 2]))
-                * (1 + (self._warps[m + 1, 5] - self._warps[m, 5]))
+                self._volumes[self._reference_index]
+                * (1 + self._warp_inc[2])
+                * (1 + self._warp_inc[5])
             )
 
         return True

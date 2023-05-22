@@ -14,7 +14,6 @@ import PIL.Image as ImagePIL
 import PIL.ImageDraw as ImageDrawPIL
 from alive_progress import alive_bar
 import traceback
-import re
 
 log = logging.getLogger(__name__)
 
@@ -1118,6 +1117,9 @@ class Mesh(MeshBase):
             self.data["areas"] = self._areas
             self.data["solved"] = self.solved
             self.data["unsolvable"] = self._unsolvable
+            self.data.update(
+                {"centroids": np.mean(self._nodes[self._elements], axis=-2)}
+            )
 
             # Pack settings.
             self._settings = {
@@ -1683,11 +1685,6 @@ class Mesh(MeshBase):
                     tolerance=self._seed_tolerance,
                 )
                 if not self._subsets[self._seed_node].data["solved"]:
-                    self._subsets[self._seed_node].convergence(
-                        show=False,
-                        save="convergence_"
-                        + re.findall(r"\d+", self.data["images"]["g_img"])[-1],
-                    )
                     self._update = True
                     log.error(
                         "Specified seed correlation coefficient tolerance not met."
@@ -1729,23 +1726,24 @@ class Mesh(MeshBase):
                     except Exception:
                         p_0 = self._subsets[self._seed_node].data["results"]["p"]
                     self._subset_solved[cur_idx] = -1  # Set as solved.
-                    solved = self._neighbours(
+                    solvable = self._neighbours(
                         cur_idx, p_0
                     )  # Calculate for neighbouring subsets.
                     count += 1
                     self._bar()
                     if count == number_nodes:
                         break
-                    elif solved is False:
+                    elif solvable is False:
                         break
-
+        if self._subsets[self._seed_node].data["solved"]:
+            self._corrections()
         # Update check.
-        if any(self._subset_solved != -1):
+        if any(self._subset_solved != -1) or any(self._C_ZNCC < self._tolerance):
             self._update = True
             self.solved = False
             self._unsolvable = True
         else:
-            self._corrections()
+            # self._corrections()
             # Compute element areas and strains.
             self._update = False
             self.solved = True
@@ -1779,13 +1777,19 @@ class Mesh(MeshBase):
                         method=self._method,
                         tolerance=self._seed_tolerance,
                     )
-                    if subset._C_ZNCC > self._subsets[idx]._C_ZNCC and subset.solved:
-                        j += 1
-                        self._subsets[idx] = subset
-                        self._store_variables(idx)
+                    try:
+                        if (
+                            subset._C_ZNCC > self._subsets[idx]._C_ZNCC
+                            and subset.solved
+                        ):
+                            j += 1
+                            self._subsets[idx] = subset
+                            self._store_variables(idx, seed=True)
+                    except Exception:
+                        pass
                     bar()
                     bar.text = "{} corrections accepted".format(round(j / (idx + 1), 3))
-            log.info("{} corrections accepted".format(round(j / (idx + 1), 3)))
+            log.info("{ca} corrections accepted".format(ca=round(j / (idx + 1), 3)))
 
     def _connectivity(self, idx):
         """
@@ -1918,7 +1922,7 @@ class Mesh(MeshBase):
                             self._C_ZNCC[idx] = np.max(
                                 (self._subsets[idx].data["results"]["C_ZNCC"], 0)
                             )
-                            return False
+        return True
 
     def _store_variables(self, idx, seed=False):
         """

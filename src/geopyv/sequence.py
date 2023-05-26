@@ -863,6 +863,7 @@ class Sequence(SequenceBase):
         rigid=False,
         subset_size_compensation=False,
         guide=False,
+        sequential=False,
     ):
         """
         Method to solve for the sequence.
@@ -1093,6 +1094,8 @@ class Sequence(SequenceBase):
         self._track = track
         self._hard_boundary = hard_boundary
         self._rigid = rigid
+        self._guide = guide
+        self._sequential = sequential
         self._subset_size_compensation = subset_size_compensation
         self._seed_warp = np.zeros(6 * self._subset_order)
 
@@ -1152,10 +1155,10 @@ class Sequence(SequenceBase):
                     )
                 else:
                     self.data["meshes"][_g_index - 1] = mesh.data
-                if track:
+                if self._track:
                     self._boundary_tags = mesh._boundary_tags
                     self._exclusions_tags = mesh._exclusions_tags
-                if guide:
+                if self._guide:
                     seed = gp.particle.Particle(
                         series=mesh, coordinate_0=self._seed_coord
                     )
@@ -1171,6 +1174,10 @@ class Sequence(SequenceBase):
                     _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
                 else:
                     self.solved = True
+                if self._sequential:
+                    _f_index = _g_index - 1
+                    del _f_img
+                    _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
             elif _f_index + 1 < _g_index:
                 _f_index = _g_index - 1
                 if self._track:
@@ -1232,6 +1239,14 @@ class Sequence(SequenceBase):
                     f_coord=centre,
                     template=gp.templates.Circle(50),
                 )
+                subset.solve(
+                    subset.solve(warp_0=self._exclusions[i][0].data["results"]["p"])
+                )
+                if subset.data["solved"] is not True:
+                    subset.solve()
+                    if subset.data["solved"] is not True:
+                        log.error("Could not track rigid exclusion.")
+                        raise ValueError("Could not track rigid exclusion.")
                 subset.solve()
                 warp = subset.data["results"]["p"].flatten()
                 theta = (warp[3] - warp[4]) / 2

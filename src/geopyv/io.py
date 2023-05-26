@@ -42,7 +42,8 @@ def load(*, filename=None, directory=None, old_format=False, verbose=True):
           data from a `Subset` instance will be loaded into a `SubsetResults` instance.
 
     """
-    if directory is None:
+    cwd = os.getcwd()
+    if directory is None and cwd not in filename:
         directory = os.getcwd()
     if filename is None:
         dialog = gp.gui.selectors.file.FileSelector()
@@ -102,7 +103,7 @@ def load(*, filename=None, directory=None, old_format=False, verbose=True):
         raise FileExistsError
 
 
-def save(*, object, filename=None):
+def save(*, object, directory=None, filename=None):
     """
 
     Function to save data from a geopyv object. If no filename is
@@ -123,7 +124,9 @@ def save(*, object, filename=None):
         * Do not include the .pyv extension in the `filename` argument.
 
     """
-    directory = os.getcwd()
+    cwd = os.getcwd()
+    if directory is None and cwd not in filename:
+        directory = os.getcwd()
     if filename is None:
         log.error(
             "No filename provided."
@@ -240,7 +243,7 @@ def _get_folder(message):
     directory = os.getcwd()
     dialog = gp.gui.selectors.folder.FolderSelector()
     folder_path = dialog.get_path(directory, message)
-    return folder_path
+    return folder_path[len(directory) :]
 
 
 def _get_image_dir():

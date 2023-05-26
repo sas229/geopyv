@@ -174,11 +174,16 @@ class Speckle(SpeckleBase):
 
     def solve(
         self,
+        *,
+        wrap=False,
     ):
+        self._wrap = wrap
         [self.X, self.Y] = np.meshgrid(range(self._image_size), range(self._image_size))
         self._ref_speckle = self._speckle_distribution()
         self._mult()
-        self.data.update({"ref_speckle": self._ref_speckle, "pm": self._pm})
+        self.data.update(
+            {"wrap": self._wrap, "ref_speckle": self._ref_speckle, "pm": self._pm}
+        )
         self._image_generation()
         self.solved = True
         self.data["solved"] = True
@@ -232,6 +237,8 @@ class Speckle(SpeckleBase):
                 _tar_speckle = (
                     self._warp(i, self._ref_speckle)[:, :2] + self._ref_speckle
                 )
+                if self._wrap:
+                    _tar_speckle %= self._image_size
                 _grid = self._grid(i, _tar_speckle)
                 self._create(i, _grid)
                 bar()

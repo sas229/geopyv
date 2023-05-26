@@ -10,6 +10,7 @@ from geopyv.object import Object
 import re
 import shapely
 from alive_progress import alive_bar
+import math
 
 log = logging.getLogger(__name__)
 
@@ -465,7 +466,7 @@ class Particle(ParticleBase):
         flag = False
         diff = centroids - self._coordinates[self._reference_index]
         dist = np.einsum("ij,ij->i", diff, diff)
-        dist_sorted = np.argpartition(dist, 10)
+        dist_sorted = np.argpartition(dist, math.ceil(0.05 * len(dist)))
         for index in dist_sorted:
             poly = shapely.Polygon(nodes[elements[index]][:3])
             point = shapely.Point(self._coordinates[self._reference_index])
@@ -646,36 +647,47 @@ class Particle(ParticleBase):
 
             self._warp_inc[6:] = (K_x_inv @ K_u).flatten()
 
-    def _strain_path(self):
-        """
-        Private method to calculate the particle strain path.
+    def _check_update(self, m):
+        if int(
+            re.findall(
+                r"\d+",
+                self._series[self._reference_index]["images"]["f_img"],
+            )[-1]
+        ) != int(re.findall(r"\d+", self._series[m]["images"]["f_img"])[-1]):
+            self._reference_index = m
+            self._reference_update_register.append(m)
 
-        """
+    def _strain_path(self):
         self._reference_update_register = []
+        self._incs = np.zeros((len(self._series) + 1, 6 * self._mesh_order))
         for m in range(np.shape(self._series)[0]):
-            # Reference update check.
-            if int(
-                re.findall(
-                    r"\d+",
-                    self._series[self._reference_index]["images"]["f_img"],
-                )[-1]
-            ) != int(re.findall(r"\d+", self._series[m]["images"]["f_img"])[-1]):
-                self._reference_index = m
-                self._reference_update_register.append(m)
-            # Mesh bearings.
+            self._check_update(m)
             tri_idx = self._element_locator(m)
-            # Interpolation.
             self._warp_increment(m, tri_idx)
-            # print(self._warp_inc)
-            # Updates.
+            self._incs[m + 1] = self._warp_inc
             self._coordinates[m + 1] = self._coordinates[
                 self._reference_index
             ] + self._warp_inc[:2] * int(self._track)
-            self._warps[m + 1] = self._warps[self._reference_index] + self._warp_inc
+            self._warps[m + 1, :2] = (
+                self._warps[self._reference_index, :2] + self._warp_inc[:2]
+            )
+            self._warps[m + 1, 2] = self._warps[self._reference_index, 2] + np.log(
+                1 + self._warp_inc[2]
+            )
+            self._warps[m + 1, 3] = (
+                self._warps[self._reference_index, 3] + self._warp_inc[3]
+            )
+            self._warps[m + 1, 4] = (
+                self._warps[self._reference_index, 4] + self._warp_inc[4]
+            )
+            self._warps[m + 1, 5] = self._warps[self._reference_index, 5] + np.log(
+                1 + self._warp_inc[5]
+            )
             self._volumes[m + 1] = (
                 self._volumes[self._reference_index]
                 * (1 + self._warp_inc[2])
                 * (1 + self._warp_inc[5])
+                - (0.5 * (self._warp_inc[3] + self._warp_inc[4])) ** 2
             )
 
         return True
@@ -704,7 +716,7 @@ class Particle(ParticleBase):
             delta_ep[:, 0] = np.diff(self._warps[:, 2])
             delta_ep[:, 1] = np.diff(self._warps[:, 5])
             delta_ep[:, 2] = np.diff((self._warps[:, 3] + self._warps[:, 4]))
-            # delta_vol = np.diff(self._volumes)
+
             self._stresses[1:] = self._stresses[0] + np.cumsum(
                 delta_ep @ stiffness, axis=0
             )

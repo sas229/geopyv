@@ -1305,3 +1305,26 @@ class SequenceResults(SequenceBase):
     def __init__(self, data):
         """Initialisation of geopyv SequenceResults class."""
         self.data = data
+
+    def load(self):
+        try:
+            _meshes = glob.glob(
+                "*.pyv", root_dir=self.data["file_settings"]["mesh_dir"]
+            )
+            _mesh_tars = [int(re.findall(r"\d+", x)[-1]) for x in _meshes]
+            _mesh_indices_arguments = np.argsort(_mesh_tars)
+            self._meshes = np.asarray(
+                [_meshes[index] for index in _mesh_indices_arguments], dtype=object
+            )
+        except Exception:
+            log.error(
+                "Issues encountered recognising mesh file names. "
+                "Please refer to the documentation for naming guidance."
+            )
+        self._images = self.data["file_settings"]["images"][
+            : np.shape(self._meshes)[0] + 1
+        ]
+        self.data["solved"] = True
+        self.data["unsolvable"] = False
+        self.data["meshes"] = self._meshes
+        self.data["file_settings"]["images"]

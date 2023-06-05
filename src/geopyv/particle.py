@@ -12,6 +12,10 @@ import shapely
 from alive_progress import alive_bar
 import math
 
+try:
+    import models
+except Exception:
+    pass
 log = logging.getLogger(__name__)
 
 
@@ -223,6 +227,7 @@ class ParticleBase(Object):
                         "warps",
                         "volumes",
                         "stresses",
+                        "works",
                     ],
                 ),
                 "ValueError",
@@ -292,7 +297,7 @@ class Particle(ParticleBase):
         series=None,
         coordinate_0=np.zeros(2),
         warp_0=np.zeros(12),
-        stress_0=np.zeros(3),
+        stress_0=np.zeros(6),
         volume_0=1.0,
         track=True,
     ):
@@ -330,18 +335,7 @@ class Particle(ParticleBase):
             ),
             "TypeError",
         )
-        if self._report(
-            gp.check._check_type(coordinate_0, "coordinate_0", [np.ndarray]), "Warning"
-        ):
-            coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif self._report(
-            gp.check._check_dim(coordinate_0, "coordinate_0", 1), "Warning"
-        ):
-            coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif self._report(
-            gp.check._check_axis(coordinate_0, "coordinate_0", 0, [2]), "Warning"
-        ):
-            coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
+
         check = gp.check._check_type(warp_0, "warp_0", [np.ndarray])
         if check:
             try:
@@ -392,19 +386,40 @@ class Particle(ParticleBase):
             self._series = np.asarray([series.data])
         self._mesh_order = self._series[0]["mesh_order"]
         self._track = track
+        if self._report(
+            gp.check._check_type(coordinate_0, "coordinate_0", [np.ndarray]), "Warning"
+        ):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
+            coordinate_0 = selector.select(f_img, gp.templates.Circle(20))
+        elif self._report(
+            gp.check._check_dim(coordinate_0, "coordinate_0", 1), "Warning"
+        ):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
+            coordinate_0 = selector.select(f_img, gp.templates.Circle(20))
+        elif self._report(
+            gp.check._check_axis(coordinate_0, "coordinate_0", 0, [2]), "Warning"
+        ):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
+            coordinate_0 = selector.select(f_img, gp.templates.Circle(20))
 
         if self._series[0]["mask"][int(coordinate_0[1]), int(coordinate_0[0])] == 0:
             log.warning(
                 "`coordinate_0` keyword argument value out of boundary.\n"
                 "Select `coordinate_0`..."
             )
-            coordinate_0 = gp.gui.selectors.coordinate.CoordinateSelector()
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
+            coordinate_0 = selector.select(f_img, gp.templates.Circle(20))
 
         self._coordinates = np.zeros((len(self._series) + 1, 2))
         self._warps = np.zeros((len(self._series) + 1, 6 * self._mesh_order))
         self._volumes = np.zeros(len(self._series) + 1)
-        self._stresses = np.zeros((len(self._series) + 1, 3))
+        self._stresses = np.zeros((len(self._series) + 1, 6))
         self._works = np.zeros(len(self._series) + 1)
+        self._strains = np.zeros((len(self._series) + 1, 6))
 
         self._coordinates[0] = coordinate_0
         self._warps[0] = warp_0[: np.shape(self._warps)[1]]
@@ -426,16 +441,18 @@ class Particle(ParticleBase):
             "image_0": self._series[0]["images"]["f_img"],
         }
 
-    def solve(self, *, model=None, statev=None, props=None):  # model, statev, props):
+    def solve(
+        self, *, model=None, state=None, parameters=None
+    ):  # model, state, parameters):
         """
 
         Method to solve for the particle.
 
         """
-        self.data.update({"props": props, "statev": statev})
+        self.data.update({"parameters": parameters, "state": state})
         self.solved += self._strain_path()
         if model:
-            self.solved += self._stress_path(model, statev, props)
+            self.solved += self._stress_path(model, state, parameters)
         self._results = {
             "coordinates": self._coordinates,
             "warps": self._warps,
@@ -683,48 +700,65 @@ class Particle(ParticleBase):
             self._warps[m + 1, 5] = self._warps[self._reference_index, 5] + np.log(
                 1 + self._warp_inc[5]
             )
-            self._volumes[m + 1] = (
-                self._volumes[self._reference_index]
-                * (1 + self._warp_inc[2])
-                * (1 + self._warp_inc[5])
-                - (0.5 * (self._warp_inc[3] + self._warp_inc[4])) ** 2
+            self._volumes[m + 1] = self._volumes[self._reference_index] * (
+                (1 + self._warp_inc[2]) * (1 + self._warp_inc[5])
+                - self._warp_inc[3] * self._warp_inc[4]
             )
+        self._strain_def()
+        return True
+
+    def _stress_path(self, model, state, parameters):
+        if model == "LinearElastic":
+            # Put input checks here!
+            model = models.LinearElastic(
+                parameters=parameters,
+                state=state,
+                # log_severity = "verbose"
+            )
+        if model == "MCC":
+            # Put input checks here!
+            model = models.MCC(
+                parameters=parameters,
+                state=state,
+                # log_severity = "verbose"
+            )
+        elif model == "SMCC":
+            # Put input checks here!
+            model = models.SMCC(
+                parameters=parameters,
+                state=state,
+                # log_severity = "verbose"
+            )
+        strain_incs = np.diff(self._strains, axis=0)
+        ps = []
+        qs = []
+        model.set_sigma_prime_tilde(self._stresses[0].T)
+        model.set_Delta_epsilon_tilde(strain_incs[0])
+        ps.append(model.p_prime)
+        qs.append(model.q)
+        for i in range(np.shape(self._series)[0]):
+            try:
+                model.set_sigma_prime_tilde(self._stresses[i].T)
+                model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
+                model.solve()
+            except Exception:
+                log.error("geomat error. Stress path curtailed.")
+                raise ValueError("geomat error. Stress path curtailed.")
+            ps.append(model.p_prime)
+            qs.append(model.q)
+            self._stresses[i + 1] = model.sigma_prime_tilde
+        self._works[1:] = (
+            np.sum(self._stresses[1:] * strain_incs, axis=-1) * self._volumes[1:]
+        )
+        self._ps = np.asarray(ps)
+        self._qs = np.asarray(qs)
 
         return True
 
-    def _stress_path(self, model, statev, props):
-        if model == "Hooke":
-            self._E = props["E"]
-            self._G = props["G"]
-            self._nu = props["nu"]
-            stiffness = np.asarray(
-                [
-                    [
-                        self._E / (1 - self._nu**2),
-                        self._E * self._nu / (1 - self._nu**2),
-                        0,
-                    ],
-                    [
-                        self._E * self._nu / (1 - self._nu**2),
-                        self._E / (1 - self._nu**2),
-                        0,
-                    ],
-                    [0, 0, self._G],
-                ]
-            )
-            delta_ep = np.zeros((np.shape(self._warps)[0] - 1, 3))
-            delta_ep[:, 0] = np.diff(self._warps[:, 2])
-            delta_ep[:, 1] = np.diff(self._warps[:, 5])
-            delta_ep[:, 2] = np.diff((self._warps[:, 3] + self._warps[:, 4]))
-
-            self._stresses[1:] = self._stresses[0] + np.cumsum(
-                delta_ep @ stiffness, axis=0
-            )
-            self._works[1:] = (
-                np.sum(self._stresses[1:] * delta_ep, axis=-1) * self._volumes[1:]
-            )
-
-        return True
+    def _strain_def(self):
+        self._strains[:, 0] = self._warps[:, 2]
+        self._strains[:, 1] = self._warps[:, 5]
+        self._strains[:, 5] = self._warps[:, 3] + self._warps[:, 4]
 
 
 class ParticleResults(ParticleBase):

@@ -328,6 +328,7 @@ class Field(FieldBase):
         exclusions=[],
         coordinates=None,
         volumes=None,
+        stresses=np.zeros(6),
     ):
         """
         Initialisation of geopyv field object.
@@ -469,6 +470,28 @@ class Field(FieldBase):
                 gp.check._check_axis(volumes, "volumes", 0, [np.shape(coordinates)[0]]),
                 "ValueError",
             )
+        check = gp.check._check_type(stresses, "stresses", [np.ndarray])
+        if check:
+            try:
+                stresses = np.asarray(stresses)
+                self._report(
+                    gp.check._conversion(stresses, "stresses", np.ndarray, False),
+                    "Warning",
+                )
+            except Exception:
+                self._report(check, "TypeError")
+        if coordinates is not None:
+            self._report(
+                gp.check._check_axis(
+                    stresses, "stresses", 0, [6, 2, np.shape(coordinates)[0]]
+                ),
+                "ValueError",
+            )
+        else:
+            self._report(
+                gp.check._check_axis(stresses, "stresses", 0, [6, 2]), "ValueError"
+            )
+
         self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
 
         # Store.
@@ -587,6 +610,7 @@ class Field(FieldBase):
 
             self._initial_mesh()
             self._distribute_particles()
+            self._stress_state(stresses)
             log.info(
                 "Field generated with {p} particles.".format(p=len(self._coordinates))
             )
@@ -595,14 +619,17 @@ class Field(FieldBase):
                 "elements": self._elements,
                 "coordinates": self._coordinates,
                 "volumes": self._volumes,
+                "stresses": self._stresses,
             }
         else:
             self._coordinates = coordinates
             self._volumes = volumes
+            self._stress_state(stresses)
             log.info("Using user-specified field.")
             self._field = {
                 "coordinates": self._coordinates,
                 "volumes": self._volumes,
+                "stresses": self._stresses,
             }
 
         self.data.update({"field": self._field})
@@ -661,7 +688,13 @@ class Field(FieldBase):
         M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
         self._volumes = abs(0.5 * np.linalg.det(M))
 
-    def solve(self, *, model=None, statev=None, props=None):
+    def solve(
+        self,
+        *,
+        model=None,
+        state=None,
+        parameters=None,
+    ):
         """
         Method to solve for the field.
 
@@ -681,10 +714,11 @@ class Field(FieldBase):
                     series=self._series,
                     coordinate_0=self._coordinates[i],
                     volume_0=self._volumes[i],
+                    stress_0=self._stresses[i],
                     track=self._track,
                 )
                 _particle_solved = particle.solve(
-                    model=model, statev=statev, props=props
+                    model=model, state=state, parameters=parameters
                 )
                 if _particle_solved is False:
                     self._unsolvable = True
@@ -705,6 +739,19 @@ class Field(FieldBase):
         self.solved = True
         self.data["solved"] = self.solved
         return self.solved
+
+    def _stress_state(self, stresses):
+        if np.shape(stresses)[0] == np.shape(self._coordinates)[0]:
+            self._stresses = stresses
+        elif np.shape(stresses)[0] == 2:
+            self._stresses = stresses[0] + (stresses[1] - stresses[0]) * (
+                (
+                    (self._coordinates[:, 1] - np.min(self._boundary[:, 1]))
+                    / (np.max(self._boundary[:, 1]) - np.min(self._boundary[:, 1]))
+                )[:, np.newaxis]
+            )
+        else:
+            self._stresses = np.tile(stresses, (np.shape(self._coordinates)[0], 1))
 
     @staticmethod
     def _uniform_remesh(

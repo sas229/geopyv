@@ -1516,7 +1516,6 @@ class Mesh(MeshBase):
         A[:, 1:, 1:] = self._nodes[self._elements][:, :3, :2].transpose(0, 2, 1)
 
         return A
-        # return zeta, eta, theta, A
 
     def _shape_function(self):
         if self._mesh_order == 1:

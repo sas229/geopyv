@@ -353,6 +353,15 @@ class Field(FieldBase):
         volumes : numpy.ndarray (N,), optional
             Array of volumes for particle representation.
             Defaults to np.ones(N) i.e. measure of volumetric strain.
+        stresses : numpy.ndarray (N,6) or (2,6) or (6,), optional.
+            Stress state specification. If:
+            (N,6) - individual particle specification (where N is the number
+                    of particles).
+            (2,6) - linearly varying stress field with depth (1st row and 2nd
+                    row vertically highest and lowest respectively, according
+                    to the boundary definition.
+            (6,)  - uniform stress field.
+            Defaults to np.zeros(6).
 
         Note ::
         Two kwargs groups for particle distribution:

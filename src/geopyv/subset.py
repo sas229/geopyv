@@ -421,8 +421,9 @@ class Subset(SubsetBase):
             :meth:`~_get_initial_guess`
 
         """
-        # Check other control parameters.
         log.debug("Solving geopyv Subset object.")
+
+        # Check input.
         check = gp.check._check_type(max_norm, "max_norm", [float])
         if check:
             try:

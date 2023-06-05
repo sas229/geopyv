@@ -1307,6 +1307,7 @@ class SequenceResults(SequenceBase):
         self.data = data
 
     def load(self):
+        """Load all meshes in sequence object mesh directory."""
         try:
             _meshes = glob.glob(
                 "*.pyv", root_dir=self.data["file_settings"]["mesh_dir"]

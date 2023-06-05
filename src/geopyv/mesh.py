@@ -908,20 +908,24 @@ class Mesh(MeshBase):
             return
 
         # Check inputs.
-        if self._report(
-            gp.check._check_type(seed_coord, "seed_coord", [np.ndarray]), "Warning"
-        ):
-            seed_coord = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif self._report(gp.check._check_dim(seed_coord, "seed_coord", 1), "Warning"):
-            seed_coord = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif self._report(
-            gp.check._check_axis(seed_coord, "seed_coord", 0, [2]), "Warning"
-        ):
-            seed_coord = gp.gui.selectors.coordinate.CoordinateSelector()
         if template is None:
             template = gp.templates.Circle(50)
         types = [gp.templates.Circle, gp.templates.Square]
         self._report(gp.check._check_type(template, "template", types), "TypeError")
+        if self._report(
+            gp.check._check_type(seed_coord, "seed_coord", [np.ndarray]), "Warning"
+        ):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            seed_coord = selector.select(self._f_img, template)
+        elif self._report(gp.check._check_dim(seed_coord, "seed_coord", 1), "Warning"):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            seed_coord = selector.select(self._f_img, template)
+        elif self._report(
+            gp.check._check_axis(seed_coord, "seed_coord", 0, [2]), "Warning"
+        ):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            seed_coord = selector.select(self._f_img, template)
+
         check = gp.check._check_type(max_norm, "max_norm", [float])
         if check:
             try:
@@ -1512,7 +1516,6 @@ class Mesh(MeshBase):
         A[:, 1:, 1:] = self._nodes[self._elements][:, :3, :2].transpose(0, 2, 1)
 
         return A
-        # return zeta, eta, theta, A
 
     def _shape_function(self):
         if self._mesh_order == 1:

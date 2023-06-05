@@ -272,18 +272,21 @@ class Subset(SubsetBase):
             gp.check._check_type(g_img, "g_img", [gp.image.Image]), "Warning"
         ):
             g_img = gp.io._load_g_img()
-        if self._report(
-            gp.check._check_type(f_coord, "f_coord", [np.ndarray]), "Warning"
-        ):
-            f_coord = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif self._report(gp.check._check_dim(f_coord, "f_coord", 1), "Warning"):
-            f_coord = gp.gui.selectors.coordinate.CoordinateSelector()
-        elif self._report(gp.check._check_axis(f_coord, "f_coord", 0, [2]), "Warning"):
-            f_coord = gp.gui.selectors.coordinate.CoordinateSelector()
         if template is None:
             template = gp.templates.Circle(50)
         types = [gp.templates.Circle, gp.templates.Square]
         self._report(gp.check._check_type(template, "template", types), "TypeError")
+        if self._report(
+            gp.check._check_type(f_coord, "f_coord", [np.ndarray]), "Warning"
+        ):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_coord = selector.select(f_img, template)
+        elif self._report(gp.check._check_dim(f_coord, "f_coord", 1), "Warning"):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_coord = selector.select(f_img, template)
+        elif self._report(gp.check._check_axis(f_coord, "f_coord", 0, [2]), "Warning"):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_coord = selector.select(f_img, template)
 
         # Store.
         self._initialised = False
@@ -418,8 +421,9 @@ class Subset(SubsetBase):
             :meth:`~_get_initial_guess`
 
         """
-        # Check other control parameters.
         log.debug("Solving geopyv Subset object.")
+
+        # Check input.
         check = gp.check._check_type(max_norm, "max_norm", [float])
         if check:
             try:

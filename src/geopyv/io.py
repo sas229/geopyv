@@ -5,10 +5,8 @@ IO module for geopyv.
 """
 import importlib
 import logging
-import json
 import pickle
 import os
-import numpy as np
 import geopyv as gp
 from alive_progress import alive_bar
 
@@ -63,26 +61,10 @@ def load(*, filename=None, directory=None, old_format=False, verbose=True):
                     bar.text = "-> Loading object from {filepath}...".format(
                         filepath=filepath
                     )
-                    if old_format:
-                        log.warning(
-                            "json file storage deprecated. "
-                            "Load and save objects to convert to new format."
-                        )
-                        data = json.load(infile)
-                        data = _convert_list_to_ndarray(data)
-                    else:
-                        data = pickle.load(infile)
+                    data = pickle.load(infile)
                     bar()
             else:
-                if old_format:
-                    log.warning(
-                        "json file storage deprecated. "
-                        "Load and save objects to convert to new format."
-                    )
-                    data = json.load(infile)
-                    data = _convert_list_to_ndarray(data)
-                else:
-                    data = pickle.load(infile)
+                data = pickle.load(infile)
             object_type = data["type"]
             if verbose:
                 log.info(
@@ -90,7 +72,10 @@ def load(*, filename=None, directory=None, old_format=False, verbose=True):
                         object_type=object_type, filepath=filepath
                     )
                 )
-            class_name = data["type"] + "Results"
+            if "." in data["type"]:
+                class_name = data["type"].split(".")[-1] + "Results"
+            else:
+                class_name = data["type"] + "Results"
             module = importlib.import_module("geopyv." + object_type.lower())
             results_instance = getattr(module, class_name)
             return results_instance(data)
@@ -158,51 +143,6 @@ def save(*, object, directory=None, filename=None):
     else:
         log.error("Nothing saved. Object supplied not a valid geopyv type.")
         return False
-
-
-def _convert_list_to_ndarray(data):
-    """
-
-    Recursive function to convert lists back to numpy ndarray.
-
-
-    Parameters
-    ----------
-    data : dict
-        Data dictionary containing lists to be parsed into `numpy.ndarray`.
-
-
-    Returns
-    -------
-    data : dict
-        Data dictionary containing `numpy.ndarray` after conversion from lists.
-
-
-    """
-    for key, value in data.items():
-        if key == "meshes":
-            try:
-                for subset in value:
-                    _convert_list_to_ndarray(subset)
-            except Exception:
-                data[key] = list(value)
-        # If not a list of subsets, convert to numpy ndarray.
-        elif (
-            type(value) == list
-            and key != "subsets"
-            and key != "mesh"
-            and key != "particles"
-            and key != "field"
-        ):
-            data[key] = np.asarray(value)
-        # If a dict convert recursively.
-        elif type(value) == dict:
-            _convert_list_to_ndarray(data[key])
-        # If a list of subsets convert recursively.
-        elif key == "subsets" or key == "mesh" or key == "particles" or key == "field":
-            for subset in value:
-                _convert_list_to_ndarray(subset)
-    return data
 
 
 def _load_img(message):

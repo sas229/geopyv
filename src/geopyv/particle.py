@@ -11,11 +11,7 @@ import re
 import shapely
 from alive_progress import alive_bar
 import math
-
-try:
-    import models
-except Exception:
-    pass
+from build.models import LinearElastic, MCC, SMCC
 
 log = logging.getLogger(__name__)
 
@@ -711,21 +707,24 @@ class Particle(ParticleBase):
     def _stress_path(self, model, state, parameters):
         if model == "LinearElastic":
             # Put input checks here!
-            model = models.LinearElastic(
+            # model = models.LinearElastic(
+            model = LinearElastic(
                 parameters=parameters,
                 state=state,
                 # log_severity = "verbose"
             )
         if model == "MCC":
             # Put input checks here!
-            model = models.MCC(
+            # model = models.MCC(
+            model = MCC(
                 parameters=parameters,
                 state=state,
                 # log_severity = "verbose"
             )
         elif model == "SMCC":
             # Put input checks here!
-            model = models.SMCC(
+            # model = models.SMCC(
+            model = SMCC(
                 parameters=parameters,
                 state=state,
                 # log_severity = "verbose"

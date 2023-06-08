@@ -15,6 +15,7 @@ import PIL.ImageDraw as ImageDrawPIL
 from alive_progress import alive_bar
 import traceback
 
+
 log = logging.getLogger(__name__)
 
 
@@ -581,7 +582,6 @@ class Mesh(MeshBase):
         size_lower_bound=1.0,
         size_upper_bound=1000.0,
         mesh_order=2,
-        hard_boundary=True,
         subset_size_compensation=False,
     ):
         """
@@ -608,10 +608,6 @@ class Mesh(MeshBase):
             Lower bound on element size. Defaults to a value of 1000.0.
         mesh_order : int, optional
             Mesh element order. Options are 1 and 2. Defaults to 2.
-        hard_boundary : bool, optional
-            Boolean to control whether the boundary is included in the
-            binary mask. True -included, False - not included.
-            Defaults to True.
         subset_size_compensation: bool, optional
             Boolean to control whether masked subsets are enlarged to
             maintain area (and thus better correlation).
@@ -650,18 +646,14 @@ class Mesh(MeshBase):
         self._report(
             gp.check._check_range(target_nodes, "target_nodes", 1), "ValueError"
         )
-        check = gp.check._check_type(boundary, "boundary", [np.ndarray])
-        if check:
-            try:
-                boundary = np.asarray(boundary)
-                self._report(
-                    gp.check._conversion(boundary, "boundary", np.ndarray, False),
-                    "Warning",
-                )
-            except Exception:
-                self._report(check, "TypeError")
-        self._report(gp.check._check_dim(boundary, "boundary", 2), "ValueError")
-        self._report(gp.check._check_axis(boundary, "boundary", 1, [2]), "ValueError")
+        self._report(
+            gp.check._check_type(
+                boundary,
+                "boundary",
+                [gp.geometry.region.Circle, gp.geometry.region.Path],
+            ),
+            "TypeError",
+        )
         check = gp.check._check_type(exclusions, "exclusions", [list])
         if check:
             try:
@@ -673,19 +665,13 @@ class Mesh(MeshBase):
             except Exception:
                 self._report(check, "TypeError")
         for exclusion in exclusions:
-            check = gp.check._check_type(exclusion, "exclusion", [np.ndarray])
-            if check:
-                try:
-                    exclusion = np.asarray(exclusion)
-                    self._report(
-                        gp.check._conversion(exclusion, "exclusion", np.ndarray, False),
-                        "Warning",
-                    )
-                except Exception:
-                    self._report(check, "TypeError")
-            self._report(gp.check._check_dim(exclusion, "exclusion", 2), "ValueError")
             self._report(
-                gp.check._check_axis(exclusion, "exclusion", 1, [2]), "ValueError"
+                gp.check._check_type(
+                    exclusion,
+                    "exclusion",
+                    [gp.geometry.region.Circle, gp.geometry.region.Path],
+                ),
+                "TypeError",
             )
         self._report(
             gp.check._check_type(size_lower_bound, "size_lower_bound", [int, float]),
@@ -705,9 +691,6 @@ class Mesh(MeshBase):
             "ValueError",
         )
         self._report(
-            gp.check._check_type(hard_boundary, "hard_boundary", [bool]), "TypeError"
-        )
-        self._report(
             gp.check._check_type(
                 subset_size_compensation, "subset_size_compensation", [bool]
             ),
@@ -717,11 +700,13 @@ class Mesh(MeshBase):
         # Pre-processing.
         size_upper_bound = min(
             size_upper_bound,
-            np.max(np.sqrt(np.sum(np.square(np.diff(boundary, axis=0)), axis=1))),
+            np.max(
+                np.sqrt(np.sum(np.square(np.diff(boundary._boundary, axis=0)), axis=1))
+            ),
         )
-        minimum_nodes = np.shape(boundary)[0]
+        minimum_nodes = np.shape(boundary._boundary)[0]
         for exclusion in exclusions:
-            minimum_nodes += np.shape(exclusion)[0]
+            minimum_nodes += np.shape(exclusion._boundary)[0]
         target_nodes = max(target_nodes, minimum_nodes)
 
         # Store.
@@ -730,17 +715,26 @@ class Mesh(MeshBase):
         self._g_img = g_img
         self._target_nodes = target_nodes
         self._boundary = boundary
+        self._boundary._rigid = False
         self._exclusions = exclusions
         self._size_lower_bound = size_lower_bound
         self._size_upper_bound = size_upper_bound
         self._mesh_order = mesh_order
-        self._hard_boundary = hard_boundary
+        self._hard_boundary = boundary._hard
         self._subset_size_compensation = subset_size_compensation
         self.solved = False
         self._unsolvable = False
 
         # Define region of interest.
-        self._define_RoI()
+        (
+            self._borders,
+            self._segments,
+            self._curves,
+            self._mask,
+        ) = gp.geometry.meshing._define_RoI(
+            self._f_img, self._boundary, self._exclusions
+        )
+        # self._define_RoI()
 
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
@@ -1106,6 +1100,11 @@ class Mesh(MeshBase):
                         )
                     )
                     return self.solved
+            self._region_tracing()
+            if self._unsolvable:
+                log.error("Rigid exclusion tracking failure.")
+                return self.solved
+
             log.info(
                 "Solved mesh. Minimum correlation coefficient: {min_C:.2f}; "
                 "maximum correlation coefficient: {max_C:.2f}.".format(
@@ -1159,6 +1158,38 @@ class Mesh(MeshBase):
         gmsh.finalize()
         return self.solved
 
+    def _region_tracing(self):
+        exclusion_warp = []
+        for i in range(np.shape(self._exclusions)[0]):
+            if self._exclusions[i]._rigid:
+                subset = gp.subset.Subset(
+                    f_img=self._f_img,
+                    g_img=self._g_img,
+                    f_coord=self._exclusions[i]._coord,
+                    template=gp.templates.Circle(
+                        int(self._exclusions[i]._specifics["radius"])
+                    ),
+                )
+                subset.solve(
+                    tolerance=0.9,
+                )
+                if subset.data["solved"] is not True:
+                    self._update = True
+                    self.solved = False
+                    self._unsolvable = True
+                    del subset
+                    return False
+                else:
+                    exclusion_warp.append(subset._p.flatten())
+                    del subset
+            else:
+                exclusion_warp.append(self._displacements[self._exclusions_tags[i]])
+        self._boundary._update(
+            self.data["images"]["f_img"], self._displacements[self._boundary_tags]
+        )
+        for i in range(np.shape(self._exclusions)[0]):
+            self._exclusions[i]._update(self.data["images"]["f_img"], exclusion_warp[i])
+
     def _update_mesh(self):
         """
 
@@ -1205,11 +1236,9 @@ class Mesh(MeshBase):
             ),
             0,
         )
-        # plt.imshow(np.asarray(binary_img))
-        # plt.show()
         if self._hard_boundary:
             ImageDrawPIL.Draw(binary_img).polygon(
-                self._boundary.flatten().tolist(), outline=1, fill=1
+                self._boundary._boundary.flatten().tolist(), outline=1, fill=1
             )
         else:
             image_edge = np.asarray(
@@ -1229,35 +1258,35 @@ class Mesh(MeshBase):
 
         # Create objects for mesh generation.
         self._segments = np.empty(
-            (np.shape(self._boundary)[0], 2), dtype=np.int32
+            (np.shape(self._boundary._boundary)[0], 2), dtype=np.int32
         )  # Initiate segment array.
         self._segments[:, 0] = np.arange(
-            np.shape(self._boundary)[0], dtype=np.int32
+            np.shape(self._boundary._boundary)[0], dtype=np.int32
         )  # Fill segment array.
         self._segments[:, 1] = np.roll(self._segments[:, 0], -1)  # Fill segment array.
         self._curves = [list(self._segments[:, 0])]  # Create curve list.
 
         # Add exclusions.
-        self._borders = self._boundary
+        self._borders = self._boundary._boundary
         for exclusion in self._exclusions:
             ImageDrawPIL.Draw(binary_img).polygon(
-                exclusion.flatten().tolist(), outline=1, fill=0
+                exclusion._boundary.flatten().tolist(), outline=1, fill=0
             )  # Add exclusion to binary mask.
             cur_max_idx = np.amax(
                 self._segments
             )  # Highest index used by current segments.
             exclusion_segment = np.empty(
-                np.shape(exclusion)
+                np.shape(exclusion._boundary)
             )  # Initiate exclusion segment array.
             exclusion_segment[:, 0] = np.arange(
                 cur_max_idx + 1,
-                cur_max_idx + 1 + np.shape(exclusion)[0],
+                cur_max_idx + 1 + np.shape(exclusion._boundary)[0],
             )  # Fill exclusion segment array.
             exclusion_segment[:, 1] = np.roll(
                 exclusion_segment[:, 0], -1
             )  # Fill exclusion segment array.
             self._borders = np.append(
-                self._borders, exclusion, axis=0
+                self._borders, exclusion._boundary, axis=0
             )  # Append exclusion to boundary array.
             self._segments = np.append(
                 self._segments, exclusion_segment, axis=0

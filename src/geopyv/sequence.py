@@ -706,18 +706,14 @@ class Sequence(SequenceBase):
         self._report(
             gp.check._check_range(target_nodes, "target_nodes", 1), "ValueError"
         )
-        check = gp.check._check_type(boundary, "boundary", [np.ndarray])
-        if check:
-            try:
-                boundary = np.asarray(boundary)
-                self._report(
-                    gp.check._conversion(boundary, "boundary", np.ndarray, False),
-                    "Warning",
-                )
-            except Exception:
-                self._report(check, "TypeError")
-        self._report(gp.check._check_dim(boundary, "boundary", 2), "ValueError")
-        self._report(gp.check._check_axis(boundary, "boundary", 1, [2]), "ValueError")
+        self._report(
+            gp.check._check_type(
+                boundary,
+                "boundary",
+                [gp.geometry.region.Circle, gp.geometry.region.Path],
+            ),
+            "TypeError",
+        )
         check = gp.check._check_type(exclusions, "exclusions", [list])
         if check:
             try:
@@ -729,19 +725,13 @@ class Sequence(SequenceBase):
             except Exception:
                 self._report(check, "TypeError")
         for exclusion in exclusions:
-            check = gp.check._check_type(exclusion, "exclusion", [np.ndarray])
-            if check:
-                try:
-                    exclusion = np.asarray(exclusion)
-                    self._report(
-                        gp.check._conversion(exclusion, "exclusion", np.ndarray, False),
-                        "Warning",
-                    )
-                except Exception:
-                    self._report(check, "TypeError")
-            self._report(gp.check._check_dim(exclusion, "exclusion", 2), "ValueError")
             self._report(
-                gp.check._check_axis(exclusion, "exclusion", 1, [2]), "ValueError"
+                gp.check._check_type(
+                    exclusion,
+                    "exclusion",
+                    [gp.geometry.region.Circle, gp.geometry.region.Path],
+                ),
+                "TypeError",
             )
         self._report(
             gp.check._check_type(size_lower_bound, "size_lower_bound", [int, float]),
@@ -858,9 +848,6 @@ class Sequence(SequenceBase):
         tolerance=0.75,
         seed_tolerance=0.9,
         alpha=0.5,
-        track=False,
-        hard_boundary=True,
-        rigid=False,
         subset_size_compensation=False,
         guide=False,
         sequential=False,
@@ -899,14 +886,6 @@ class Sequence(SequenceBase):
         alpha : float, optional
             Mesh adaptivity control parameter.
             Defaults to a value of 0.5.
-        track : bool, optional
-            Mesh boundary tracking at reference image updates. Options are:
-            False - no movement,
-            True - movement of initially defined boundary points tracked.
-        hard_boundary : bool, optional
-            Boolean to control whether the boundary is included in the
-            binary mask. True -included, False - not included.
-            Defaults to True.
         subset_size_compensation: bool, optional
             Boolean to control whether masked subsets are enlarged to
             maintain area (and thus better correlation).
@@ -1048,11 +1027,6 @@ class Sequence(SequenceBase):
             except Exception:
                 self._report(check, "TypeError")
         self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
-        self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
-        self._report(gp.check._check_type(rigid, "rigid", [bool]), "TypeError")
-        self._report(
-            gp.check._check_type(hard_boundary, "hard_boundary", [bool]), "TypeError"
-        )
         self._report(
             gp.check._check_type(
                 subset_size_compensation, "subset_size_compensation", [bool]
@@ -1091,9 +1065,6 @@ class Sequence(SequenceBase):
         self._tolerance = tolerance
         self._seed_tolerance = seed_tolerance
         self._alpha = alpha
-        self._track = track
-        self._hard_boundary = hard_boundary
-        self._rigid = rigid
         self._guide = guide
         self._sequential = sequential
         self._subset_size_compensation = subset_size_compensation
@@ -1120,7 +1091,6 @@ class Sequence(SequenceBase):
                 size_lower_bound=self._size_lower_bound,
                 size_upper_bound=self._size_upper_bound,
                 mesh_order=self._mesh_order,
-                hard_boundary=self._hard_boundary,
                 subset_size_compensation=self._subset_size_compensation,
             )  # Initialise mesh object.
             mesh.solve(
@@ -1155,9 +1125,6 @@ class Sequence(SequenceBase):
                     )
                 else:
                     self.data["meshes"][_g_index - 1] = mesh.data
-                if self._track:
-                    self._boundary_tags = mesh._boundary_tags
-                    self._exclusions_tags = mesh._exclusions_tags
                 if self._guide:
                     seed = gp.particle.Particle(
                         series=mesh, coordinate_0=self._seed_coord
@@ -1180,8 +1147,6 @@ class Sequence(SequenceBase):
                     _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
             elif _f_index + 1 < _g_index:
                 _f_index = _g_index - 1
-                if self._track:
-                    self._tracking(_f_index)
                 del _f_img
                 _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
             else:
@@ -1204,66 +1169,6 @@ class Sequence(SequenceBase):
         self.data["unsolvable"] = self._unsolvable
         self.data["meshes"] = np.asarray(self.data["meshes"])
         return self.solved
-
-    def _tracking(self, _f_index):
-        """
-        Private method for tracking the movement of the mesh boundary
-        and exclusions upon reference image updates.
-        """
-
-        log.info("Tracing boundary and exclusion displacements.")
-        if self._save_by_reference:
-            previous_mesh = gp.io.load(
-                filename=self._mesh_dir + self.data["meshes"][_f_index - 1]
-            ).data
-        else:
-            previous_mesh = self.data["meshes"][_f_index - 1]
-        self._boundary = (
-            previous_mesh["nodes"][self._boundary_tags]
-            + previous_mesh["results"]["displacements"][self._boundary_tags]
-        )
-        _exclusions = []
-        if self._rigid:
-            for i in range(np.shape(self._exclusions)[0]):
-                centre = np.mean(self._exclusions[i], axis=0)
-                local_coordinates = self._exclusions[i] - centre
-                f_img = gp.image.Image(
-                    filepath=previous_mesh["images"]["f_img"],
-                )
-                g_img = gp.image.Image(
-                    filepath=previous_mesh["images"]["g_img"],
-                )
-                subset = gp.subset.Subset(
-                    f_img=f_img,
-                    g_img=g_img,
-                    f_coord=centre,
-                    template=gp.templates.Circle(50),
-                )
-                subset.solve(
-                    subset.solve(warp_0=self._exclusions[i][0].data["results"]["p"])
-                )
-                if subset.data["solved"] is not True:
-                    subset.solve()
-                    if subset.data["solved"] is not True:
-                        log.error("Could not track rigid exclusion.")
-                        raise ValueError("Could not track rigid exclusion.")
-                subset.solve()
-                warp = subset.data["results"]["p"].flatten()
-                theta = (warp[3] - warp[4]) / 2
-                rot = np.asarray(
-                    [[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]]
-                )
-                centre += warp[:2]
-                _exclusions.append(centre + local_coordinates @ rot)
-        else:
-            for i in range(np.shape(self._exclusions)[0]):
-                _exclusions.append(
-                    previous_mesh["nodes"][self._exclusions_tags[i]]
-                    + previous_mesh["results"]["displacements"][
-                        self._exclusions_tags[i]
-                    ]
-                )
-        self._exclusions = _exclusions
 
     def load(self):
         try:

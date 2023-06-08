@@ -12,7 +12,6 @@ template = gp.templates.Circle(50)
 subset = gp.subset.Subset(
     f_img=ref, g_img=tar, f_coord=np.asarray([1000, 1000]), template=template
 )
-
 # Subset inspection.
 subset.inspect()
 
@@ -34,13 +33,23 @@ subset = gp.io.load(filename="test")
 ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
 tar = gp.image.Image("./images/T-Bar/IMG_1065.jpg")
 template = gp.templates.Circle(50)
-boundary = np.asarray(
-    [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
+boundary = gp.geometry.region.Path(
+    boundary=np.asarray(
+        [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
+    ),
+    rigid=False,
+    hard=False,
+    track=True,
 )
 exclusions = []
 exclusions.append(
-    gp.geometry.exclusions.circular_exclusion(
-        np.asarray([1925, 1470]), radius=430, size=100
+    gp.geometry.region.Circle(
+        coord=np.asarray([1925, 1470]),
+        radius=430.0,
+        size=100.0,
+        rigid=True,
+        hard=True,
+        track=True,
     )
 )
 seed = np.asarray([400, 400.0])
@@ -53,7 +62,6 @@ mesh = gp.mesh.Mesh(
     target_nodes=1000,
     boundary=boundary,
     exclusions=exclusions,
-    hard_boundary=False,
     subset_size_compensation=True,
     mesh_order=1,
 )
@@ -73,6 +81,7 @@ mesh.solve(
     alpha=alpha,
     tolerance=0.7,
 )
+
 # Mesh saving.
 gp.io.save(object=mesh, filename="mesh")
 del mesh
@@ -123,13 +132,23 @@ mesh.convergence(subset_index=0)
 # Sequence test.
 # Sequence setup.
 template = gp.templates.Circle(50)
-boundary = np.asarray(
-    [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
+boundary = gp.geometry.region.Path(
+    boundary=np.asarray(
+        [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
+    ),
+    rigid=False,
+    hard=False,
+    track=True,
 )
 exclusions = []
 exclusions.append(
-    gp.geometry.exclusions.circular_exclusion(
-        np.asarray([1925, 1470]), radius=430, size=100
+    gp.geometry.region.Circle(
+        coord=np.asarray([1925, 1470]),
+        radius=430.0,
+        size=100.0,
+        rigid=True,
+        hard=True,
+        track=True,
     )
 )
 seed = np.asarray([400, 400.0])
@@ -147,7 +166,6 @@ sequence = gp.sequence.Sequence(
 
 # Sequence solving.
 sequence.solve(
-    track=True,
     seed_coord=seed,
     template=template,
     adaptive_iterations=0,
@@ -217,21 +235,23 @@ component = 0
 particle_index = 4
 
 # Coordinates.
-coordinates = field.data["particles"][particle_index]["coordinates"]
+coordinates = field.data["particles"][particle_index]["results"]["coordinates"]
 print(coordinates)
 
 # Warps.
 # Full.
-warps = field.data["particles"][particle_index]["warps"]  # warp components :
+warps = field.data["particles"][particle_index]["results"]["warps"]  # warp components :
 # [u, v, dudx, dudy, dvdx, dvdy, d2udx2, d2udxdy, d2udy2, d2vdx2, d2vdxdy, d2vdy2]
 print(warps)
-warps = field.data["particles"][particle_index]["warps"][
+warps = field.data["particles"][particle_index]["results"]["warps"][
     2:5, :2
 ]  # Time steps 2-5 for components 0 and 1 i.e. displacements.
 print(warps)
 
 # e.g. to extract volume progression. Note, area is in pixels.
-volume_array = field.data["particles"][particle_index]["volumes"]
+volume_array = field.data["particles"][particle_index]["results"]["volumes"]
 print(volume_array)
-volume = field.data["particles"][particle_index]["volumes"][3]  # At time step 3.
+volume = field.data["particles"][particle_index]["results"]["volumes"][
+    3
+]  # At time step 3.
 print(volume)

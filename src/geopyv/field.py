@@ -590,13 +590,23 @@ class Field(FieldBase):
             self._size_upper_bound = min(
                 self._size_upper_bound,
                 np.max(
-                    np.sqrt(np.sum(np.square(np.diff(self._boundary, axis=0)), axis=1))
+                    np.sqrt(
+                        np.sum(
+                            np.square(
+                                np.diff(self._boundary.data["boundaries"][0], axis=0)
+                            ),
+                            axis=1,
+                        )
+                    )
                 ),
             )
 
             # Define region of interest.
+            self._boundary._boundary = self._boundary.data["boundaries"][0]
+            for exclusion in self._exclusions:
+                exclusion._boundary = exclusion.data["boundaries"][0]
             (
-                self._boundary,
+                self._borders,
                 self._segments,
                 self._curves,
                 _,
@@ -655,7 +665,7 @@ class Field(FieldBase):
         def f(size):
             return self._uniform_remesh(
                 size,
-                self._boundary,
+                self._borders,
                 self._segments,
                 self._curves,
                 self._target_particles,
@@ -750,13 +760,19 @@ class Field(FieldBase):
         return self.solved
 
     def _stress_state(self, stresses):
+        """
+        Private method to define the initial stress state.
+        """
         if np.shape(stresses)[0] == np.shape(self._coordinates)[0]:
             self._stresses = stresses
         elif np.shape(stresses)[0] == 2:
             self._stresses = stresses[0] + (stresses[1] - stresses[0]) * (
                 (
-                    (self._coordinates[:, 1] - np.min(self._boundary[:, 1]))
-                    / (np.max(self._boundary[:, 1]) - np.min(self._boundary[:, 1]))
+                    (self._coordinates[:, 1] - np.min(self._boundary._boundary[:, 1]))
+                    / (
+                        np.max(self._boundary._boundary[:, 1])
+                        - np.min(self._boundary._boundary[:, 1])
+                    )
                 )[:, np.newaxis]
             )
         else:

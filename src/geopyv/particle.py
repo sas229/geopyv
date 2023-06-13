@@ -11,7 +11,8 @@ import re
 import shapely
 from alive_progress import alive_bar
 import math
-from build.models import LinearElastic, MCC, SMCC
+
+# from build.models import LinearElastic, MCC, SMCC
 
 log = logging.getLogger(__name__)
 
@@ -448,8 +449,8 @@ class Particle(ParticleBase):
         """
         self.data.update({"parameters": parameters, "state": state})
         self.solved += self._strain_path()
-        if model:
-            self.solved += self._stress_path(model, state, parameters)
+        # if model:
+        #    self.solved += self._stress_path(model, state, parameters)
         self._results = {
             "coordinates": self._coordinates,
             "warps": self._warps,
@@ -492,7 +493,7 @@ class Particle(ParticleBase):
                 "Particle {particle} is outside of boundary {boundary}.\n"
                 " Check for convex boundary update.".format(
                     particle=self._coordinates[self._reference_index],
-                    boundary=self._series[m]["boundary"],
+                    boundary=self._series[m]["boundary"]._boundary,
                 )
             )
             raise ValueError("Particle outside of boundary.")
@@ -697,61 +698,63 @@ class Particle(ParticleBase):
             self._warps[m + 1, 5] = self._warps[self._reference_index, 5] + np.log(
                 1 + self._warp_inc[5]
             )
+            self._warps[m + 1, 6:] = (
+                self._warps[self._reference_index, 6:] + self._warp_inc[6:]
+            )
             self._volumes[m + 1] = self._volumes[self._reference_index] * (
                 (1 + self._warp_inc[2]) * (1 + self._warp_inc[5])
                 - self._warp_inc[3] * self._warp_inc[4]
             )
+
         self._strain_def()
         return True
 
     def _stress_path(self, model, state, parameters):
-        if model == "LinearElastic":
-            # Put input checks here!
-            # model = models.LinearElastic(
-            model = LinearElastic(
-                parameters=parameters,
-                state=state,
-                # log_severity = "verbose"
-            )
-        if model == "MCC":
-            # Put input checks here!
-            # model = models.MCC(
-            model = MCC(
-                parameters=parameters,
-                state=state,
-                # log_severity = "verbose"
-            )
-        elif model == "SMCC":
-            # Put input checks here!
-            # model = models.SMCC(
-            model = SMCC(
-                parameters=parameters,
-                state=state,
-                # log_severity = "verbose"
-            )
-        strain_incs = np.diff(self._strains, axis=0)
-        ps = []
-        qs = []
-        model.set_sigma_prime_tilde(self._stresses[0].T)
-        model.set_Delta_epsilon_tilde(strain_incs[0])
-        ps.append(model.p_prime)
-        qs.append(model.q)
-        for i in range(np.shape(self._series)[0]):
-            try:
-                model.set_sigma_prime_tilde(self._stresses[i].T)
-                model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
-                model.solve()
-            except Exception:
-                log.error("geomat error. Stress path curtailed.")
-                raise ValueError("geomat error. Stress path curtailed.")
-            ps.append(model.p_prime)
-            qs.append(model.q)
-            self._stresses[i + 1] = model.sigma_prime_tilde
-        self._works[1:] = (
-            np.sum(self._stresses[1:] * strain_incs, axis=-1) * self._volumes[1:]
-        )
-        self._ps = np.asarray(ps)
-        self._qs = np.asarray(qs)
+        """Under construction"""
+
+        # if model == "LinearElastic":
+        #     # Put input checks here!
+        #     # model = models.LinearElastic(
+        #     model = LinearElastic(
+        #         parameters=parameters,
+        #         state=state,
+        #         # log_severity = "verbose"
+        #     )
+        # if model == "MCC":
+        #     # Put input checks here!
+        #     # model = models.MCC(
+        #     model = MCC(parameters=parameters, state=state, log_severity="verbose")
+        # elif model == "SMCC":
+        #     # Put input checks here!
+        #     # model = models.SMCC(
+        #     model = SMCC(
+        #         parameters=parameters,
+        #         state=state,
+        #         # log_severity = "verbose"
+        #     )
+        # strain_incs = np.diff(self._strains, axis=0)
+        # ps = []
+        # qs = []
+        # model.set_sigma_prime_tilde(self._stresses[0].T)
+        # model.set_Delta_epsilon_tilde(strain_incs[0])
+        # ps.append(model.p_prime)
+        # qs.append(model.q)
+        # for i in range(np.shape(self._series)[0]):
+        #     try:
+        #         model.set_sigma_prime_tilde(self._stresses[i].T)
+        #         model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
+        #         model.solve()
+        #     except Exception:
+        #         log.error("geomat error. Stress path curtailed.")
+        #         raise ValueError("geomat error. Stress path curtailed.")
+        #     ps.append(model.p_prime)
+        #     qs.append(model.q)
+        #     self._stresses[i + 1] = model.sigma_prime_tilde
+        # self._works[1:] = (
+        #     np.sum(self._stresses[1:] * strain_incs, axis=-1) * self._volumes[1:]
+        # )
+        # self._ps = np.asarray(ps)
+        # self._qs = np.asarray(qs)
 
         return True
 

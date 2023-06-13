@@ -10,6 +10,7 @@ from geopyv.object import Object
 import re
 import glob
 import traceback
+from alive_progress import alive_bar
 
 log = logging.getLogger(__name__)
 
@@ -604,11 +605,12 @@ class SequenceBase(Object):
         )
         return fig, ax
 
-    def _load_mesh(self, mesh_index):
+    def _load_mesh(self, mesh_index, verbose=True):
         if self.data["file_settings"]["save_by_reference"]:
             return gp.io.load(
                 filename=self.data["file_settings"]["mesh_dir"]
-                + self.data["meshes"][mesh_index]
+                + self.data["meshes"][mesh_index],
+                verbose=verbose,
             ).data
         else:
             return self.data["meshes"][mesh_index]
@@ -1211,7 +1213,7 @@ class SequenceResults(SequenceBase):
         """Initialisation of geopyv SequenceResults class."""
         self.data = data
 
-    def load(self):
+    def load(self, ref=True):
         """Load all meshes in sequence object mesh directory."""
         try:
             _meshes = glob.glob(
@@ -1232,5 +1234,15 @@ class SequenceResults(SequenceBase):
         ]
         self.data["solved"] = True
         self.data["unsolvable"] = False
+        self.data["file_settings"]["images"] = self._images
+        if ref is not True:
+            with alive_bar(
+                np.shape(self._meshes)[0],
+                dual_line=True,
+                bar="blocks",
+                title="Loading meshes...",
+            ) as bar:
+                for i in range(np.shape(self._meshes)[0]):
+                    self._meshes[i] = self._load_mesh(mesh_index=i, verbose=False)
+                    bar()
         self.data["meshes"] = self._meshes
-        self.data["file_settings"]["images"]

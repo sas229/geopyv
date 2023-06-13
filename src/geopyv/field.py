@@ -270,14 +270,14 @@ class FieldBase(Object):
             gp.check._check_type(components, "components", [list, type(None)]),
             "TypeError",
         )
-        if components:
-            for component in components:
-                self._report(
-                    gp.check._check_index(
-                        component, "component", 1, self.data["results"][quantity]
-                    ),
-                    "IndexError",
-                )
+        # if components:
+        #    for component in components:
+        #        self._report(
+        #            gp.check._check_index(
+        #                component, "component", 1, self.data["results"][quantity]
+        #            ),
+        #            "IndexError",
+        #        )
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
         if xlim is not None:

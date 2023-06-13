@@ -71,25 +71,26 @@ class Region(RegionBase):
             "boundaries": [self._boundary],
         }
         self._reference_update_register = []
-        self._ref_index = 0
-        self._tar_index = 1
+        self._ref_index = None
 
     def _update(self, f_img, warp):
         if self._track:
-            if self._ref_update(f_img):
-                self._boundary = self.data["boundaries"][-1]
-                self._coord = self.data["coords"][-1]
             if self._rigid:
                 local_coordinates = self._boundary - self._coord
                 theta = (warp[3] - warp[4]) / 2
                 rot = np.asarray(
                     [[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]]
                 )
-                self.data["boundaries"].append(self._coord + local_coordinates @ rot)
+                self.data["boundaries"].append(
+                    self._coord + warp[:2] + local_coordinates @ rot
+                )
                 self.data["coords"].append(self._coord + warp[:2])
             else:
                 self.data["boundaries"].append(self._boundary + warp)
                 self.data["coords"].append(self._coord + np.mean(warp, axis=0))
+            if self._ref_update(f_img):
+                self._boundary = self.data["boundaries"][-1]
+                self._coord = self.data["coords"][-1]
         self._solved = True
         self.data["solved"] = self._solved
 
@@ -100,7 +101,9 @@ class Region(RegionBase):
                 f_img,
             )[-1]
         )
+        print(index, self._ref_index)
         if index != self._ref_index:
+            print("Triggered!")
             self._ref_index = index
             return True
         else:

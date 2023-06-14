@@ -481,7 +481,7 @@ class Particle(ParticleBase):
         flag = False
         diff = centroids - self._coordinates[self._reference_index]
         dist = np.einsum("ij,ij->i", diff, diff)
-        dist_sorted = np.argpartition(dist, math.ceil(0.05 * len(dist)))
+        dist_sorted = np.argpartition(dist, min(10, math.ceil(0.05 * len(dist))))
         for index in dist_sorted:
             poly = shapely.Polygon(nodes[elements[index]][:3])
             point = shapely.Point(self._coordinates[self._reference_index])

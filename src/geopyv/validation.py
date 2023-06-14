@@ -69,6 +69,10 @@ class ValidationBase(Object):
             self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
             self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(scale, "scale", [str]), "TypeError")
+        if scale == "lin" or scale == "Lin" or scale == "Linear":
+            scale = "linear"
+        elif scale == "Log" or scale == "ln":
+            scale = "log"
         self._report(
             gp.check._check_value(scale, "scale", ["linear", "log"]), "ValueError"
         )
@@ -138,6 +142,10 @@ class ValidationBase(Object):
             self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
             self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
         self._report(gp.check._check_type(scale, "scale", [str]), "TypeError")
+        if scale == "lin" or scale == "Lin" or scale == "Linear":
+            scale = "linear"
+        elif scale == "Log" or scale == "ln":
+            scale = "log"
         self._report(
             gp.check._check_value(scale, "scale", ["linear", "log"]), "ValueError"
         )

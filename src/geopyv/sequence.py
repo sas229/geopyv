@@ -637,8 +637,8 @@ class Sequence(SequenceBase):
         common_name="",
         file_format=".jpg",
         target_nodes=1000,
-        boundary=None,
-        exclusions=[],
+        boundary_obj=None,
+        exclusion_objs=[],
         size_lower_bound=1.0,
         size_upper_bound=1000.0,
         save_by_reference=False,
@@ -710,27 +710,27 @@ class Sequence(SequenceBase):
         )
         self._report(
             gp.check._check_type(
-                boundary,
-                "boundary",
+                boundary_obj,
+                "boundary_obj",
                 [gp.geometry.region.Circle, gp.geometry.region.Path],
             ),
             "TypeError",
         )
-        check = gp.check._check_type(exclusions, "exclusions", [list])
+        check = gp.check._check_type(exclusion_objs, "exclusion_objs", [list])
         if check:
             try:
-                exclusions = list(exclusions)
+                exclusion_objs = list(exclusion_objs)
                 self._report(
-                    gp.check._conversion(exclusions, "exclusions", list, False),
+                    gp.check._conversion(exclusion_objs, "exclusion_objs", list, False),
                     "Warning",
                 )
             except Exception:
                 self._report(check, "TypeError")
-        for exclusion in exclusions:
+        for exclusion_obj in exclusion_objs:
             self._report(
                 gp.check._check_type(
-                    exclusion,
-                    "exclusion",
+                    exclusion_obj,
+                    "exclusion_obj",
                     [gp.geometry.region.Circle, gp.geometry.region.Path],
                 ),
                 "TypeError",
@@ -794,8 +794,8 @@ class Sequence(SequenceBase):
             print(traceback.format_exc())
             return
         self._target_nodes = target_nodes
-        self._boundary = boundary
-        self._exclusions = exclusions
+        self._boundary_obj = boundary_obj
+        self._exclusion_objs = exclusion_objs
         self._size_lower_bound = size_lower_bound
         self._size_upper_bound = size_upper_bound
         self._save_by_reference = save_by_reference
@@ -818,8 +818,8 @@ class Sequence(SequenceBase):
         }
         mesh_settings = {
             "target_nodes": self._target_nodes,
-            "boundary": self._boundary,
-            "exclusions": self._exclusions,
+            "boundary_obj": self._boundary_obj,
+            "exclusion_objs": self._exclusion_objs,
             "size_lower_bound": self._size_lower_bound,
             "size_upper_bound": self._size_upper_bound,
         }
@@ -1088,8 +1088,8 @@ class Sequence(SequenceBase):
                 f_img=_f_img,
                 g_img=_g_img,
                 target_nodes=self._target_nodes,
-                boundary=self._boundary,
-                exclusions=self._exclusions,
+                boundary_obj=self._boundary_obj,
+                exclusion_objs=self._exclusion_objs,
                 size_lower_bound=self._size_lower_bound,
                 size_upper_bound=self._size_upper_bound,
                 mesh_order=self._mesh_order,
@@ -1245,4 +1245,5 @@ class SequenceResults(SequenceBase):
                 for i in range(np.shape(self._meshes)[0]):
                     self._meshes[i] = self._load_mesh(mesh_index=i, verbose=False)
                     bar()
+            self.data["file_settings"]["save_by_reference"] = False
         self.data["meshes"] = self._meshes

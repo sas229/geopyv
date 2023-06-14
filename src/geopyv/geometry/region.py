@@ -43,17 +43,17 @@ class RegionBase(Object):
 
 class Region(RegionBase):
     def __init__(
-        self, shape=None, coord=None, boundary=None, rigid=False, hard=True, track=True
+        self, shape=None, centre=None, nodes=None, rigid=False, hard=True, track=True
     ):
         """
-        hard_boundary : bool, optional
-            Boolean to control whether the boundary is included in the
+        hard : bool, optional
+            Boolean to control whether the nodes is included in the
             binary mask. True -included, False - not included.
             Defaults to True.
         """
         self._shape = shape
-        self._coord = coord
-        self._boundary = boundary
+        self._centre = centre
+        self._nodes = nodes
         self._rigid = rigid
         self._hard = hard
         self._track = track
@@ -67,47 +67,41 @@ class Region(RegionBase):
             "hard": self._hard,
             "track": self._track,
             "specifics": self._specifics,
-            "coords": [self._coord],
-            "boundaries": [self._boundary],
+            "centres": [self._centre],
+            "nodes": [self._nodes],
         }
         self._reference_update_register = []
         self._ref_index = None
 
-    def _update(self, f_img, warp):
+    def _store(self, warp):
         if self._track:
             if self._rigid:
-                local_coordinates = self._boundary - self._coord
+                local_coordinates = self._nodes - self._centre
                 theta = (warp[3] - warp[4]) / 2
                 rot = np.asarray(
                     [[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]]
                 )
-                self.data["boundaries"].append(
-                    self._coord + warp[:2] + local_coordinates @ rot
+                self.data["nodes"].append(
+                    self._centre + warp[:2] + local_coordinates @ rot
                 )
-                self.data["coords"].append(self._coord + warp[:2])
+                self.data["centres"].append(self._centre + warp[:2])
             else:
-                self.data["boundaries"].append(self._boundary + warp)
-                self.data["coords"].append(self._coord + np.mean(warp, axis=0))
-            if self._ref_update(f_img):
-                self._boundary = self.data["boundaries"][-1]
-                self._coord = self.data["coords"][-1]
+                self.data["nodes"].append(self._nodes + warp)
+                self.data["centres"].append(self._centre + np.mean(warp, axis=0))
         self._solved = True
         self.data["solved"] = self._solved
 
-    def _ref_update(self, f_img):
+    def _update(self, f_img_filepath):
         index = int(
             re.findall(
                 r"\d+",
-                f_img,
+                f_img_filepath,
             )[-1]
         )
-        print(index, self._ref_index)
         if index != self._ref_index:
-            print("Triggered!")
             self._ref_index = index
-            return True
-        else:
-            return False
+            self._nodes = self.data["nodes"][-1]
+            self._centre = self.data["centres"][-1]
 
 
 class Circle(Region):
@@ -118,7 +112,7 @@ class Circle(Region):
     """
 
     def __init__(
-        self, coord=None, radius=50.0, size=20.0, rigid=True, hard=True, track=True
+        self, centre=None, radius=50.0, size=20.0, rigid=True, hard=True, track=True
     ):
         """
 
@@ -126,7 +120,7 @@ class Circle(Region):
 
         Parameters
         ----------
-        coord : numpy.ndarray(2,)
+        centre : numpy.ndarray(2,)
             Central coordinate of the circular Region.
 
         Attributes
@@ -134,10 +128,12 @@ class Circle(Region):
 
         """
         # Input check.
-        if self._report(gp.check._check_type(coord, "coord", [np.ndarray]), "Warning"):
+        if self._report(
+            gp.check._check_type(centre, "centre", [np.ndarray]), "Warning"
+        ):
             image = gp.io._load_f_img()
-            selector = gp.gui.selectors.coordinate.CoordinateSelector()
-            coord = selector.select(image, gp.templates.Circle(50))
+            selector = gp.gui.selectors.coordinate.coordinateSelector()
+            centre = selector.select(image, gp.templates.Circle(50))
         check = gp.check._check_type(radius, "radius", [float])
         if check:
             try:
@@ -171,20 +167,20 @@ class Circle(Region):
             "radius": self._radius,
         }
 
-        # Defining boundary.
+        # Defining nodes.
         number_points = np.maximum(
             6, int(2 * np.pi * radius / size)
         )  # Use a minimum of six points irrespective of target size defined.
         theta = np.linspace(0, 2 * np.pi, number_points, endpoint=False)
-        x = radius * np.cos(theta) + coord[0]
-        y = radius * np.sin(theta) + coord[1]
-        boundary = np.column_stack((x, y))
+        x = radius * np.cos(theta) + centre[0]
+        y = radius * np.sin(theta) + centre[1]
+        nodes = np.column_stack((x, y))
 
         # Store general variables.
         super().__init__(
             shape="Circle",
-            coord=coord,
-            boundary=boundary,
+            centre=centre,
+            nodes=nodes,
             rigid=rigid,
             hard=hard,
             track=track,
@@ -198,14 +194,14 @@ class Path(Region):
 
     """
 
-    def __init__(self, coord=None, boundary=None, rigid=True, hard=True, track=True):
+    def __init__(self, centre=None, nodes=None, rigid=True, hard=True, track=True):
         """
 
         Class for circular Region. Subclassed from Region.
 
         Parameters
         ----------
-        coord : numpy.ndarray(2,)
+        centre : numpy.ndarray(2,)
             Central coordinate of the circular Region.
 
         Attributes
@@ -214,26 +210,26 @@ class Path(Region):
         """
         # Input check.
         if self._report(
-            gp.check._check_type(coord, "coord", [np.ndarray, type(None)]), "Warning"
+            gp.check._check_type(centre, "centre", [np.ndarray, type(None)]), "Warning"
         ):
             image = gp.io._load_f_img()
-            selector = gp.gui.selectors.coordinate.CoordinateSelector()
-            coord = selector.select(image, gp.templates.Circle(50))
-        check = gp.check._check_type(boundary, "boundary", [np.ndarray])
+            selector = gp.gui.selectors.coordinate.coordinateSelector()
+            centre = selector.select(image, gp.templates.Circle(50))
+        check = gp.check._check_type(nodes, "nodes", [np.ndarray])
         if check:
             try:
-                boundary = np.asarray(boundary)
+                nodes = np.asarray(nodes)
                 self._report(
-                    gp.check._conversion(boundary, "boundary", np.ndarray, False),
+                    gp.check._conversion(nodes, "nodes", np.ndarray, False),
                     "Warning",
                 )
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_dim(boundary, "boundary", 2), "ValueError")
-        self._report(gp.check._check_axis(boundary, "boundary", 1, [2]), "ValueError")
+        self._report(gp.check._check_dim(nodes, "nodes", 2), "ValueError")
+        self._report(gp.check._check_axis(nodes, "nodes", 1, [2]), "ValueError")
 
-        if coord is None:
-            coord = np.mean(boundary, axis=0)
+        if centre is None:
+            centre = np.mean(nodes, axis=0)
 
         # Store unique variables.
         self._specifics = {}
@@ -241,8 +237,8 @@ class Path(Region):
         # Store general variables.
         super().__init__(
             shape="Path",
-            coord=coord,
-            boundary=boundary,
+            centre=centre,
+            nodes=nodes,
             rigid=rigid,
             hard=hard,
             track=track,

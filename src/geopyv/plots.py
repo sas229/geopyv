@@ -1162,6 +1162,7 @@ def standard_error_validation(
     ax.set_xscale(scale)
     ax.set_yscale("log")
     ax.grid(which="both")
+    ax.set_axisbelow(True)
 
     # Limit control.
     if xlim is not None:
@@ -1280,6 +1281,7 @@ def mean_error_validation(
     ax.set_xscale(scale)
     ax.set_yscale("log")
     ax.grid(which="both")
+    ax.set_axisbelow(True)
 
     # Limit control.
     if xlim is not None:

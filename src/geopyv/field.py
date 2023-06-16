@@ -324,8 +324,8 @@ class Field(FieldBase):
         series=None,
         target_particles=1000,
         track=True,
-        boundary=None,
-        exclusions=[],
+        boundary_obj=None,
+        exclusion_objs=[],
         coordinates=None,
         volumes=None,
         stresses=np.zeros(6),
@@ -403,46 +403,32 @@ class Field(FieldBase):
         self._report(
             gp.check._check_range(target_particles, "target_particles", 1), "ValueError"
         )
-
-        check = gp.check._check_type(boundary, "boundary", [np.ndarray, type(None)])
+        self._report(
+            gp.check._check_type(
+                boundary_obj,
+                "boundary_obj",
+                [gp.geometry.region.Circle, gp.geometry.region.Path, type(None)],
+            ),
+            "TypeError",
+        )
+        check = gp.check._check_type(exclusion_objs, "exclusion_objs", [list])
         if check:
             try:
-                boundary = np.asarray(boundary)
+                exclusion_objs = list(exclusion_objs)
                 self._report(
-                    gp.check._conversion(boundary, "boundary", np.ndarray, False),
+                    gp.check._conversion(exclusion_objs, "exclusion_objs", list, False),
                     "Warning",
                 )
             except Exception:
                 self._report(check, "TypeError")
-        if boundary:
-            self._report(gp.check._check_dim(boundary, "boundary", 2), "ValueError")
+        for exclusion_obj in exclusion_objs:
             self._report(
-                gp.check._check_axis(boundary, "boundary", 1, [2]), "ValueError"
-            )
-        check = gp.check._check_type(exclusions, "exclusions", [list])
-        if check:
-            try:
-                exclusions = list(exclusions)
-                self._report(
-                    gp.check._conversion(exclusions, "exclusions", list, False),
-                    "Warning",
-                )
-            except Exception:
-                self._report(check, "TypeError")
-        for exclusion in exclusions:
-            check = gp.check._check_type(exclusion, "exclusion", [np.ndarray])
-            if check:
-                try:
-                    exclusion = np.asarray(exclusion)
-                    self._report(
-                        gp.check._conversion(exclusion, "exclusion", np.ndarray, False),
-                        "Warning",
-                    )
-                except Exception:
-                    self._report(check, "TypeError")
-            self._report(gp.check._check_dim(exclusion, "exclusion", 2), "ValueError")
-            self._report(
-                gp.check._check_axis(exclusion, "exclusion", 1, [2]), "ValueError"
+                gp.check._check_type(
+                    exclusion_obj,
+                    "exclusion_obj",
+                    [gp.geometry.region.Circle, gp.geometry.region.Path, type(None)],
+                ),
+                "TypeError",
             )
         check = gp.check._check_type(
             coordinates, "coordinates", [np.ndarray, type(None)]
@@ -579,55 +565,30 @@ class Field(FieldBase):
 
         # Particle distribution.
         if _auto_distribute is True:
-            # Extract region of interest.
-            if boundary is None:
-                self._boundary = mesh_0["boundary"]
-            if exclusions == []:
-                self._exclusions = mesh_0["exclusions"]
+            self._boundary_obj = mesh_0["boundary_obj"]
+            self._exclusion_objs = mesh_0["exclusion_objs"]
             self._size_lower_bound = mesh_0["size_lower_bound"]
             self._size_upper_bound = mesh_0["size_upper_bound"]
-
-            self._size_upper_bound = min(
-                self._size_upper_bound,
-                np.max(
-                    np.sqrt(
-                        np.sum(
-                            np.square(
-                                np.diff(self._boundary.data["boundaries"][0], axis=0)
-                            ),
-                            axis=1,
-                        )
-                    )
-                ),
-            )
-
-            # Define region of interest.
-            self._boundary._boundary = self._boundary.data["boundaries"][0]
-            for exclusion in self._exclusions:
-                exclusion._boundary = exclusion.data["boundaries"][0]
             (
                 self._borders,
                 self._segments,
                 self._curves,
-                _,
+                self._mask,
             ) = gp.geometry.meshing._define_RoI(
-                gp.image.Image(self._image_0),
-                self._boundary,
-                self._exclusions,
+                gp.image.Image(self._image_0), self._boundary_obj, self._exclusion_objs
             )
-
             # Initialize gmsh if not already initialized.
             if gmsh.isInitialized() == 0:
                 gmsh.initialize()
             gmsh.option.setNumber("General.Verbosity", 2)
-
             log.info(
                 "Generating mesh using gmsh with approximately {n} particles.".format(
                     n=self._target_particles
                 )
             )
-
             self._initial_mesh()
+            self._update_mesh()
+            gmsh.finalize()
             self._distribute_particles()
             self._stress_state(stresses)
             log.info(
@@ -678,8 +639,6 @@ class Field(FieldBase):
             bounds=(self._size_lower_bound, self._size_upper_bound),
             method="bounded",
         )
-        self._update_mesh()
-        gmsh.finalize()
 
     def _update_mesh(self):
         """

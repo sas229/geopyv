@@ -12,6 +12,8 @@ import shapely
 from alive_progress import alive_bar
 import math
 
+# import matplotlib.pyplot as plt
+
 # from build.models import LinearElastic, MCC, SMCC
 
 log = logging.getLogger(__name__)
@@ -489,11 +491,38 @@ class Particle(ParticleBase):
                 flag = True
                 break
         if flag is False:
+            # print(self._coordinates[0])
+            # print(np.diff(self._coordinates, axis = 0))
+            # fig, ax = plt.subplots()
+            # nodes = self._series[0]["nodes"]
+            # ax.plot(
+            #     nodes[self._series[0]["boundary"]][[0,1,2,3,0],0],
+            #     nodes[self._series[0]["boundary"]][[0,1,2,3,0],1],
+            #     color = "b"
+            # )
+            # nodes = self._series[m]["nodes"]
+            # ax.plot(
+            #     nodes[
+            #         self._series[self._reference_index]["boundary"]
+            #     ][[0,1,2,3,0],0],
+            #     nodes[
+            #         self._series[self._reference_index]["boundary"]
+            #     ][[0,1,2,3,0],1],
+            #     color = "b"
+            # )
+            # ax.scatter(self._coordinates[:,0],self._coordinates[:,1], color = "r")
+            # ax.scatter(
+            #    self._coordinates[self._reference_index][0],
+            #    self._coordinates[self._reference_index][1],
+            #    color = "g"
+            # )
+            # ax.axis("equal")
+            # plt.show()
             log.error(
                 "Particle {particle} is outside of boundary {boundary}.\n"
                 " Check for convex boundary update.".format(
                     particle=self._coordinates[self._reference_index],
-                    boundary=self._series[m]["boundary"]._boundary,
+                    boundary=nodes[self._series[m]["boundary"]],
                 )
             )
             raise ValueError("Particle outside of boundary.")

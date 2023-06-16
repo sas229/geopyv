@@ -13,7 +13,6 @@ from scipy.optimize import minimize_scalar
 from alive_progress import alive_bar
 import traceback
 
-
 log = logging.getLogger(__name__)
 
 
@@ -771,6 +770,8 @@ class Mesh(MeshBase):
             },
             "target_nodes": self._target_nodes,
             "mesh_order": self._mesh_order,
+            "boundary_obj": self._boundary_obj,
+            "exclusion_objs": self._exclusion_objs,
             "boundary": self._boundary,
             "exclusions": self._exclusions,
             "size_lower_bound": self._size_lower_bound,
@@ -1064,6 +1065,7 @@ class Mesh(MeshBase):
 
         # Create initial mesh.
         self._initial_mesh()
+        self._update_mesh()
 
         # Solve initial mesh.
         self._message = "Solving initial mesh"
@@ -1169,14 +1171,14 @@ class Mesh(MeshBase):
                 subset = gp.subset.Subset(
                     f_img=self._f_img,
                     g_img=self._g_img,
-                    f_coord=self._exclusion_objs[i]._coord,
+                    f_coord=self._exclusion_objs[i]._centre,
                     template=gp.templates.Circle(
                         int(self._exclusion_objs[i]._specifics["radius"])
                     ),
                 )
-                subset.solve(
-                    tolerance=0.9,
-                )
+                warp_0 = np.zeros(6 * self._subset_order)
+                warp_0[:2] = np.mean(self._displacements[self._exclusions[i]], axis=0)
+                subset.solve(tolerance=0.9, warp_0=warp_0)
                 if subset.data["solved"] is not True:
                     self._update = True
                     self.solved = False
@@ -1189,8 +1191,8 @@ class Mesh(MeshBase):
             else:
                 exclusion_obj_warp.append(self._displacements[self._exclusions[i]])
         self._boundary_obj._store(self._displacements[self._boundary])
-        for i in range(np.shape(self._exclusions)[0]):
-            self._exclusion_obj[i]._store(exclusion_obj_warp[i])
+        for i in range(np.shape(self._exclusion_objs)[0]):
+            self._exclusion_objs[i]._store(exclusion_obj_warp[i])
 
     def _update_region(self):
         self._boundary_obj._update(self._f_img.filepath)
@@ -1217,7 +1219,7 @@ class Mesh(MeshBase):
         )  # Element connectivity array.
         self._boundary = gmsh.model.occ.getCurveLoops(0)[1][0]
         self._exclusions = []
-        for i in range(len(self._exclusions)):
+        for i in range(len(self._exclusion_objs)):
             self._exclusions.append(gmsh.model.occ.getCurveLoops(0)[1][i + 1])
 
     def _find_seed_node(self):
@@ -1691,7 +1693,6 @@ class Mesh(MeshBase):
                         break
         if self._subsets[self._seed_node].data["solved"]:
             self._corrections()
-        # Update check.
         if any(self._subset_solved != -1) or any(self._C_ZNCC < self._tolerance):
             self._update = True
             self.solved = False
@@ -1709,20 +1710,27 @@ class Mesh(MeshBase):
         for corrective_iteration in range(1, self._corrective_iterations + 1):
             sorted_correlation = np.argsort(self._C_ZNCC)
             j = 0
+            k = 0
+            benefit = np.zeros(len(self._C_ZNCC))
             with alive_bar(
                 np.shape(self._subsets)[0],
                 dual_line=True,
                 bar="blocks",
                 title="Performing corrections...",
             ) as bar:
-                for idx in range(np.shape(sorted_correlation)[0]):
+                for idx in sorted_correlation:
+                    k += 1
                     subset = gp.subset.Subset(
                         f_coord=self._nodes[idx],
                         f_img=self._f_img,
                         g_img=self._g_img,
                         template=self._subsets[idx]._template,
                     )
-                    warp = np.mean(self._p[self._connectivity(idx)], axis=0)
+                    neighbours = self._connectivity(idx)
+                    warp = np.mean(
+                        self._p[neighbours[self._C_ZNCC[neighbours] > self._tolerance]],
+                        axis=0,
+                    )
                     subset.solve(
                         max_norm=self._max_norm,
                         max_iterations=self._max_iterations,
@@ -1737,13 +1745,24 @@ class Mesh(MeshBase):
                             and subset.solved
                         ):
                             j += 1
+                            benefit[idx] = subset._C_ZNCC - self._subsets[idx]._C_ZNCC
                             self._subsets[idx] = subset
                             self._store_variables(idx, seed=True)
                     except Exception:
                         pass
                     bar()
-                    bar.text = "{} corrections accepted".format(round(j / (idx + 1), 3))
-            log.info("{ca} corrections accepted".format(ca=round(j / (idx + 1), 3)))
+                    bar.text = "{} corrections accepted".format(round(j / k, 3))
+            log.info(
+                (
+                    "{ca} corrections accepted;"
+                    "{max} maximum improvement;"
+                    "{mean} mean improvement"
+                ).format(
+                    ca=round(j / k, 3),
+                    max=round(np.max(benefit), 3),
+                    mean=round(np.mean(benefit), 3),
+                )
+            )
 
     def _connectivity(self, idx):
         """

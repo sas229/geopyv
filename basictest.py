@@ -12,6 +12,7 @@ template = gp.templates.Circle(50)
 subset = gp.subset.Subset(
     f_img=ref, g_img=tar, f_coord=np.asarray([1000, 1000]), template=template
 )
+
 # Subset inspection.
 subset.inspect()
 
@@ -34,7 +35,7 @@ ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
 tar = gp.image.Image("./images/T-Bar/IMG_1065.jpg")
 template = gp.templates.Circle(50)
 boundary = gp.geometry.region.Path(
-    boundary=np.asarray(
+    nodes=np.asarray(
         [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
     ),
     rigid=False,
@@ -44,7 +45,7 @@ boundary = gp.geometry.region.Path(
 exclusions = []
 exclusions.append(
     gp.geometry.region.Circle(
-        coord=np.asarray([1925, 1470]),
+        centre=np.asarray([1925, 1470]),
         radius=430.0,
         size=100.0,
         rigid=True,
@@ -60,15 +61,14 @@ mesh = gp.mesh.Mesh(
     f_img=ref,
     g_img=tar,
     target_nodes=1000,
-    boundary=boundary,
-    exclusions=exclusions,
+    boundary_obj=boundary,
+    exclusion_objs=exclusions,
     subset_size_compensation=True,
     mesh_order=1,
 )
 
 # Mesh inspection.
 # mesh.inspect(subset_index=5000)
-
 # Mesh saving : note, prior to solving, a geopyv object cannot be saved.
 gp.io.save(object=mesh, filename="mesh")
 
@@ -128,12 +128,11 @@ mesh.convergence(subset_index=0)
 
 # If you supply a subset index that is out of range you get a ValueError.
 # mesh.convergence(subset_index=4000)
-
 # Sequence test.
 # Sequence setup.
 template = gp.templates.Circle(50)
 boundary = gp.geometry.region.Path(
-    boundary=np.asarray(
+    nodes=np.asarray(
         [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
     ),
     rigid=False,
@@ -143,7 +142,7 @@ boundary = gp.geometry.region.Path(
 exclusions = []
 exclusions.append(
     gp.geometry.region.Circle(
-        coord=np.asarray([1925, 1470]),
+        centre=np.asarray([1925, 1470]),
         radius=430.0,
         size=100.0,
         rigid=True,
@@ -158,8 +157,8 @@ alpha = 0.2
 sequence = gp.sequence.Sequence(
     image_dir="images/T-Bar/",
     target_nodes=1000,
-    boundary=boundary,
-    exclusions=exclusions,
+    boundary_obj=boundary,
+    exclusion_objs=exclusions,
     save_by_reference=True,
     mesh_dir="images/T-Bar/meshes/",
 )

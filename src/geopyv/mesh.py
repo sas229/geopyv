@@ -6,6 +6,7 @@ Mesh module for geopyv.
 import logging
 import numpy as np
 import geopyv as gp
+import scipy as sp
 from geopyv.object import Object
 import gmsh
 from copy import deepcopy
@@ -1218,9 +1219,14 @@ class Mesh(MeshBase):
             (np.asarray(ent) - 1).flatten(), (-1, 3 * self._mesh_order)
         )  # Element connectivity array.
         self._boundary = gmsh.model.occ.getCurveLoops(0)[1][0]
+        self._edges = list(gmsh.model.mesh.getNodesForPhysicalGroup(1, 0)[0] - 1)
         self._exclusions = []
+        self._on_exclusions = []
         for i in range(len(self._exclusion_objs)):
             self._exclusions.append(gmsh.model.occ.getCurveLoops(0)[1][i + 1])
+            self._edges += list(
+                gmsh.model.mesh.getNodesForPhysicalGroup(1, i + 1)[0] - 1
+            )
 
     def _find_seed_node(self):
         """
@@ -1693,18 +1699,39 @@ class Mesh(MeshBase):
                         break
         if self._subsets[self._seed_node].data["solved"]:
             self._corrections()
-        if any(self._subset_solved != -1) or any(self._C_ZNCC < self._tolerance):
+        self._element_area()
+        self._element_strains()
+        if self._compatibility():
+            log.error("Local mesh compatibility failure.")
+            self._update = True
+            self.solved = False
+            self._unsolvable = True
+        elif np.max(self._warps[:, 2:]) > 1.0 or np.min(self._warps[:, 2:]) < -1.0:
+            log.error("Incompatible deformation.")
+            self._update = True
+            self.solved = False
+            self._unsolvable = True
+        elif any(self._subset_solved != -1) or any(self._C_ZNCC < self._tolerance):
             self._update = True
             self.solved = False
             self._unsolvable = True
         else:
-            # self._corrections()
-            # Compute element areas and strains.
             self._update = False
             self.solved = True
             self._unsolvable = False
-            self._element_area()
-            self._element_strains()
+
+    def _compatibility(self):
+        for i in range(np.shape(self._subsets)[0]):
+            if i not in self._edges:
+                neighbours = self._connectivity(i)
+                coord = self._nodes[i] + self._displacements[i]
+                neighbour_coords = (
+                    self._nodes[neighbours] + self._displacements[neighbours]
+                )
+                hull = sp.spatial.Delaunay(neighbour_coords)
+                if hull.find_simplex(coord) < 0:
+                    return True
+        return False
 
     def _corrections(self):
         for corrective_iteration in range(1, self._corrective_iterations + 1):

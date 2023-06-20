@@ -6,13 +6,11 @@ Particle module for geopyv.
 import logging
 import numpy as np
 import geopyv as gp
+import scipy as sp
 from geopyv.object import Object
 import re
-import shapely
 from alive_progress import alive_bar
 import math
-
-# import matplotlib.pyplot as plt
 
 # from build.models import LinearElastic, MCC, SMCC
 
@@ -485,48 +483,12 @@ class Particle(ParticleBase):
         dist = np.einsum("ij,ij->i", diff, diff)
         dist_sorted = np.argpartition(dist, min(10, math.ceil(0.05 * len(dist))))
         for index in dist_sorted:
-            poly = shapely.Polygon(nodes[elements[index]][:3])
-            point = shapely.Point(self._coordinates[self._reference_index])
-            if poly.intersects(point):
+            hull = sp.spatial.Delaunay(nodes[elements[index]][:3])
+            if hull.find_simplex(self._coordinates[self._reference_index]) >= 0:
                 flag = True
                 break
         if flag is False:
-            # print(self._coordinates[0])
-            # print(np.diff(self._coordinates, axis = 0))
-            # fig, ax = plt.subplots()
-            # nodes = self._series[0]["nodes"]
-            # ax.plot(
-            #     nodes[self._series[0]["boundary"]][[0,1,2,3,0],0],
-            #     nodes[self._series[0]["boundary"]][[0,1,2,3,0],1],
-            #     color = "b"
-            # )
-            # nodes = self._series[m]["nodes"]
-            # ax.plot(
-            #     nodes[
-            #         self._series[self._reference_index]["boundary"]
-            #     ][[0,1,2,3,0],0],
-            #     nodes[
-            #         self._series[self._reference_index]["boundary"]
-            #     ][[0,1,2,3,0],1],
-            #     color = "b"
-            # )
-            # ax.scatter(self._coordinates[:,0],self._coordinates[:,1], color = "r")
-            # ax.scatter(
-            #    self._coordinates[self._reference_index][0],
-            #    self._coordinates[self._reference_index][1],
-            #    color = "g"
-            # )
-            # ax.axis("equal")
-            # plt.show()
-            log.error(
-                "Particle {particle} is outside of boundary {boundary}.\n"
-                " Check for convex boundary update.".format(
-                    particle=self._coordinates[self._reference_index],
-                    boundary=nodes[self._series[m]["boundary"]],
-                )
-            )
             raise ValueError("Particle outside of boundary.")
-
         return index
 
     def _local_coordinates(self, element_nodes):

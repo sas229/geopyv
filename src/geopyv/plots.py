@@ -1100,7 +1100,7 @@ def standard_error_validation(
         component=labels[component]
     )
     fig, ax = plt.subplots(num=title)
-    for i in range(np.shape(data["applied"])[0]):
+    for i in range(len(data["applied"])):
         series = np.zeros((np.shape(data["applied"][i])[0], 2))
         for j in range(np.shape(data["applied"][i])[0]):
             if component == 12:
@@ -1233,7 +1233,7 @@ def mean_error_validation(
     ]
     title = r"Mean error: component = {component}".format(component=labels[component])
     fig, ax = plt.subplots(num=title)
-    for i in range(np.shape(data["applied"])[0]):
+    for i in range(len(data["applied"])):
         series = np.zeros((np.shape(data["applied"][i])[0], 2))
         for j in range(np.shape(data["applied"][i])[0]):
             if component == 12:

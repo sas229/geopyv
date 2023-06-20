@@ -11,6 +11,7 @@ from geopyv.object import Object
 import re
 from alive_progress import alive_bar
 import math
+import geomat
 
 # from build.models import LinearElastic, MCC, SMCC
 
@@ -449,8 +450,8 @@ class Particle(ParticleBase):
         """
         self.data.update({"parameters": parameters, "state": state})
         self.solved += self._strain_path()
-        # if model:
-        #    self.solved += self._stress_path(model, state, parameters)
+        if model:
+            self.solved += self._stress_path(model, state, parameters)
         self._results = {
             "coordinates": self._coordinates,
             "warps": self._warps,
@@ -703,49 +704,50 @@ class Particle(ParticleBase):
     def _stress_path(self, model, state, parameters):
         """Under construction"""
 
-        # if model == "LinearElastic":
-        #     # Put input checks here!
-        #     # model = models.LinearElastic(
-        #     model = LinearElastic(
-        #         parameters=parameters,
-        #         state=state,
-        #         # log_severity = "verbose"
-        #     )
-        # if model == "MCC":
-        #     # Put input checks here!
-        #     # model = models.MCC(
-        #     model = MCC(parameters=parameters, state=state, log_severity="verbose")
-        # elif model == "SMCC":
-        #     # Put input checks here!
-        #     # model = models.SMCC(
-        #     model = SMCC(
-        #         parameters=parameters,
-        #         state=state,
-        #         # log_severity = "verbose"
-        #     )
-        # strain_incs = np.diff(self._strains, axis=0)
-        # ps = []
-        # qs = []
-        # model.set_sigma_prime_tilde(self._stresses[0].T)
-        # model.set_Delta_epsilon_tilde(strain_incs[0])
-        # ps.append(model.p_prime)
-        # qs.append(model.q)
-        # for i in range(np.shape(self._series)[0]):
-        #     try:
-        #         model.set_sigma_prime_tilde(self._stresses[i].T)
-        #         model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
-        #         model.solve()
-        #     except Exception:
-        #         log.error("geomat error. Stress path curtailed.")
-        #         raise ValueError("geomat error. Stress path curtailed.")
-        #     ps.append(model.p_prime)
-        #     qs.append(model.q)
-        #     self._stresses[i + 1] = model.sigma_prime_tilde
-        # self._works[1:] = (
-        #     np.sum(self._stresses[1:] * strain_incs, axis=-1) * self._volumes[1:]
-        # )
-        # self._ps = np.asarray(ps)
-        # self._qs = np.asarray(qs)
+        if model == "LinearElastic":
+            # Put input checks here!
+            model = geomat.models.LinearElastic(
+                parameters=parameters,
+                state=state,
+                # log_severity = "verbose"
+            )
+        if model == "MCC":
+            # Put input checks here!
+            model = geomat.models.MCC(
+                parameters=parameters,
+                state=state,
+                # log_severity="verbose"
+            )
+        elif model == "SMCC":
+            # Put input checks here!
+            model = geomat.models.SMCC(
+                parameters=parameters,
+                state=state,
+                # log_severity = "verbose"
+            )
+        strain_incs = np.diff(self._strains, axis=0)
+        ps = []
+        qs = []
+        model.set_sigma_prime_tilde(self._stresses[0].T)
+        model.set_Delta_epsilon_tilde(strain_incs[0])
+        ps.append(model.p_prime)
+        qs.append(model.q)
+        for i in range(np.shape(self._series)[0]):
+            try:
+                model.set_sigma_prime_tilde(self._stresses[i].T)
+                model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
+                model.solve()
+            except Exception:
+                log.error("geomat error. Stress path curtailed.")
+                raise ValueError("geomat error. Stress path curtailed.")
+            ps.append(model.p_prime)
+            qs.append(model.q)
+            self._stresses[i + 1] = model.sigma_prime_tilde
+        self._works[1:] = (
+            np.sum(self._stresses[1:] * strain_incs, axis=-1) * self._volumes[1:]
+        )
+        self._ps = np.asarray(ps)
+        self._qs = np.asarray(qs)
 
         return True
 

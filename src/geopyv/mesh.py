@@ -1723,14 +1723,15 @@ class Mesh(MeshBase):
     def _compatibility(self):
         for i in range(np.shape(self._subsets)[0]):
             if i not in self._edges:
-                neighbours = self._connectivity(i)
+                neighbours = self._connectivity(i, full=True)
                 coord = self._nodes[i] + self._displacements[i]
                 neighbour_coords = (
                     self._nodes[neighbours] + self._displacements[neighbours]
                 )
-                hull = sp.spatial.Delaunay(neighbour_coords)
-                if hull.find_simplex(coord) < 0:
-                    return True
+                if len(neighbour_coords) > 2:
+                    hull = sp.spatial.Delaunay(neighbour_coords)
+                    if hull.find_simplex(coord) < 0:
+                        return True
         return False
 
     def _corrections(self):
@@ -1791,7 +1792,7 @@ class Mesh(MeshBase):
                 )
             )
 
-    def _connectivity(self, idx):
+    def _connectivity(self, idx, full=False):
         """
 
         A private method that returns the indices of nodes connected
@@ -1810,7 +1811,7 @@ class Mesh(MeshBase):
 
         """
 
-        if self._mesh_order == 1:
+        if self._mesh_order == 1 or full is True:
             element_idxs = np.argwhere(np.any(self._elements == idx, axis=1)).flatten()
             pts_idxs = np.unique(self._elements[element_idxs])
             pts_idxs = np.delete(pts_idxs, np.argwhere(pts_idxs == idx))

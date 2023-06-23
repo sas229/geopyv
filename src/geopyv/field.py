@@ -529,9 +529,9 @@ class Field(FieldBase):
             image = gp.image.Image(self._image_0)
             for coord in coordinates:
                 if (
-                    coord[0] > np.shape(image.image_gs)[0]
+                    coord[0] > np.shape(image.image_gs)[1]
                     or coord[0] < 0
-                    or coord[1] > np.shape(image.image_gs)[1]
+                    or coord[1] > np.shape(image.image_gs)[0]
                     or coord[1] < 0
                 ):
                     log.error(

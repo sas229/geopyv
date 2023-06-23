@@ -49,7 +49,7 @@ class Template:
         self.coords = []
         self.shape = "None"
         self.dimension = "None"
-        self.subset_mask = np.zeros(((2 * self.size) + 1, (2 * self.size) + 1)).astype(
+        self.subset_mask = np.ones(((2 * self.size) + 1, (2 * self.size) + 1)).astype(
             np.intc
         )
 
@@ -90,24 +90,13 @@ class Template:
             Value of 0 indicates pixels to mask in template.
 
         """
-        x_coords = (self.coords[:, 0] + centre[0]).astype(np.intc)
-        y_coords = (self.coords[:, 1] + centre[1]).astype(np.intc)
-        masked_coords = np.zeros((1, 2))
-        count = 0
-        for i in range(np.shape(self.coords)[0]):
-            x = x_coords[i]
-            y = y_coords[i]
-            if mask[y, x] == 1:
-                if count == 0:
-                    masked_coords = self.coords[i, :]
-                else:
-                    masked_coords = np.row_stack((masked_coords, self.coords[i, :]))
-                count += 1
-            else:
-                x_s = int(self.coords[i, 0] + self.size)
-                y_s = int(self.coords[i, 1] + self.size)
-                self.subset_mask[x_s, y_s] = 1
-        self.coords = masked_coords
+
+        local = mask[
+            int(centre[1]) - self.size : int(centre[1]) + self.size + 1,
+            int(centre[0]) - self.size : int(centre[0]) + self.size + 1,
+        ]
+        local_masked = local * self.subset_mask
+        self.coords = np.argwhere(local_masked == 1) - self.size
         self.n_px = np.shape(self.coords)[0]
 
 
@@ -170,7 +159,7 @@ class Circle(Template):
             np.arange(-self.size, self.size + 1, 1),
         )
         dist = np.sqrt(x**2 + y**2)
-        self.subset_mask[dist > self.size] = 255
+        self.subset_mask[dist > self.size] = 0
 
 
 class Square(Template):

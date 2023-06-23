@@ -100,7 +100,9 @@ class Speckle(SpeckleBase):
         name=None,
         image_dir=None,
         file_format=".jpg",
-        image_size=1001,
+        image_size_x=1001,
+        image_size_y=1001,
+        speckle_limits=1001,
         image_no=101,
         mmin=0,
         mmax=1,
@@ -144,7 +146,9 @@ class Speckle(SpeckleBase):
 
         self._name = name
         self._image_dir = image_dir
-        self._image_size = image_size
+        self._image_size_x = image_size_x
+        self._image_size_y = image_size_y
+        self._speckle_limits = speckle_limits
         self._file_format = file_format
         self._image_no = image_no
         self._mmin = mmin
@@ -172,14 +176,12 @@ class Speckle(SpeckleBase):
             "speckle_size": self._speckle_size,
         }
 
-    def solve(
-        self,
-        *,
-        wrap=False,
-    ):
+    def solve(self, *, wrap=False, number=None):
         self._wrap = wrap
-        [self.X, self.Y] = np.meshgrid(range(self._image_size), range(self._image_size))
-        self._ref_speckle = self._speckle_distribution()
+        [self.X, self.Y] = np.meshgrid(
+            range(self._image_size_x), range(self._image_size_y)
+        )
+        self._ref_speckle = self._speckle_distribution(number)
         self._mult()
         self.data.update(
             {"wrap": self._wrap, "ref_speckle": self._ref_speckle, "pm": self._pm}
@@ -188,25 +190,48 @@ class Speckle(SpeckleBase):
         self.solved = True
         self.data["solved"] = True
 
-    def _speckle_distribution(self):
-        raw_grid = np.zeros((self._image_size, self._image_size))
-        speckles = []
-        i = 0
-        mi = 0
-        with alive_bar(
-            self._tmi, manual=True, dual_line=True, bar="blocks", title="Speckling..."
-        ) as bar:
-            while mi < self._tmi and i < 50000:
-                new_speckle = np.random.rand(2) * self._image_size
-                speckles.append(new_speckle)
-                raw_grid += np.exp(
-                    -((self.X - new_speckle[0]) ** 2 + (self.Y - new_speckle[1]) ** 2)
-                    / ((self._speckle_size**2) / 4)
-                )
-                final_grid = np.clip(raw_grid * 200, 0, 255)
-                mi = np.mean(final_grid)
-                i += 1
-                bar(min(mi / self._tmi, 1))
+    def _speckle_distribution(self, number):
+        raw_grid = np.zeros((self._image_size_y, self._image_size_x))
+
+        if number is not None:
+            corner = np.asarray(
+                [
+                    0.5 * (self._image_size_x - self._speckle_limits),
+                    0.5 * (self._image_size_y - self._speckle_limits),
+                ]
+            )
+            speckles = corner + np.random.rand(number, 2) * self._speckle_limits
+        else:
+            i = 0
+            mi = 0
+            speckles = []
+            with alive_bar(
+                self._tmi,
+                manual=True,
+                dual_line=True,
+                bar="blocks",
+                title="Speckling...",
+            ) as bar:
+                while mi < self._tmi and i < 50000:
+                    corner = np.asarray(
+                        [
+                            0.5 * self._image_size_y - self._speckle_limits,
+                            0.5 * self._image_size_x - self._speckle_limits,
+                        ]
+                    )
+                    new_speckle = corner + np.random.rand(2) * self._speckle_limits
+                    speckles.append(new_speckle)
+                    raw_grid += np.exp(
+                        -(
+                            (self.X - new_speckle[0]) ** 2
+                            + (self.Y - new_speckle[1]) ** 2
+                        )
+                        / ((self._speckle_size**2) / 4)
+                    )
+                    final_grid = np.clip(raw_grid * 200, 0, 255)
+                    mi = np.mean(final_grid)
+                    i += 1
+                    bar(min(mi / self._tmi, 1))
 
         return np.asarray(speckles)
 
@@ -238,24 +263,50 @@ class Speckle(SpeckleBase):
                     self._warp(i, self._ref_speckle)[:, :2] + self._ref_speckle
                 )
                 if self._wrap:
-                    _tar_speckle %= self._image_size
+                    _tar_speckle[:, 0] %= self._image_size_x
+                    _tar_speckle[:, 1] %= self._image_size_y
                 _grid = self._grid(i, _tar_speckle)
                 self._create(i, _grid)
                 bar()
 
     def _grid(self, i, _tar_speckle):
-        grid = np.zeros((self._image_size, self._image_size))
+        grid = np.zeros((self._image_size_y, self._image_size_x))
         if self.noisem[i, 0] != 0.0:
             _tar_speckle = np.random.normal(loc=_tar_speckle, scale=self.noisem[i, 0])
         for j in range(len(_tar_speckle)):
             di = np.exp(
                 -(
-                    (self.X - _tar_speckle[:, 0][j]) ** 2
-                    + (self.Y - _tar_speckle[:, 1][j]) ** 2
+                    (
+                        self.X[
+                            int(_tar_speckle[j, 1])
+                            - 100 : int(_tar_speckle[j, 1])
+                            + 101,
+                            int(_tar_speckle[j, 0])
+                            - 100 : int(_tar_speckle[j, 0])
+                            + 101,
+                        ]
+                        - _tar_speckle[j, 0]
+                    )
+                    ** 2
+                    + (
+                        self.Y[
+                            int(_tar_speckle[j, 1])
+                            - 100 : int(_tar_speckle[j, 1])
+                            + 101,
+                            int(_tar_speckle[j, 0])
+                            - 100 : int(_tar_speckle[j, 0])
+                            + 101,
+                        ]
+                        - _tar_speckle[j, 1]
+                    )
+                    ** 2
                 )
                 / ((self._speckle_size**2) / 4)
             )
-            grid += di
+            grid[
+                int(_tar_speckle[j, 1]) - 100 : int(_tar_speckle[j, 1]) + 101,
+                int(_tar_speckle[j, 0]) - 100 : int(_tar_speckle[j, 0]) + 101,
+            ] += di
         if self.noisem[i, 1] != 0.0:
             grid = np.random.normal(loc=grid, scale=self.noisem[i, 1])
         grid = np.clip(grid * 200, 0, 255)

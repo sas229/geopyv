@@ -489,6 +489,14 @@ class Particle(ParticleBase):
                 flag = True
                 break
         if flag is False:
+            log.error(
+                "Particle {particle} is outside of boundary {boundary}.\n"
+                " Check for convex boundary update.".format(
+                    particle=self._coordinates[self._reference_index],
+                    boundary=self._series[m]["nodes"][self._series[m]["boundary"]],
+                )
+            )
+            print(m)
             raise ValueError("Particle outside of boundary.")
         return index
 

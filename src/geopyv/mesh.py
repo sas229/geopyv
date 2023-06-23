@@ -1054,8 +1054,6 @@ class Mesh(MeshBase):
         self._tolerance = tolerance
         self._seed_tolerance = seed_tolerance
         self._alpha = alpha
-        self._subset_bgf_nodes = None
-        self._subset_bgf_values = None
         self._update = False
         self._seed_warp = seed_warp
 
@@ -1179,7 +1177,7 @@ class Mesh(MeshBase):
                 )
                 warp_0 = np.zeros(6 * self._subset_order)
                 warp_0[:2] = np.mean(self._displacements[self._exclusions[i]], axis=0)
-                subset.solve(tolerance=0.9, warp_0=warp_0)
+                subset.solve(tolerance=0.9, warp_0=warp_0, order=self._subset_order)
                 if subset.data["solved"] is not True:
                     self._update = True
                     self.solved = False
@@ -1571,29 +1569,11 @@ class Mesh(MeshBase):
             (m, 2), dtype=np.float64
         )  # Displacement output array.
 
-        # All nodes.
-        entities = gmsh.model.getEntities()
-        self._node_tags = []
-        for e in entities:
-            tags, _, _ = gmsh.model.mesh.getNodes(e[0], e[1])
-            self._node_tags = np.append(self._node_tags, tags.flatten()).astype(int)
-        # Interior and boundary nodes.
-        entities = gmsh.model.getEntities(2)
-        self._interior_node_tags = []
-        for e in entities:
-            tags, _, _ = gmsh.model.mesh.getNodes(e[0], e[1])
-            self._interior_node_tags = np.append(
-                self._interior_node_tags, tags.flatten()
-            ).astype(int)
-        self._borders_node_tags = (
-            np.setdiff1d(self._node_tags, self._interior_node_tags).astype(int) - 1
-        )
         # Template masking using binary mask.
-        for tag in range(len(self._node_tags)):
-            if tag in self._borders_node_tags:
-                centre = self._nodes[tag]
+        for i in range(np.shape(self._nodes)[0]):
+            if i in self._edges:
                 template = deepcopy(self._template)
-                template.mask(centre, self._mask)
+                template.mask(self._nodes[i], self._mask)
                 if self._subset_size_compensation:
                     if template.n_px < self._template.n_px:
                         size = int(
@@ -1604,24 +1584,24 @@ class Mesh(MeshBase):
                             template = gp.templates.Circle(radius=size)
                         elif self._template.shape == "square":
                             template = gp.templates.Square(length=size)
-                        template.mask(centre, self._mask)
-                self._subsets[tag] = gp.subset.Subset(
-                    f_coord=self._nodes[tag],
+                template.mask(self._nodes[i], self._mask)
+                self._subsets[i] = gp.subset.Subset(
+                    f_coord=self._nodes[i],
                     f_img=self._f_img,
                     g_img=self._g_img,
                     template=template,
                 )  # Create masked boundary subset.
             else:
-                self._subsets[tag] = gp.subset.Subset(
-                    f_coord=self._nodes[tag],
+                self._subsets[i] = gp.subset.Subset(
+                    f_coord=self._nodes[i],
                     f_img=self._f_img,
                     g_img=self._g_img,
                     template=self._template,
                 )  # Create full subset.
+
         # Solve subsets in mesh.
-        number_nodes = np.shape(self._nodes)[0]
         with alive_bar(
-            number_nodes,
+            np.shape(self._nodes)[0],
             dual_line=True,
             bar="blocks",
             title=self._message,
@@ -1693,7 +1673,7 @@ class Mesh(MeshBase):
                     )  # Calculate for neighbouring subsets.
                     count += 1
                     self._bar()
-                    if count == number_nodes:
+                    if count == np.shape(self._nodes)[0]:
                         break
                     elif solvable is False:
                         break

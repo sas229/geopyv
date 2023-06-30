@@ -850,7 +850,6 @@ class Sequence(SequenceBase):
         tolerance=0.75,
         seed_tolerance=0.9,
         alpha=0.5,
-        subset_size_compensation=False,
         guide=False,
         sequential=False,
     ):
@@ -888,10 +887,6 @@ class Sequence(SequenceBase):
         alpha : float, optional
             Mesh adaptivity control parameter.
             Defaults to a value of 0.5.
-        subset_size_compensation: bool, optional
-            Boolean to control whether masked subsets are enlarged to
-            maintain area (and thus better correlation).
-            Defaults to False.
 
         Returns
         -------
@@ -1029,12 +1024,6 @@ class Sequence(SequenceBase):
             except Exception:
                 self._report(check, "TypeError")
         self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
-        self._report(
-            gp.check._check_type(
-                subset_size_compensation, "subset_size_compensation", [bool]
-            ),
-            "TypeError",
-        )
         if seed_warp is not None:
             check = gp.check._check_type(seed_warp, "seed_warp", [np.ndarray])
             if check:
@@ -1069,12 +1058,13 @@ class Sequence(SequenceBase):
         self._alpha = alpha
         self._guide = guide
         self._sequential = sequential
-        self._subset_size_compensation = subset_size_compensation
         self._seed_warp = np.zeros(6 * self._subset_order)
 
         # Solve.
         _f_index = 0
         _g_index = 1
+        _seed_coord_t = seed_coord
+        _seed_displacement = np.zeros(2)
         _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
         _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
         while _g_index < len(self._image_indices):
@@ -1093,7 +1083,6 @@ class Sequence(SequenceBase):
                 size_lower_bound=self._size_lower_bound,
                 size_upper_bound=self._size_upper_bound,
                 mesh_order=self._mesh_order,
-                subset_size_compensation=self._subset_size_compensation,
             )  # Initialise mesh object.
             mesh.solve(
                 seed_coord=self._seed_coord,
@@ -1128,10 +1117,9 @@ class Sequence(SequenceBase):
                 else:
                     self.data["meshes"][_g_index - 1] = mesh.data
                 if self._guide:
-                    seed = gp.particle.Particle(
-                        series=mesh, coordinate_0=self._seed_coord
-                    )
+                    seed = gp.particle.Particle(series=mesh, coordinate_0=_seed_coord_t)
                     seed.solve()
+                    _seed_displacement += seed.data["results"]["warps"][1, :2]
                     self._seed_warp[
                         : 6 * min(self._mesh_order, self._subset_order)
                     ] = seed.data["results"]["warps"][
@@ -1147,10 +1135,14 @@ class Sequence(SequenceBase):
                     _f_index = _g_index - 1
                     del _f_img
                     _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
+                    _seed_coord_t += _seed_displacement
+                    _seed_displacement = np.zeros(2)
             elif _f_index + 1 < _g_index:
                 _f_index = _g_index - 1
                 del _f_img
                 _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
+                _seed_coord_t += _seed_displacement
+                _seed_displacement = np.zeros(2)
             else:
                 log.error(
                     "Mesh for consecutive image pair {a}-{b} is unsolvable. "

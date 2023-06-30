@@ -12,6 +12,7 @@ import re
 from alive_progress import alive_bar
 import math
 import geomat
+import matplotlib.pyplot as plt
 
 # from build.models import LinearElastic, MCC, SMCC
 
@@ -451,12 +452,18 @@ class Particle(ParticleBase):
         self.data.update({"parameters": parameters, "state": state})
         self.solved += self._strain_path()
         if model:
+            self._ps = np.zeros((len(self._series) + 1))
+            self._qs = np.zeros((len(self._series) + 1))
+            self._states = np.zeros((len(self._series) + 1, len(state)))
             self.solved += self._stress_path(model, state, parameters)
         self._results = {
             "coordinates": self._coordinates,
             "warps": self._warps,
             "volumes": self._volumes,
             "stresses": self._stresses,
+            "mean_effective_stresses": self._ps,
+            "deviatoric_stresses": self._qs,
+            "states": self._states,
             "works": self._works,
         }
         self.data.update({"results": self._results})
@@ -496,7 +503,20 @@ class Particle(ParticleBase):
                     boundary=self._series[m]["nodes"][self._series[m]["boundary"]],
                 )
             )
+            fig, ax = plt.subplots()
+            ax.plot(
+                np.append(
+                    nodes[self._series[m]["exclusions"][0]][:, 0],
+                    nodes[self._series[m]["exclusions"][0]][0, 0],
+                ),
+                np.append(
+                    nodes[self._series[m]["exclusions"][0]][:, 1],
+                    nodes[self._series[m]["exclusions"][0]][0, 1],
+                ),
+            )
+            ax.plot(self._coordinates[:m, 0], self._coordinates[:m, 1])
             print(m)
+            plt.show()
             raise ValueError("Particle outside of boundary.")
         return index
 
@@ -734,12 +754,11 @@ class Particle(ParticleBase):
                 # log_severity = "verbose"
             )
         strain_incs = np.diff(self._strains, axis=0)
-        ps = []
-        qs = []
         model.set_sigma_prime_tilde(self._stresses[0].T)
         model.set_Delta_epsilon_tilde(strain_incs[0])
-        ps.append(model.p_prime)
-        qs.append(model.q)
+        self._ps[0] = model.p_prime
+        self._qs[0] = model.q
+        self._states[0] = model.state
         for i in range(np.shape(self._series)[0]):
             try:
                 model.set_sigma_prime_tilde(self._stresses[i].T)
@@ -748,14 +767,14 @@ class Particle(ParticleBase):
             except Exception:
                 log.error("geomat error. Stress path curtailed.")
                 raise ValueError("geomat error. Stress path curtailed.")
-            ps.append(model.p_prime)
-            qs.append(model.q)
+            self._ps[i + 1] = model.p_prime
+            self._qs[i + 1] = model.q
+            self._states[i + 1] = model.state
             self._stresses[i + 1] = model.sigma_prime_tilde
+
         self._works[1:] = (
             np.sum(self._stresses[1:] * strain_incs, axis=-1) * self._volumes[1:]
         )
-        self._ps = np.asarray(ps)
-        self._qs = np.asarray(qs)
 
         return True
 

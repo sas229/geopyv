@@ -43,7 +43,15 @@ class RegionBase(Object):
 
 class Region(RegionBase):
     def __init__(
-        self, shape=None, centre=None, nodes=None, rigid=False, hard=True, track=True
+        self,
+        *,
+        shape=None,
+        centre=None,
+        nodes=None,
+        rigid=False,
+        hard=True,
+        track=True,
+        compensate=True
     ):
         """
         hard : bool, optional
@@ -57,6 +65,7 @@ class Region(RegionBase):
         self._rigid = rigid
         self._hard = hard
         self._track = track
+        self._compensate = compensate
         self.solved = False
 
         self.data = {
@@ -66,6 +75,7 @@ class Region(RegionBase):
             "rigid": self._rigid,
             "hard": self._hard,
             "track": self._track,
+            "compensate": self._compensate,
             "specifics": self._specifics,
             "centres": [self._centre],
             "nodes": [self._nodes],
@@ -112,7 +122,15 @@ class Circle(Region):
     """
 
     def __init__(
-        self, centre=None, radius=50.0, size=20.0, rigid=True, hard=True, track=True
+        self,
+        *,
+        centre=None,
+        radius=50.0,
+        size=20.0,
+        rigid=True,
+        hard=True,
+        track=True,
+        compensate=True
     ):
         """
 
@@ -184,6 +202,7 @@ class Circle(Region):
             rigid=rigid,
             hard=hard,
             track=track,
+            compensate=compensate,
         )
 
 
@@ -194,7 +213,16 @@ class Path(Region):
 
     """
 
-    def __init__(self, centre=None, nodes=None, rigid=True, hard=True, track=True):
+    def __init__(
+        self,
+        *,
+        centre=None,
+        nodes=None,
+        rigid=True,
+        hard=True,
+        track=True,
+        compensate=True
+    ):
         """
 
         Class for circular Region. Subclassed from Region.
@@ -242,6 +270,7 @@ class Path(Region):
             rigid=rigid,
             hard=hard,
             track=track,
+            compensate=compensate,
         )
 
 

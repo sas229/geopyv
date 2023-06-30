@@ -63,7 +63,6 @@ mesh = gp.mesh.Mesh(
     target_nodes=1000,
     boundary_obj=boundary,
     exclusion_objs=exclusions,
-    subset_size_compensation=True,
     mesh_order=1,
 )
 

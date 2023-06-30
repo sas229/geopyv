@@ -582,7 +582,6 @@ class Mesh(MeshBase):
         size_lower_bound=1.0,
         size_upper_bound=1000.0,
         mesh_order=2,
-        subset_size_compensation=False,
     ):
         """
 
@@ -608,10 +607,6 @@ class Mesh(MeshBase):
             Lower bound on element size. Defaults to a value of 1000.0.
         mesh_order : int, optional
             Mesh element order. Options are 1 and 2. Defaults to 2.
-        subset_size_compensation: bool, optional
-            Boolean to control whether masked subsets are enlarged to
-            maintain area (and thus better correlation).
-            Defaults to False.
 
         Attributes
         ----------
@@ -690,12 +685,6 @@ class Mesh(MeshBase):
             ),
             "ValueError",
         )
-        self._report(
-            gp.check._check_type(
-                subset_size_compensation, "subset_size_compensation", [bool]
-            ),
-            "TypeError",
-        )
 
         # Pre-processing.
         size_upper_bound = min(
@@ -721,7 +710,6 @@ class Mesh(MeshBase):
         self._size_upper_bound = size_upper_bound
         self._mesh_order = mesh_order
         self._hard_boundary = boundary_obj._hard
-        self._subset_size_compensation = subset_size_compensation
         self.solved = False
         self._unsolvable = False
 
@@ -1219,9 +1207,8 @@ class Mesh(MeshBase):
         self._boundary = gmsh.model.occ.getCurveLoops(0)[1][0]
         self._edges = list(gmsh.model.mesh.getNodesForPhysicalGroup(1, 0)[0] - 1)
         self._exclusions = []
-        self._on_exclusions = []
         for i in range(len(self._exclusion_objs)):
-            self._exclusions.append(gmsh.model.occ.getCurveLoops(0)[1][i + 1])
+            self._exclusions.append(np.sort(gmsh.model.occ.getCurveLoops(0)[1][i + 1]))
             self._edges += list(
                 gmsh.model.mesh.getNodesForPhysicalGroup(1, i + 1)[0] - 1
             )
@@ -1574,7 +1561,15 @@ class Mesh(MeshBase):
             if i in self._edges:
                 template = deepcopy(self._template)
                 template.mask(self._nodes[i], self._mask)
-                if self._subset_size_compensation:
+                check = False
+                for e in range(len(self._exclusions)):
+                    if i in self._exclusions[e]:
+                        if self._exclusion_objs[e]._compensate:
+                            check = True
+                            break
+                if (
+                    i in self._boundary and self._boundary_obj._compensate
+                ) or check is True:
                     if template.n_px < self._template.n_px:
                         size = int(
                             self._template.size

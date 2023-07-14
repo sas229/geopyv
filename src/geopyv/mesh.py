@@ -1706,6 +1706,10 @@ class Mesh(MeshBase):
                 if len(neighbour_coords) > 2:
                     hull = sp.spatial.Delaunay(neighbour_coords)
                     if hull.find_simplex(coord) < 0:
+                        print(self._nodes[i])
+                        print(self._nodes[neighbours])
+                        print(coord)
+                        print(self._nodes[neighbours] + self._displacements[neighbours])
                         return True
         return False
 

@@ -51,7 +51,7 @@ class Region(RegionBase):
         rigid=False,
         hard=True,
         track=True,
-        compensate=True
+        compensate=True,
     ):
         """
         hard : bool, optional
@@ -130,7 +130,7 @@ class Circle(Region):
         rigid=True,
         hard=True,
         track=True,
-        compensate=True
+        compensate=True,
     ):
         """
 
@@ -209,7 +209,7 @@ class Circle(Region):
 class Path(Region):
     """
 
-    Circular Region template class.
+    Path Region template class.
 
     """
 
@@ -221,7 +221,8 @@ class Path(Region):
         rigid=True,
         hard=True,
         track=True,
-        compensate=True
+        compensate=True,
+        radius=25,
     ):
         """
 
@@ -260,7 +261,7 @@ class Path(Region):
             centre = np.mean(nodes, axis=0)
 
         # Store unique variables.
-        self._specifics = {}
+        self._specifics = {"radius": self._radius}
 
         # Store general variables.
         super().__init__(

@@ -565,8 +565,12 @@ class Field(FieldBase):
 
         # Particle distribution.
         if _auto_distribute is True:
-            self._boundary_obj = mesh_0["boundary_obj"]
-            self._exclusion_objs = mesh_0["exclusion_objs"]
+            if boundary_obj is not None:
+                self._boundary_obj = boundary_obj
+                self._exclusion_objs = self._exclusion_objs
+            else:
+                self._boundary_obj = mesh_0["boundary_obj"]
+                self._exclusion_objs = mesh_0["exclusion_objs"]
             self._size_lower_bound = mesh_0["size_lower_bound"]
             self._size_upper_bound = mesh_0["size_upper_bound"]
             (

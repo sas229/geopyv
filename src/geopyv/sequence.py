@@ -782,7 +782,7 @@ class Sequence(SequenceBase):
         except Exception:
             log.error(
                 (
-                    "No files found under: \n{address}"
+                    "No files found under: \n{address}. "
                     "Please check file names and directories."
                 ).format(
                     address=self._image_dir

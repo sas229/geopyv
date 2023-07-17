@@ -261,7 +261,7 @@ class Path(Region):
             centre = np.mean(nodes, axis=0)
 
         # Store unique variables.
-        self._specifics = {"radius": self._radius}
+        self._specifics = {"radius": radius}
 
         # Store general variables.
         super().__init__(

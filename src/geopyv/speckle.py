@@ -274,28 +274,24 @@ class Speckle(SpeckleBase):
         if self.noisem[i, 0] != 0.0:
             _tar_speckle = np.random.normal(loc=_tar_speckle, scale=self.noisem[i, 0])
         for j in range(len(_tar_speckle)):
+            a = max(int(_tar_speckle[j, 1]) - 100, 0)
+            b = min(int(_tar_speckle[j, 1]) + 101, self._image_size_y)
+            c = max(int(_tar_speckle[j, 0]) - 100, 0)
+            d = min(int(_tar_speckle[j, 0]) + 101, self._image_size_x)
             di = np.exp(
                 -(
                     (
                         self.X[
-                            int(_tar_speckle[j, 1])
-                            - 100 : int(_tar_speckle[j, 1])
-                            + 101,
-                            int(_tar_speckle[j, 0])
-                            - 100 : int(_tar_speckle[j, 0])
-                            + 101,
+                            a:b,
+                            c:d,
                         ]
                         - _tar_speckle[j, 0]
                     )
                     ** 2
                     + (
                         self.Y[
-                            int(_tar_speckle[j, 1])
-                            - 100 : int(_tar_speckle[j, 1])
-                            + 101,
-                            int(_tar_speckle[j, 0])
-                            - 100 : int(_tar_speckle[j, 0])
-                            + 101,
+                            a:b,
+                            c:d,
                         ]
                         - _tar_speckle[j, 1]
                     )
@@ -304,8 +300,8 @@ class Speckle(SpeckleBase):
                 / ((self._speckle_size**2) / 4)
             )
             grid[
-                int(_tar_speckle[j, 1]) - 100 : int(_tar_speckle[j, 1]) + 101,
-                int(_tar_speckle[j, 0]) - 100 : int(_tar_speckle[j, 0]) + 101,
+                a:b,
+                c:d,
             ] += di
         if self.noisem[i, 1] != 0.0:
             grid = np.random.normal(loc=grid, scale=self.noisem[i, 1])

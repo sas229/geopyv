@@ -305,11 +305,13 @@ class Validation(ValidationBase):
                 )
             for i in range(np.shape(field.data["particles"])[0]):
                 if np.shape(field.data["particles"][i]["results"]["warps"])[1] == 6:
-                    observed[:, i, :6] = field.data["particles"][i]["results"]["warps"][
-                        1:
-                    ]
+                    observed[
+                        : len(field.data["particles"][i]["results"]["warps"]) - 1, i, :6
+                    ] = field.data["particles"][i]["results"]["warps"][1:]
                 elif np.shape(field.data["particles"][i]["results"]["warps"])[1] == 12:
-                    observed[:, i] = field.data["particles"][i]["results"]["warps"][1:]
+                    observed[
+                        : len(field.data["particles"][i]["results"]["warps"]) - 1, i
+                    ] = field.data["particles"][i]["results"]["warps"][1:]
 
             self._applied.append(applied)
             self._observed.append(observed)

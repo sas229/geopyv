@@ -1167,16 +1167,27 @@ class Sequence(SequenceBase):
     def load(self):
         try:
             _meshes = glob.glob("*.pyv", root_dir=self._mesh_dir)
-            _mesh_tars = [int(re.findall(r"\d+", x)[-1]) for x in _meshes]
-            _mesh_indices_arguments = np.argsort(_mesh_tars)
-            self._meshes = np.asarray(
-                [_meshes[index] for index in _mesh_indices_arguments], dtype=object
-            )
         except Exception:
-            log.error(
-                "Issues encountered recognising mesh file names. "
-                "Please refer to the documentation for naming guidance."
+            msg = ("Cannot find pyv files with specified path: {}").format(
+                self._mesh_dir + "*.pyv"
             )
+            log.error(msg)
+            raise FileExistsError(msg)
+        try:
+            _mesh_tars = [int(re.findall(r"\d+", x)[-1]) for x in _meshes]
+        except Exception:
+            msg = (
+                "Cannot extract integers from file names. "
+                "Please ensure file names are of the form: `mesh_X_Y.pyv`, "
+                "where X and Y are integers."
+            )
+            log.error(msg)
+            raise ValueError(msg)
+        _mesh_indices_arguments = np.argsort(_mesh_tars)
+        self._meshes = np.asarray(
+            [_meshes[index] for index in _mesh_indices_arguments], dtype=object
+        )
+
         self._images = self._images[: np.shape(self._meshes)[0] + 1]
         self.data["solved"] = True
         self.data["unsolvable"] = False

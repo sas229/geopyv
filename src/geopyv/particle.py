@@ -13,11 +13,7 @@ from alive_progress import alive_bar
 import math
 import geomat
 import matplotlib.pyplot as plt
-import sys
 
-# from build.models import LinearElastic, MCC, SMCC
-
-print(sys.path)
 log = logging.getLogger(__name__)
 
 
@@ -751,12 +747,14 @@ class Particle(ParticleBase):
         if model == "MCC":
             # Put input checks here!
             model = geomat.models.MCC(
-                parameters=parameters, state=state, log_severity="verbose"
+                parameters=parameters,
+                state=state,  # log_severity="verbose"
             )
         elif model == "SMCC":
             # Put input checks here!
             model = geomat.models.SMCC(
-                parameters=parameters, state=state, log_severity="verbose"
+                parameters=parameters,
+                state=state,  # log_severity="verbose"
             )
         strain_incs = np.diff(self._strains, axis=0)
         model.set_sigma_prime_tilde(self._stresses[0].T)
@@ -766,8 +764,6 @@ class Particle(ParticleBase):
         self._states[0] = model.state
         for i in range(np.shape(self._series)[0]):
             try:
-                print(model.sigma_prime_tilde)
-                input()
                 model.set_sigma_prime_tilde(self._stresses[i].T)
                 model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
                 model.solve()

@@ -1119,7 +1119,7 @@ class Sequence(SequenceBase):
                 if self._guide:
                     seed = gp.particle.Particle(series=mesh, coordinate_0=_seed_coord_t)
                     seed.solve()
-                    _seed_displacement += seed.data["results"]["warps"][1, :2]
+                    _seed_displacement = seed.data["results"]["warps"][1, :2]
                     self._seed_warp[
                         : 6 * min(self._mesh_order, self._subset_order)
                     ] = seed.data["results"]["warps"][

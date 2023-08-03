@@ -23,6 +23,7 @@ seaborn = "*"
 alphashape = "*"
 shapely = "*"
 geomat = "*"
+geopyv = {path = "."}
 
 [dev-packages]
 ipykernel = "*"

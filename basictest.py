@@ -112,7 +112,7 @@ fig, ax = mesh.contour(quantity="v", alpha=1.0, levels=np.arange(-5, 6, 1))
 ax.plot([0, 2000], [1000, 1000], color="k", linewidth=3.0, zorder=10)
 ax.set_xlim((0, 2000))
 plt.show()
-#
+
 # Let's inspect some clipped subsets.
 mesh.inspect(subset_index=0)
 mesh.inspect(subset_index=1)
@@ -127,6 +127,7 @@ mesh.convergence(subset_index=0)
 
 # If you supply a subset index that is out of range you get a ValueError.
 # mesh.convergence(subset_index=4000)
+
 # Sequence test.
 # Sequence setup.
 template = gp.templates.Circle(50)

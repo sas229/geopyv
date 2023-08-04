@@ -843,7 +843,7 @@ class Sequence(SequenceBase):
         max_norm=1e-5,
         max_iterations=50,
         adaptive_iterations=0,
-        corrective_iterations=0,
+        correction=True,
         method="ICGN",
         mesh_order=2,
         subset_order=1,
@@ -910,6 +910,15 @@ class Sequence(SequenceBase):
             gp.check._check_axis(seed_coord, "seed_coord", 0, [2]), "Warning"
         ):
             seed_coord = gp.gui.selectors.coordinate.CoordinateSelector()
+        elif gp.check._check_dtype(seed_coord, "seed_coord", [float]):
+            try:
+                np.float64(seed_coord)
+                self._report(
+                    gp.check._dconversion(seed_coord, "seed_coord", np.float64),
+                    "Warning",
+                )
+            except Exception:
+                seed_coord(gp.gui.selectors.coordinate.CoordinateSelector())
         if template is None:
             template = gp.templates.Circle(50)
         types = [gp.templates.Circle, gp.templates.Square]
@@ -1049,7 +1058,7 @@ class Sequence(SequenceBase):
         self._max_iterations = max_iterations
         self._max_norm = max_norm
         self._adaptive_iterations = adaptive_iterations
-        self._corrective_iterations = corrective_iterations
+        self._correction = correction
         self._method = method
         self._subset_order = subset_order
         self._mesh_order = mesh_order
@@ -1063,7 +1072,7 @@ class Sequence(SequenceBase):
         # Solve.
         _f_index = 0
         _g_index = 1
-        _seed_coord_t = seed_coord
+        _seed_coord_t = self._seed_coord
         _seed_displacement = np.zeros(2)
         _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
         _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
@@ -1091,7 +1100,7 @@ class Sequence(SequenceBase):
                 max_iterations=self._max_iterations,
                 max_norm=self._max_norm,
                 adaptive_iterations=self._adaptive_iterations,
-                corrective_iterations=self._corrective_iterations,
+                correction=self._correction,
                 method=self._method,
                 subset_order=self._subset_order,
                 tolerance=self._tolerance,
@@ -1099,7 +1108,8 @@ class Sequence(SequenceBase):
                 alpha=self._alpha,
             )  # Solve mesh.
             if mesh.solved:
-                if self._save_by_reference:
+                # Save/store mesh.
+                if self._save_by_reference:  # Save...
                     gp.io.save(
                         object=mesh,
                         filename=self._mesh_dir
@@ -1114,23 +1124,29 @@ class Sequence(SequenceBase):
                         + "_"
                         + str(self._image_indices[_g_index])
                     )
-                else:
+                else:  # ...or store.
                     self.data["meshes"][_g_index - 1] = mesh.data
+                # Iterate target index.
+                _g_index += 1  # Iterate the target image index.
+                # Check for end.
+                if _g_index != len(self._image_indices):
+                    del _g_img
+                    _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
+                else:
+                    self.solved = True
+                    break
+                # Setup for next mesh.
+                # Deformation preconditioning (if guided).
                 if self._guide:
                     seed = gp.particle.Particle(series=mesh, coordinate_0=_seed_coord_t)
                     seed.solve()
-                    _seed_displacement += seed.data["results"]["warps"][1, :2]
+                    _seed_displacement = seed.data["results"]["warps"][1, :2]
                     self._seed_warp[
                         : 6 * min(self._mesh_order, self._subset_order)
                     ] = seed.data["results"]["warps"][
                         1, : 6 * min(self._mesh_order, self._subset_order)
                     ]
-                _g_index += 1  # Iterate the target image index.
-                del _g_img
-                if _g_index != len(self._image_indices):
-                    _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
-                else:
-                    self.solved = True
+                # Reference updating (if sequential).
                 if self._sequential:
                     _f_index = _g_index - 1
                     del _f_img

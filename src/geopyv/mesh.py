@@ -597,10 +597,14 @@ class Mesh(MeshBase):
             :mod:`~geopyv.image.Image`.
         target_nodes : int, optional
             Target number of nodes. Defaults to a value of 1000.
-        boundary : `numpy.ndarray` (N,2)
-            Array of coordinates to define the mesh boundary.
-        exclusions : list, optional
-            List of `numpy.ndarray` to define the mesh exclusions.
+        boundary_obj : geopyv.geometry.region.Region
+            Boundary of geopyv.geometry.region.Region class, instantiated
+            by :mod: `~geopyv.geometry.region.Region` to define the boundary
+            of the region of interest (RoI).
+        exclusion_objs : list, optional
+            List of geopyv.geometry.region.Region class objects, instantiated
+            by :mod: `~geopyv.geometry.region.Region` to define exclusion regions
+            within the region of interest (RoI).
         size_lower_bound : float, optional
             Lower bound on element size. Defaults to a value of 1.0.
         size_upper_bound : float, optional
@@ -617,6 +621,7 @@ class Mesh(MeshBase):
             Boolean to indicate if the mesh has been solved.
 
         """
+
         # Set initialised boolean.
         self.initialised = False
 
@@ -685,18 +690,18 @@ class Mesh(MeshBase):
             ),
             "ValueError",
         )
-
-        # Pre-processing.
-        size_upper_bound = min(
-            size_upper_bound,
-            np.max(
-                np.sqrt(np.sum(np.square(np.diff(boundary_obj._nodes, axis=0)), axis=1))
-            ),
+        check = gp.check._check_type(mesh_order, "mesh_order", [int])
+        if check:
+            try:
+                mesh_order = int(mesh_order)
+                self._report(
+                    gp.check._conversion(mesh_order, "mesh_order", int), "Warning"
+                )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_value(mesh_order, "mesh_order", [1, 2]), "ValueError"
         )
-        minimum_nodes = np.shape(boundary_obj._nodes)[0]
-        for exclusion_obj in exclusion_objs:
-            minimum_nodes += np.shape(exclusion_obj._nodes)[0]
-        target_nodes = max(target_nodes, minimum_nodes)
 
         # Store.
         self._initialised = False
@@ -713,9 +718,11 @@ class Mesh(MeshBase):
         self.solved = False
         self._unsolvable = False
 
-        # Check boundary and exclusion updates.
-        self._update_region()
+        # Checks.
+        self._target_checks()  # Size bounds and target nodes.
+        self._update_region()  # Boundary and exclusion objects.
 
+        # Creating the initial mesh.
         # Define region of interest.
         (
             self._borders,
@@ -725,15 +732,12 @@ class Mesh(MeshBase):
         ) = gp.geometry.meshing._define_RoI(
             self._f_img, self._boundary_obj, self._exclusion_objs
         )
-
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
             gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)
         # 0: silent except for fatal errors, 1: +errors, 2: +warnings,
         # 3: +direct, 4: +information, 5: +status, 99: +debug.
-
-        # Create initial mesh.
         log.info(
             "Generating mesh using gmsh with approximately {n} nodes.".format(
                 n=self._target_nodes
@@ -772,6 +776,26 @@ class Mesh(MeshBase):
 
         self.initialised = True
 
+    def _target_checks(self):
+        """Private method to limit the mesh size upper bound by the boundary geometry
+        and the target nodes by the number included in the boundary and exclusion
+        geometries."""
+
+        self._size_upper_bound = min(
+            self._size_upper_bound,
+            np.max(
+                np.sqrt(
+                    np.sum(
+                        np.square(np.diff(self._boundary_obj._nodes, axis=0)), axis=1
+                    )
+                )
+            ),
+        )
+        minimum_nodes = np.shape(self._boundary_obj._nodes)[0]
+        for exclusion_obj in self._exclusion_objs:
+            minimum_nodes += np.shape(exclusion_obj._nodes)[0]
+        self._target_nodes = max(self._target_nodes, minimum_nodes)
+
     def set_target_nodes(self, target_nodes):
         """
 
@@ -804,6 +828,9 @@ class Mesh(MeshBase):
         # Store.
         self._target_nodes = target_nodes
 
+        # Checks.
+        self._target_checks()  # Size bounds and target nodes.
+
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
             gmsh.initialize()
@@ -827,9 +854,9 @@ class Mesh(MeshBase):
     def solve(
         self,
         *,
+        template=None,
         seed_coord=None,
         seed_warp=None,
-        template=None,
         max_norm=1e-5,
         max_iterations=50,
         subset_order=1,
@@ -837,7 +864,7 @@ class Mesh(MeshBase):
         seed_tolerance=0.9,
         method="ICGN",
         adaptive_iterations=0,
-        corrective_iterations=0,
+        correction=True,
         alpha=0.5,
     ):
         r"""
@@ -846,11 +873,13 @@ class Mesh(MeshBase):
 
         Parameters
         ----------
+        template : `geopyv.templates.Template`
+            Subset template object.
         seed_coord : `numpy.ndarray` (2,)
             An image coordinate selected in a region of low deformation. The
             reliability-guided approach is initiated from the nearest subset.
-        template : `geopyv.templates.Template`
-            Subset template object.
+        seed_warp : `numpy.ndarray` (6*subset_order,)
+            Deformation preconditioning vector for the seed subset.
         max_norm : float, optional
             Exit criterion for norm of increment in warp function.
             Defaults to value of
@@ -874,10 +903,13 @@ class Mesh(MeshBase):
         adaptive_iterations : int, optional
             Number of mesh adaptivity iterations to perform.
             Defaults to a value of 0.
+        correction : bool, optional
+            Boolean indicator as to whether to correct poor
+            correlation subsets.
+            Defaults to a value of True.
         alpha : float, optional
             Mesh adaptivity control parameter.
             Defaults to a value of 0.5.
-
 
         Returns
         -------
@@ -889,6 +921,7 @@ class Mesh(MeshBase):
               :ref:`mesh tutorial <Mesh Tutorial>`.
 
         """
+
         # Check if solved.
         if self.data["solved"] is True:
             log.error("Mesh has already been solved. Cannot be solved again.")
@@ -912,7 +945,24 @@ class Mesh(MeshBase):
         ):
             selector = gp.gui.selectors.coordinate.CoordinateSelector()
             seed_coord = selector.select(self._f_img, template)
-
+        if seed_warp is not None:
+            check = gp.check._check_type(seed_warp, "seed_warp", [np.ndarray])
+            if check:
+                try:
+                    seed_warp = np.asarray(seed_warp)
+                    self._report(
+                        gp.check._conversion(seed_warp, "seed_warp", np.ndarray),
+                        "Warning",
+                    )
+                except Exception:
+                    self._report(check, "TypeError")
+            self._report(gp.check._check_dim(seed_warp, "seed_warp", 1), "ValueError")
+            self._report(
+                gp.check._check_axis(seed_warp, "seed_warp", 0, [6 * subset_order]),
+                "ValueError",
+            )
+        else:
+            seed_warp = np.zeros(6 * subset_order)
         check = gp.check._check_type(max_norm, "max_norm", [float])
         if check:
             try:
@@ -964,6 +1014,20 @@ class Mesh(MeshBase):
             gp.check._check_range(adaptive_iterations, "adaptive_iterations", 0),
             "ValueError",
         )
+        check = gp.check._check_type(correction, "correction", [bool])
+        if check:
+            try:
+                correction = bool(correction)
+                self._report(
+                    gp.check._conversion(correction, "correction", int),
+                    "Warning",
+                )
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(
+            gp.check._check_range(correction, "correction", 0),
+            "ValueError",
+        )
         check = gp.check._check_type(tolerance, "tolerance", [float])
         if check:
             try:
@@ -1011,24 +1075,6 @@ class Mesh(MeshBase):
             except Exception:
                 self._report(check, "TypeError")
         self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
-        if seed_warp is not None:
-            check = gp.check._check_type(seed_warp, "seed_warp", [np.ndarray])
-            if check:
-                try:
-                    seed_warp = np.asarray(seed_warp)
-                    self._report(
-                        gp.check._conversion(seed_warp, "seed_warp", np.ndarray),
-                        "Warning",
-                    )
-                except Exception:
-                    self._report(check, "TypeError")
-            self._report(gp.check._check_dim(seed_warp, "seed_warp", 1), "ValueError")
-            self._report(
-                gp.check._check_axis(seed_warp, "seed_warp", 0, [6 * subset_order]),
-                "ValueError",
-            )
-        else:
-            seed_warp = np.zeros(6 * subset_order)
 
         # Store variables.
         self._seed_coord = seed_coord
@@ -1036,7 +1082,7 @@ class Mesh(MeshBase):
         self._max_iterations = max_iterations
         self._max_norm = max_norm
         self._adaptive_iterations = adaptive_iterations
-        self._corrective_iterations = corrective_iterations
+        self._correction = correction
         self._method = method
         self._subset_order = subset_order
         self._tolerance = tolerance
@@ -1044,6 +1090,7 @@ class Mesh(MeshBase):
         self._alpha = alpha
         self._update = False
         self._seed_warp = seed_warp
+        self._status = 0
 
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
@@ -1060,20 +1107,7 @@ class Mesh(MeshBase):
         try:
             self._reliability_guided()
             if self._unsolvable:
-                if (
-                    np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)])
-                    < self._tolerance
-                ):
-                    log.error(
-                        "Specified correlation coefficient tolerance not met. "
-                        "Minimum correlation coefficient: "
-                        "{min_C:.2f}; tolerance: {tolerance:.2f}.".format(
-                            min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]),
-                            tolerance=self._tolerance,
-                        )
-                    )
-                else:
-                    log.error("Mesh unsolvable.")
+                self._check_status()
                 return self.solved
             # Solve adaptive iterations.
             for iteration in range(1, adaptive_iterations + 1):
@@ -1083,27 +1117,15 @@ class Mesh(MeshBase):
                 self._find_seed_node()
                 self._reliability_guided()
                 if self._unsolvable:
-                    log.error(
-                        "Specified correlation coefficient tolerance not met. "
-                        "Minimum correlation coefficient: "
-                        "{min_C:.2f}; tolerance: {tolerance:.2f}.".format(
-                            min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]),
-                            tolerance=self._tolerance,
-                        )
-                    )
+                    self._check_status()
                     return self.solved
             self._store_region()
             if self._unsolvable:
-                log.error("Rigid exclusion tracking failure.")
+                self._check_status()
                 return self.solved
 
-            log.info(
-                "Solved mesh. Minimum correlation coefficient: {min_C:.2f}; "
-                "maximum correlation coefficient: {max_C:.2f}.".format(
-                    min_C=np.amin(self._C_ZNCC),
-                    max_C=np.amax(self._C_ZNCC),
-                )
-            )
+            self._status = 1
+            self._check_status()
 
             # Pack data.
             self.solved = True
@@ -1123,7 +1145,7 @@ class Mesh(MeshBase):
                 "adaptive_iterations": self._adaptive_iterations,
                 "method": self._method,
                 "tolerance": self._tolerance,
-                "corrective_iterations": self._corrective_iterations,
+                "correction": self._correction,
             }
             self.data.update({"settings": self._settings})
 
@@ -1143,18 +1165,58 @@ class Mesh(MeshBase):
             self.data.update({"results": self._results})
 
         except Exception:
-            log.error("Could not solve mesh. Not a correlation issue.")
-            print(traceback.format_exc())
-            self._update = True
-            self.solved = False
+            self._status = 7
             self._unsolvable = True
+            self._check_status()
+            print(traceback.format_exc())
         gmsh.finalize()
         return self.solved
 
+    def _check_status(self):
+        """Private method for issue catergorisation and error message delivery."""
+        if self._status == 0:  # Solvable unsolved.
+            return
+        elif self._status == 1:  # Solvable solved.
+            log.info(
+                "Solved mesh. Minimum correlation coefficient: {min_C:.2f}; "
+                "maximum correlation coefficient: {max_C:.2f}.".format(
+                    min_C=np.amin(self._C_ZNCC),
+                    max_C=np.amax(self._C_ZNCC),
+                )
+            )
+        elif self._status == 2:  # Unsolvable: seed decorrelation.
+            log.error(
+                "Specified seed correlation coefficient tolerance not met."
+                "Minimum seed correlation coefficient:"
+                "{seed_C:.2f}; tolerance: {seed_tolerance:.2f}.".format(
+                    seed_C=self._subsets[self._seed_node].data["results"]["C_ZNCC"],
+                    seed_tolerance=self._seed_tolerance,
+                )
+            )
+        elif self._status == 3:  # Unsolvable: subset decorrelation.
+            log.error(
+                "Specified correlation coefficient tolerance not met. "
+                "Minimum correlation coefficient: "
+                "{min_C:.2f}; tolerance: {tolerance:.2f}.".format(
+                    min_C=np.amin(self._C_ZNCC[np.where(self._C_ZNCC > 0.0)]),
+                    tolerance=self._tolerance,
+                )
+            )
+        elif self._status == 4:  # Unsolvable: rigid exclusions decorrelation.
+            log.error("Rigid exclusion tracking failure.")
+        elif self._status == 5:  # Unsolvable: unsolvable subset.
+            log.error("Unsolvable subset.")
+        elif self._status == 6:  # Unsolvable: subset compatability failure.
+            log.error("Local mesh compatibility failure.")
+        elif self._status == 7:  # Unsolvable: unkown issue.
+            log.error("Could not solve mesh. Unrecognised problem.")
+        self._update = True
+
     def _store_region(self):
+        """Private method to record the deformation of the boundary and exclusions."""
         exclusion_obj_warp = []
         for i in range(np.shape(self._exclusion_objs)[0]):
-            if self._exclusion_objs[i]._rigid:
+            if self._exclusion_objs[i]._rigid:  # Track if rigid.
                 subset = gp.subset.Subset(
                     f_img=self._f_img,
                     g_img=self._g_img,
@@ -1167,11 +1229,9 @@ class Mesh(MeshBase):
                 warp_0[:2] = np.mean(self._displacements[self._exclusions[i]], axis=0)
                 subset.solve(tolerance=0.9, warp_0=warp_0, order=self._subset_order)
                 if subset.data["solved"] is not True:
-                    self._update = True
-                    self.solved = False
-                    self._unsolvable = True
+                    self._status = 4
                     del subset
-                    return False
+                    return
                 else:
                     exclusion_obj_warp.append(subset._p.flatten())
                     del subset
@@ -1182,6 +1242,12 @@ class Mesh(MeshBase):
             self._exclusion_objs[i]._store(exclusion_obj_warp[i])
 
     def _update_region(self):
+        """
+
+        Private method to trigger region objects (boundary and exclusions) to update.
+
+        """
+
         self._boundary_obj._update(self._f_img.filepath)
         for exclusion_obj in self._exclusion_objs:
             exclusion_obj._update(self._f_img.filepath)
@@ -1245,7 +1311,6 @@ class Mesh(MeshBase):
                 self._mesh_order,
             )
 
-        # minimize_scalar(f)
         minimize_scalar(
             f,
             bounds=(self._size_lower_bound, self._size_upper_bound),
@@ -1438,13 +1503,11 @@ class Mesh(MeshBase):
 
     def _element_area(self):
         """
-        Private method to calculate the element areas.
+        Private method to calculate the element areas based on corner nodes.
 
         """
         M = np.ones((len(self._elements), 3, 3))
-        M[:, 1] = self._nodes[self._elements[:, :3]][
-            :, :, 0
-        ]  # [:3] will provide corner nodes in both 1st and 2nd order element case.
+        M[:, 1] = self._nodes[self._elements[:, :3]][:, :, 0]
         M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
         self._areas = 0.5 * np.linalg.det(M)
 
@@ -1453,6 +1516,11 @@ class Mesh(MeshBase):
         Private method to define the element centroid in terms of the local
         coordinate system. Thereotically, this is constant but is calculated in
         case of rounding error.
+
+        Return
+        ------
+        A : `numpy.ndarray` (N,3,4)
+            Element centroid local coordinates.
         """
 
         A = np.ones((np.shape(self._elements)[0], 3, 4))
@@ -1462,6 +1530,19 @@ class Mesh(MeshBase):
         return A
 
     def _shape_function(self):
+        """Private method for defining the shape functions at the
+        element centroid.
+
+        Return
+        ------
+        N : `numpy.ndarray`
+            Shape function.
+        dN : `numpy.ndarray`
+            Shape function 1st order derivative.
+        d2N : `numpy.ndarray`
+            Shape function 2nd order derivative.
+        """
+
         if self._mesh_order == 1:
             N = np.asarray([1 / 3, 1 / 3, 1 / 3])
             dN = np.asarray([[1, 0, -1], [0, 1, -1]])
@@ -1491,9 +1572,11 @@ class Mesh(MeshBase):
 
         """
 
+        # Setup.
         self._warps = np.zeros((np.shape(self._elements)[0], 12))
         x = self._nodes[self._elements]
         u = self._displacements[self._elements]
+
         # Coordinate matrix.
         A = self._local_coordinates()
 
@@ -1536,16 +1619,47 @@ class Mesh(MeshBase):
                 np.shape(self._elements)[0], -1
             )
 
+    def _seed_solve(self):
+        """
+
+        Private method for the solving of the seed node.
+
+        """
+
+        self._subsets[self._seed_node].solve(
+            max_norm=self._max_norm,
+            max_iterations=self._max_iterations,
+            warp_0=self._seed_warp,
+            order=self._subset_order,
+            method=self._method,
+            tolerance=self._seed_tolerance,
+        )  # Solve for seed subset.
+        if not self._subsets[self._seed_node].data["solved"]:  # If seed unsolved.
+            self._subsets[self._seed_node].solve(
+                max_norm=self._max_norm,
+                max_iterations=self._max_iterations,
+                warp_0=np.zeros(np.shape(self._seed_warp)),
+                order=self._subset_order,
+                method=self._method,
+                tolerance=self._seed_tolerance,
+            )
+            if not self._subsets[self._seed_node].data["solved"]:  # If seed unsolved.
+                self._unsolvable = True
+                self._status = 2
+                return
+        # Store if solved.
+        self._store_variables(idx=self._seed_node, flag=-1)
+
     def _reliability_guided(self):
         """
 
         Private method to perform reliability-guided (RG) PIV analysis.
 
         """
+
         # Set up.
         m = np.shape(self._nodes)[0]
         n = np.shape(self._seed_warp)[0]
-        self._solvables = []
         self._subset_solved = np.zeros(
             m, dtype=int
         )  # Solved/unsolved reference array (1 if unsolved, -1 if solved).
@@ -1556,7 +1670,59 @@ class Mesh(MeshBase):
             (m, 2), dtype=np.float64
         )  # Displacement output array.
 
-        # Template masking using binary mask.
+        # Subset instantiation with template masking.
+        self._subset_instantiation()
+
+        # Solve subsets in mesh.
+        with alive_bar(
+            np.shape(self._nodes)[0],
+            dual_line=True,
+            bar="blocks",
+            title=self._message,
+        ) as self._bar:
+            # Solve for seed.
+            self._bar.text = "-> Solving seed subset..."
+            self._seed_solve()
+            if self._unsolvable:
+                return
+            self._bar()
+
+            # Solve for seed neighbours.
+            self._neighbours(
+                self._seed_node, self._subsets[self._seed_node].data["results"]["p"]
+            )
+            if self._unsolvable:
+                return
+
+            # Solve through sorted queue.
+            self._bar.text = (
+                "-> Solving remaining subsets using reliability guided approach..."
+            )
+            while np.max(self._subset_solved) > -1:
+                # Highest correlation subset selected.
+                cur_idx = np.argmax(self._subset_solved * self._C_ZNCC)
+                self._subset_solved[cur_idx] = -1  # Set as solved.
+                p_0 = self._subsets[cur_idx].data["results"]["p"]  # Precondition.
+                self._neighbours(cur_idx, p_0)  # Solve for neighbours.
+                self._bar()
+                if self._unsolvable:
+                    return
+
+        # Corrections, calculations and checks.
+        if self._correction:
+            self._corrections()
+        self._compatibility()
+        if self._unsolvable:
+            return
+        self._element_area()
+        self._element_strains()
+        if any(self._subset_solved != -1) or any(self._C_ZNCC < self._tolerance):
+            self._unsolvable = True
+            self._status = 3
+
+    def _subset_instantiation(self):
+        """Private method that instantiates the mesh subsets with masking."""
+
         for i in range(np.shape(self._nodes)[0]):
             if i in self._edges:
                 template = deepcopy(self._template)
@@ -1594,138 +1760,80 @@ class Mesh(MeshBase):
                     template=self._template,
                 )  # Create full subset.
 
-        # Solve subsets in mesh.
-        with alive_bar(
-            np.shape(self._nodes)[0],
-            dual_line=True,
-            bar="blocks",
-            title=self._message,
-        ) as self._bar:
-            # Solve for seed.
-            self._bar.text = "-> Solving seed subset..."
-            self._subsets[self._seed_node].solve(
-                max_norm=self._max_norm,
-                max_iterations=self._max_iterations,
-                warp_0=self._seed_warp,
-                order=self._subset_order,
-                method=self._method,
-                tolerance=self._seed_tolerance,
-            )  # Solve for seed subset.
-            self._bar()
-            if not self._subsets[self._seed_node].data["solved"]:  # If seed unsolved.
-                self._subsets[self._seed_node].solve(
-                    max_norm=self._max_norm,
-                    max_iterations=self._max_iterations,
-                    warp_0=np.zeros(np.shape(self._seed_warp)),
-                    order=self._subset_order,
-                    method=self._method,
-                    tolerance=self._seed_tolerance,
-                )
-                if not self._subsets[self._seed_node].data["solved"]:
-                    self._update = True
-                    log.error(
-                        "Specified seed correlation coefficient tolerance not met."
-                        "Minimum seed correlation coefficient:"
-                        "{seed_C:.2f}; tolerance: {seed_tolerance:.2f}.".format(
-                            seed_C=self._subsets[self._seed_node].data["results"][
-                                "C_ZNCC"
-                            ],
-                            seed_tolerance=self._seed_tolerance,
-                        )
-                    )
-                    self._C_ZNCC[self._seed_node] = self._subsets[self._seed_node].data[
-                        "results"
-                    ]["C_ZNCC"]
-            if self._subsets[self._seed_node].data["solved"]:
-                # Store if solved.
-                self._store_variables(self._seed_node, seed=True)
-                # Solve for neighbours of the seed subset.
-                p_0 = self._subsets[self._seed_node].data["results"][
-                    "p"
-                ]  # Set seed subset warp function as the preconditioning.
-                self._neighbours(
-                    self._seed_node, p_0
-                )  # Solve for neighbouring subsets.
-                # Solve through sorted queue.
-                self._bar.text = (
-                    "-> Solving remaining subsets using reliability guided approach..."
-                )
-                count = 1
-                while np.max(self._subset_solved) > -1:
-                    # Identify next subset.
-                    cur_idx = np.argmax(
-                        self._subset_solved * self._C_ZNCC
-                    )  # Subset with highest correlation coefficient selected.
-                    try:
-                        p_0 = self._subsets[cur_idx].data["results"][
-                            "p"
-                        ]  # Precondition based on selected subset.
-                    except Exception:
-                        p_0 = self._subsets[self._seed_node].data["results"]["p"]
-                    self._subset_solved[cur_idx] = -1  # Set as solved.
-                    solvable = self._neighbours(
-                        cur_idx, p_0
-                    )  # Calculate for neighbouring subsets.
-                    count += 1
-                    self._bar()
-                    if count == np.shape(self._nodes)[0]:
-                        break
-                    elif solvable is False:
-                        break
-        if self._subsets[self._seed_node].data["solved"]:
-            self._corrections()
-        self._element_area()
-        self._element_strains()
-        if self._compatibility():
-            log.error("Local mesh compatibility failure.")
-            self._update = True
-            self.solved = False
-            self._unsolvable = True
-        elif np.max(self._warps[:, 2:]) > 1.0 or np.min(self._warps[:, 2:]) < -1.0:
-            log.error("Incompatible deformation.")
-            self._update = True
-            self.solved = False
-            self._unsolvable = True
-        elif any(self._subset_solved != -1) or any(self._C_ZNCC < self._tolerance):
-            self._update = True
-            self.solved = False
-            self._unsolvable = True
-        else:
-            self._update = False
-            self.solved = True
-            self._unsolvable = False
-
     def _compatibility(self):
+        """
+
+        Private method to ensure compatibility (that the displacement of a subset
+        nowhere exceeds the displacement bounds of neighbouring subsets).
+
+        """
         for i in range(np.shape(self._subsets)[0]):
             if i not in self._edges:
                 neighbours = self._connectivity(i, full=True)
-                coord = self._nodes[i] + self._displacements[i]
-                neighbour_coords = (
-                    self._nodes[neighbours] + self._displacements[neighbours]
-                )
-                if len(neighbour_coords) > 2:
-                    hull = sp.spatial.Delaunay(neighbour_coords)
-                    if hull.find_simplex(coord) < 0:
-                        print(self._nodes[i])
-                        print(self._nodes[neighbours])
-                        print(coord)
-                        print(self._nodes[neighbours] + self._displacements[neighbours])
-                        return True
-        return False
+                if len(neighbours) > 2:
+                    hull = sp.spatial.Delaunay(
+                        self._nodes[neighbours] + self._displacements[neighbours]
+                    )
+                    if hull.find_simplex(self._nodes[i] + self._displacements[i]) < 0:
+                        fixed = self._compatability_correction(i, neighbours, hull)
+                        if fixed is not True:
+                            self._unsolvable = True
+                            self._status = 6
+
+    def _compatability_correction(self, idx, neighbours, hull):
+        """
+
+        Private method to correct subset displacement in the case of incompatibility.
+
+        """
+
+        subset = gp.subset.Subset(
+            f_coord=self._nodes[idx],
+            f_img=self._f_img,
+            g_img=self._g_img,
+            template=self._subsets[idx]._template,
+        )
+        warp = np.mean(
+            self._p[neighbours[self._C_ZNCC[neighbours] > self._tolerance]],
+            axis=0,
+        )
+        subset.solve(
+            max_norm=self._max_norm,
+            max_iterations=self._max_iterations,
+            warp_0=warp,
+            order=self._subset_order,
+            method=self._method,
+            tolerance=self._seed_tolerance,
+        )
+        coord = self._nodes[idx] + subset._p[:2].flatten()
+        if hull.find_simplex(coord) >= 0 and subset.solved:
+            self._subsets[idx] = subset
+            self._store_variables(idx=idx, flag=-1)
+            return True
+        else:
+            return False
 
     def _corrections(self):
-        for corrective_iteration in range(1, self._corrective_iterations + 1):
-            sorted_correlation = np.argsort(self._C_ZNCC)
-            j = 0
-            k = 0
-            benefit = np.zeros(len(self._C_ZNCC))
+        """
+
+        Private method to improve subset correlation through neighbour
+        preconditioning.
+
+        """
+
+        arg = np.argsort(self._C_ZNCC)
+        corarg = arg[self._C_ZNCC[arg] < self._seed_tolerance]
+        j = 0
+        k = 0
+        benefit = np.zeros(len(self._C_ZNCC))
+        if np.shape(corarg)[0] >= 1:
             with alive_bar(
-                np.shape(self._subsets)[0],
+                np.shape(corarg)[0],
                 dual_line=True,
                 bar="blocks",
-                title="Performing corrections...",
+                title="Corrections",
             ) as bar:
-                for idx in sorted_correlation:
+                for idx in corarg:
                     k += 1
                     subset = gp.subset.Subset(
                         f_coord=self._nodes[idx],
@@ -1754,7 +1862,7 @@ class Mesh(MeshBase):
                             j += 1
                             benefit[idx] = subset._C_ZNCC - self._subsets[idx]._C_ZNCC
                             self._subsets[idx] = subset
-                            self._store_variables(idx, seed=True)
+                            self._store_variables(idx=idx, flag=-1)
                     except Exception:
                         pass
                     bar()
@@ -1781,6 +1889,9 @@ class Mesh(MeshBase):
         ----------
         idx : int
             Index of node.
+        full : bool, optional
+            False - return immediate nodes to the index.
+            True - return all nodes sharing an element with the index.
 
 
         Returns
@@ -1822,6 +1933,8 @@ class Mesh(MeshBase):
 
         Parameters
         ----------
+        cur_idx : int
+            The current susbet index.
         p_0 : `numpy.ndarray` (N)
             Preconditioning warp function.
 
@@ -1832,10 +1945,14 @@ class Mesh(MeshBase):
             Boolean to indicate whether the neighbouring subsets have been solved.
 
         """
+
+        # Identify neighbours.
         neighbours = self._connectivity(cur_idx)
+
+        # Iterate through list of neighbours.
         for idx in neighbours:
             if self._subset_solved[idx] == 0:  # If not previously solved.
-                # Use nearest-neighbout pre-conditioning.
+                # 1. Use nearest-neighbour pre-conditioning.
                 self._subsets[idx].solve(
                     max_norm=self._max_norm,
                     max_iterations=self._max_iterations,
@@ -1845,11 +1962,13 @@ class Mesh(MeshBase):
                     tolerance=self._tolerance,
                 )
                 if self._subsets[idx].data["solved"]:  # Check against tolerance.
-                    self._store_variables(idx)
+                    self._store_variables(idx=idx, flag=1)
                 elif self._subsets[idx].data["unsolvable"]:
-                    return False
+                    self._status = 5
+                    self._unsolvable = True
+                    return
                 else:
-                    # Use projected pre-conditioning.
+                    # 2. Use projected pre-conditioning.
                     diff = self._nodes[idx] - self._nodes[cur_idx]
                     p = self._subsets[cur_idx].data["results"]["p"]
                     if np.shape(p)[0] == 6:
@@ -1884,10 +2003,14 @@ class Mesh(MeshBase):
                         tolerance=self._tolerance,
                         order=self._subset_order,
                     )
-                    if self._subsets[idx].data["solved"]:  # Check.
-                        self._store_variables(idx)
+                    if self._subsets[idx].data["solved"]:  # Check against tolerance.
+                        self._store_variables(idx=idx, flag=1)
+                    elif self._subsets[idx].data["unsolvable"]:
+                        self._status = 5
+                        self._unsolvable = True
+                        return
                     else:
-                        # Finally, try the NCC initial guess.
+                        # 3. Use the NCC initial guess.
                         self._subsets[idx].solve(
                             max_norm=self._max_norm,
                             max_iterations=self._max_iterations,
@@ -1897,14 +2020,17 @@ class Mesh(MeshBase):
                             order=self._subset_order,
                         )
                         if self._subsets[idx].data["solved"]:
-                            self._store_variables(idx)
+                            self._store_variables(idx=idx, flag=1)
+                        elif self._subsets[idx].data["unsolvable"]:
+                            self._status = 5
+                            self._unsolvable = True
+                            return
                         else:
                             self._C_ZNCC[idx] = np.max(
                                 (self._subsets[idx].data["results"]["C_ZNCC"], 0)
                             )
-        return True
 
-    def _store_variables(self, idx, seed=False):
+    def _store_variables(self, idx, flag):
         """
 
         Private method to store variables.
@@ -1913,16 +2039,14 @@ class Mesh(MeshBase):
         ----------
         idx : int
             Index of current subset.
-        seed : bool
-            Boolean to indicate whether this is the seed subset.
+        flag : int
+            -1 : solved and stored
+            0  : unsolved
+            1  : solved and unstored
 
         """
-        if seed is True:
-            self._subset_solved[idx] = -1
-        elif self._subsets[idx].data["solved"] is False:
-            self._subset_solved[idx] = 0
-        else:
-            self._subset_solved[idx] = 1
+
+        self._subset_solved[idx] = flag
         self._C_ZNCC[idx] = np.max(
             (self._subsets[idx].data["results"]["C_ZNCC"], 0)
         )  # Clip correlation coefficient to positive values.

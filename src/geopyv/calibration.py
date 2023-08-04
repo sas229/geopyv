@@ -192,7 +192,6 @@ class Calibration(CalibrationBase):
         """
         if self._method == "charuco":
             self._allCorners, self._allIds, self._imsize = self._read_chessboards()
-            print(self._allCorners)
             (
                 self._ret,
                 self._camera_matrix,
@@ -233,11 +232,9 @@ class Calibration(CalibrationBase):
                     and len(res2[1]) > 3
                     and decimator % 1 == 0
                 ):
-                    allCorners.append(res2[1])
-                    allIds.append(res2[2])
-                else:
-                    allCorners.append(np.asarray([]))
-                    allIds.append(np.asarray([]))
+                    if len(res2[1]) > 50:
+                        allCorners.append(res2[1])
+                        allIds.append(res2[2])
 
             decimator += 1
 

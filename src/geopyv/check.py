@@ -40,6 +40,41 @@ def _check_type(parameter, name, types):
         )
 
 
+def _check_dtype(parameter, name, dtypes):
+    """
+
+    Standard function for checking data types of input parameter arrays.
+
+    Parameters
+    ----------
+    parameter :
+        The input to check.
+    types:
+        The types expected.
+
+    Returns
+    -------
+    msg :
+
+    """
+
+    if parameter.dtype not in dtypes:
+        if len(dtypes) > 1:
+            dtype_str = ", ".join([val.__name__ for val in dtypes])
+            splitpoint = dtype_str.rfind(",")
+            dtype_str = dtype_str[:splitpoint] + " or" + dtype_str[splitpoint + 1 :]
+        else:
+            dtype_str = dtypes[0]
+        return (
+            "`{name}` kwarg type invalid. "
+            "Expected a {dtypes}, but got a {parameter_type}."
+        ).format(
+            name=name,
+            dtypes=dtype_str,
+            parameter_type=type(parameter).__name__,
+        )
+
+
 def _check_index(index, name, axis, array):
     """
 
@@ -208,6 +243,20 @@ def _conversion(parameter, name, new_type, show=True):
         return ("`{name}` kwarg converted to a {type}.").format(
             name=name,
             type=new_type.__name__,
+        )
+
+
+def _dconversion(parameter, name, new_dtype, show=True):
+    if show:
+        return ("`{name}` kwarg converted to a {type}: {value}.").format(
+            name=name,
+            type=new_dtype.__name__,
+            value=parameter,
+        )
+    else:
+        return ("`{name}` kwarg converted to a {type}.").format(
+            name=name,
+            type=new_dtype.__name__,
         )
 
 

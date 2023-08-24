@@ -1705,13 +1705,15 @@ class Mesh(MeshBase):
                 p_0 = self._subsets[cur_idx].data["results"]["p"]  # Precondition.
                 self._neighbours(cur_idx, p_0)  # Solve for neighbours.
                 self._bar()
+                if self._bar.current == np.shape(self._nodes)[0]:
+                    break
                 if self._unsolvable:
                     return
 
         # Corrections, calculations and checks.
         if self._correction:
             self._corrections()
-        self._compatibility()
+        # self._compatibility()
         if self._unsolvable:
             return
         self._element_area()
@@ -2021,14 +2023,16 @@ class Mesh(MeshBase):
                         )
                         if self._subsets[idx].data["solved"]:
                             self._store_variables(idx=idx, flag=1)
-                        elif self._subsets[idx].data["unsolvable"]:
+                        elif self._subsets[idx].data["unsolvable"] or np.isnan(
+                            self._subsets[idx].data["results"]["C_ZNCC"]
+                        ):
                             self._status = 5
                             self._unsolvable = True
                             return
                         else:
-                            self._C_ZNCC[idx] = np.max(
-                                (self._subsets[idx].data["results"]["C_ZNCC"], 0)
-                            )
+                            self._C_ZNCC[idx] = self._subsets[idx].data["results"][
+                                "C_ZNCC"
+                            ]
 
     def _store_variables(self, idx, flag):
         """

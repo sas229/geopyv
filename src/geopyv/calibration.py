@@ -13,6 +13,7 @@ from cv2 import aruco
 import matplotlib.pyplot as plt
 import glob
 import re
+import matplotlib as mpl
 
 log = logging.getLogger(__name__)
 
@@ -132,13 +133,18 @@ class Calibration(CalibrationBase):
             self._board = aruco.CharucoBoard(
                 (columns, rows), square_length, marker_length, self._dictionary
             )
-            imboard = self._board.generateImage((2000, 2000))
-            cv2.imwrite("chessboard.tiff", imboard)
-            # fig = plt.figure()
-            # ax = fig.add_subplot(1,1,1)
-            # plt.imshow(imboard, cmap = mpl.cm.gray, interpolation = "nearest")
-            # ax.axis("off")
-            # plt.show()
+        elif self._method == "gridboard":
+            X, Y, marker_length, marker_separation = board_parameters
+            self._board = aruco.GridBoard(
+                (X, Y), marker_length, marker_separation, self._dictionary
+            )
+        imboard = self._board.generateImage((2000, 2000))
+        cv2.imwrite("chessboard.tiff", imboard)
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        plt.imshow(imboard, cmap=mpl.cm.gray, interpolation="nearest")
+        ax.axis("off")
+        plt.show()
 
         try:
             self._calibration_images = glob.glob(

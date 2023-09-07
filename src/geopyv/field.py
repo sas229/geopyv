@@ -567,7 +567,7 @@ class Field(FieldBase):
         if _auto_distribute is True:
             if boundary_obj is not None:
                 self._boundary_obj = boundary_obj
-                self._exclusion_objs = self._exclusion_objs
+                self._exclusion_objs = exclusion_objs
             else:
                 self._boundary_obj = mesh_0["boundary_obj"]
                 self._exclusion_objs = mesh_0["exclusion_objs"]

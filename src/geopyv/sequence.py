@@ -850,7 +850,8 @@ class Sequence(SequenceBase):
         tolerance=0.75,
         seed_tolerance=0.9,
         alpha=0.5,
-        guide=False,
+        guide=True,
+        override=False,
         sequential=False,
     ):
         """
@@ -1067,6 +1068,7 @@ class Sequence(SequenceBase):
         self._alpha = alpha
         self._guide = guide
         self._sequential = sequential
+        self._override = override
         self._seed_warp = np.zeros(6 * self._subset_order)
 
         # Solve.
@@ -1109,68 +1111,81 @@ class Sequence(SequenceBase):
             )  # Solve mesh.
             if mesh.solved:
                 # Save/store mesh.
-                if self._save_by_reference:  # Save...
-                    gp.io.save(
-                        object=mesh,
-                        filename=self._mesh_dir
-                        + "mesh_"
-                        + str(self._image_indices[_f_index])
-                        + "_"
-                        + str(self._image_indices[_g_index]),
-                    )
-                    self.data["meshes"].append(
-                        "mesh_"
-                        + str(self._image_indices[_f_index])
-                        + "_"
-                        + str(self._image_indices[_g_index])
-                    )
-                else:  # ...or store.
-                    self.data["meshes"][_g_index - 1] = mesh.data
-                # Iterate target index.
-                _g_index += 1  # Iterate the target image index.
-                # Check for end.
-                if _g_index != len(self._image_indices):
-                    del _g_img
-                    _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
-                else:
-                    self.solved = True
+                self._save_store_mesh(_f_index, _g_index, mesh)
+
+                # Target image update.
+                _g_index, _g_img = self._target_update(_g_index, _g_img)
+                if self.solved:
                     break
+
                 # Setup for next mesh.
                 # Deformation preconditioning (if guided).
-                if self._guide:
-                    seed = gp.particle.Particle(series=mesh, coordinate_0=_seed_coord_t)
-                    seed.solve()
-                    _seed_displacement = seed.data["results"]["warps"][1, :2]
-                    self._seed_warp[
-                        : 6 * min(self._mesh_order, self._subset_order)
-                    ] = seed.data["results"]["warps"][
-                        1, : 6 * min(self._mesh_order, self._subset_order)
-                    ]
+                _seed_displacement = self._deformation_preconditioning(
+                    mesh, _seed_coord_t
+                )
                 # Reference updating (if sequential).
                 if self._sequential:
-                    _f_index = _g_index - 1
-                    del _f_img
-                    _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
-                    _seed_coord_t += _seed_displacement
-                    _seed_displacement = np.zeros(2)
-            elif _f_index + 1 < _g_index:
-                _f_index = _g_index - 1
-                del _f_img
-                _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
-                _seed_coord_t += _seed_displacement
-                _seed_displacement = np.zeros(2)
-            else:
-                log.error(
-                    "Mesh for consecutive image pair {a}-{b} is unsolvable. "
-                    "Sequence curtailed.".format(
-                        a=self._image_indices[_f_index],
-                        b=self._image_indices[_g_index],
+                    (
+                        _f_index,
+                        _f_img,
+                        _seed_coord_t,
+                        _seed_displacement,
+                    ) = self._reference_update(
+                        _g_index, _f_img, _seed_coord_t, _seed_displacement
                     )
+
+            elif _f_index + 1 < _g_index:
+                (
+                    _f_index,
+                    _f_img,
+                    _seed_coord_t,
+                    _seed_displacement,
+                ) = self._reference_update(
+                    _g_index, _f_img, _seed_coord_t, _seed_displacement
                 )
-                self.data["meshes"] = np.asarray(self.data["meshes"])
-                self._unsolvable = True
-                del mesh
-                return self.solved
+            else:
+                if mesh._status == 3 and self._override:
+                    log.warning(
+                        (
+                            "Warning, correlation thresholds overriden to "
+                            "prevent sequence curtailment: {x} subsets with "
+                            "correlation between: {min}-{tol}"
+                        ).format(
+                            x=(mesh._C_ZNCC < self._tolerance).sum(),
+                            min=np.min(mesh._C_ZNCC),
+                            tol=self._tolerance,
+                        )
+                    )
+                    # Save/store mesh.
+                    mesh.data["solved"] = True
+                    self._save_store_mesh(_f_index, _g_index, mesh)
+
+                    # Target image update.
+                    _g_index, _g_img = self._target_update(_g_index, _g_img)
+                    if self.solved:
+                        break
+
+                    # Reference image update.
+                    (
+                        _f_index,
+                        _f_img,
+                        _seed_coord_t,
+                        _seed_displacement,
+                    ) = self._reference_update(
+                        _g_index, _f_img, _seed_coord_t, _seed_displacement
+                    )
+                else:
+                    log.error(
+                        "Mesh for consecutive image pair {a}-{b} is unsolvable. "
+                        "Sequence curtailed.".format(
+                            a=self._image_indices[_f_index],
+                            b=self._image_indices[_g_index],
+                        )
+                    )
+                    self.data["meshes"] = np.asarray(self.data["meshes"])
+                    self._unsolvable = True
+                    del mesh
+                    return self.solved
             del mesh
         del _f_img
 
@@ -1179,6 +1194,56 @@ class Sequence(SequenceBase):
         self.data["unsolvable"] = self._unsolvable
         self.data["meshes"] = np.asarray(self.data["meshes"])
         return self.solved
+
+    def _save_store_mesh(self, _f_index, _g_index, mesh):
+        # Save/store mesh.
+        if self._save_by_reference:  # Save...
+            gp.io.save(
+                object=mesh,
+                filename=self._mesh_dir
+                + "mesh_"
+                + str(self._image_indices[_f_index])
+                + "_"
+                + str(self._image_indices[_g_index]),
+            )
+            self.data["meshes"].append(
+                "mesh_"
+                + str(self._image_indices[_f_index])
+                + "_"
+                + str(self._image_indices[_g_index])
+            )
+        else:  # ...or store.
+            self.data["meshes"][_g_index - 1] = mesh.data
+
+    def _deformation_preconditioning(self, mesh, _seed_coord_t):
+        if self._guide:
+            seed = gp.particle.Particle(series=mesh, coordinate_0=_seed_coord_t)
+            seed.solve()
+            _seed_displacement = seed.data["results"]["warps"][1, :2]
+            self._seed_warp[
+                : 6 * min(self._mesh_order, self._subset_order)
+            ] = seed.data["results"]["warps"][
+                1, : 6 * min(self._mesh_order, self._subset_order)
+            ]
+            return _seed_displacement
+
+    def _target_update(self, _g_index, _g_img):
+        _g_index += 1
+        del _g_img
+        if _g_index != len(self._image_indices):
+            _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
+            return _g_index, _g_img
+        else:
+            self.solved = True
+            return _g_index, None
+
+    def _reference_update(self, _g_index, _f_img, _seed_coord_t, _seed_displacement):
+        _f_index = _g_index - 1
+        del _f_img
+        _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
+        _seed_coord_t += _seed_displacement
+        _seed_displacement = np.zeros(2)
+        return _f_index, _f_img, _seed_coord_t, _seed_displacement
 
     def load(self):
         try:

@@ -48,9 +48,8 @@ class Region(RegionBase):
         shape=None,
         centre=None,
         nodes=None,
-        rigid=False,
+        option="F",
         hard=True,
-        track=True,
         compensate=True,
     ):
         """
@@ -58,60 +57,78 @@ class Region(RegionBase):
             Boolean to control whether the nodes is included in the
             binary mask. True -included, False - not included.
             Defaults to True.
+        option :
+            "D" : Defined: a controlled region.
+            "S" : Static: an untracked region.
+            "R" : Rigid: a tracked region, unable to deform.
+            "F" : Flexible: a tracked region, able to deform.
         """
         self._shape = shape
-        self._centre = centre
-        self._nodes = nodes
-        self._rigid = rigid
+        self._option = option
+        if self._option == "D":
+            centres = [np.mean(nodes[i], axis=0) for i in range(np.shape(nodes)[0])]
+            self._nodes = nodes[0]
+            self._centre = centres[0]
+        else:
+            self._nodes = nodes
+            self._centre = centre
+            nodes = [nodes]
+            centres = [centre]
         self._hard = hard
-        self._track = track
         self._compensate = compensate
+
         self.solved = False
 
         self.data = {
             "type": "geometry.Region",
             "solved": self.solved,
             "shape": self._shape,
-            "rigid": self._rigid,
             "hard": self._hard,
-            "track": self._track,
             "compensate": self._compensate,
             "specifics": self._specifics,
-            "centres": [self._centre],
-            "nodes": [self._nodes],
+            "centres": centres,
+            "nodes": nodes,
         }
         self._reference_update_register = []
         self._ref_index = None
 
     def _store(self, warp):
-        if self._track:
-            if self._rigid:
-                local_coordinates = self._nodes - self._centre
-                theta = (warp[3] - warp[4]) / 2
-                rot = np.asarray(
-                    [[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]]
-                )
-                self.data["nodes"].append(
-                    self._centre + warp[:2] + local_coordinates @ rot
-                )
-                self.data["centres"].append(self._centre + warp[:2])
-            else:
-                self.data["nodes"].append(self._nodes + warp)
-                self.data["centres"].append(self._centre + np.mean(warp, axis=0))
+        # if self._option == "D":
+        #    self.data["nodes"].append(self.data["full_nodes"][np.shape(self.data["nodes"])[0]+1])
+        #    self.data["centres"].append(np.mean(self.data["nodes"][-1], axis=0))
+        if self._option == "R":
+            local_coordinates = self._nodes - self._centre
+            theta = (warp[3] - warp[4]) / 2
+            rot = np.asarray(
+                [[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]]
+            )
+            self.data["nodes"].append(self._centre + warp[:2] + local_coordinates @ rot)
+            self.data["centres"].append(self._centre + warp[:2])
+        elif self._option == "F":
+            self.data["nodes"].append(self._nodes + warp)
+            self.data["centres"].append(self._centre + np.mean(warp, axis=0))
         self._solved = True
         self.data["solved"] = self._solved
 
     def _update(self, f_img_filepath):
-        index = int(
-            re.findall(
-                r"\d+",
-                f_img_filepath,
-            )[-1]
-        )
-        if index != self._ref_index:
-            self._ref_index = index
-            self._nodes = self.data["nodes"][-1]
-            self._centre = self.data["centres"][-1]
+        if self._option != "S":
+            index = int(
+                re.findall(
+                    r"\d+",
+                    f_img_filepath,
+                )[-1]
+            )
+            if index != self._ref_index:
+                self._ref_index = index
+                self._reference_update_register.append(index)
+                self._nodes = self.data["nodes"][
+                    self._reference_update_register[-1]
+                    - self._reference_update_register[0]
+                ]
+                self._centre = self.data["centres"][
+                    self._reference_update_register[-1]
+                    - self._reference_update_register[0]
+                ]
 
 
 class Circle(Region):
@@ -127,9 +144,8 @@ class Circle(Region):
         centre=None,
         radius=50.0,
         size=20.0,
-        rigid=True,
+        option="F",
         hard=True,
-        track=True,
         compensate=True,
     ):
         """
@@ -175,7 +191,6 @@ class Circle(Region):
             "ValueError",
         )
         self._report(gp.check._check_type(hard, "hard", [bool]), "TypeError")
-        self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
 
         # Store unique variables.
         self._size = size
@@ -199,9 +214,8 @@ class Circle(Region):
             shape="Circle",
             centre=centre,
             nodes=nodes,
-            rigid=rigid,
+            option=option,
             hard=hard,
-            track=track,
             compensate=compensate,
         )
 
@@ -218,9 +232,8 @@ class Path(Region):
         *,
         centre=None,
         nodes=None,
-        rigid=True,
+        option="F",
         hard=True,
-        track=True,
         compensate=True,
         radius=25,
     ):
@@ -254,8 +267,8 @@ class Path(Region):
                 )
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_dim(nodes, "nodes", 2), "ValueError")
-        self._report(gp.check._check_axis(nodes, "nodes", 1, [2]), "ValueError")
+        # self._report(gp.check._check_dim(nodes, "nodes", 2), "ValueError")
+        # self._report(gp.check._check_axis(nodes, "nodes", 1, [2]), "ValueError")
 
         if centre is None:
             centre = np.mean(nodes, axis=0)
@@ -268,9 +281,8 @@ class Path(Region):
             shape="Path",
             centre=centre,
             nodes=nodes,
-            rigid=rigid,
+            option=option,
             hard=hard,
-            track=track,
             compensate=compensate,
         )
 

@@ -91,13 +91,43 @@ class Template:
 
         """
 
+        ly = int(centre[1]) - self.size
+        uy = int(centre[1]) + self.size + 1
+        lx = int(centre[0]) - self.size
+        ux = int(centre[0]) + self.size + 1
+        lyp = 0
+        uyp = 0
+        lxp = 0
+        uxp = 0
+        flag = 0
+        if lx < 0:
+            lxp = -lx
+            lx = 0
+            flag = 1
+        if ly < 0:
+            lyp = -ly
+            ly = 0
+            flag = 1
+        if ux >= np.shape(mask)[1]:
+            uxp = ux + 1 - np.shape(mask)[1]
+            ux = np.shape(mask)[1] - 1
+            flag = 1
+        if uy >= np.shape(mask)[0]:
+            uyp = uy + 1 - np.shape(mask)[0]
+            uy = np.shape(mask)[0] - 1
+            flag = 1
         local = mask[
-            int(centre[1]) - self.size : int(centre[1]) + self.size + 1,
-            int(centre[0]) - self.size : int(centre[0]) + self.size + 1,
+            ly:uy,
+            lx:ux,
         ]
+        local = np.pad(local, ((lyp, uyp), (lxp, uxp)))
         local_masked = local * self.subset_mask
         self.coords = np.argwhere(local_masked == 1) - self.size
         self.n_px = np.shape(self.coords)[0]
+        if flag:
+            log.warning(
+                "Subset centred {centre} clipped by image edge.".format(centre=centre)
+            )
 
 
 class Circle(Template):

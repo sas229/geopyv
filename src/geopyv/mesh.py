@@ -709,7 +709,8 @@ class Mesh(MeshBase):
         self._g_img = g_img
         self._target_nodes = target_nodes
         self._boundary_obj = boundary_obj
-        self._boundary_obj._rigid = False
+        if self._boundary_obj._option == "R":
+            self._boundary_obj._option = "F"
         self._exclusion_objs = exclusion_objs
         self._size_lower_bound = size_lower_bound
         self._size_upper_bound = size_upper_bound
@@ -1116,19 +1117,20 @@ class Mesh(MeshBase):
                 self._update_mesh()
                 self._find_seed_node()
                 self._reliability_guided()
-                if self._unsolvable:
+                if self._unsolvable and self._status != 3:
                     self._check_status()
                     return self.solved
             self._store_region()
-            if self._unsolvable:
+            if self._unsolvable and self._status != 3:
                 self._check_status()
                 return self.solved
 
-            self._status = 1
+            if self._status == 0:
+                self._status = 1
+                self.solved = True
             self._check_status()
 
             # Pack data.
-            self.solved = True
             self.data["nodes"] = self._nodes
             self.data["elements"] = self._elements
             self.data["areas"] = self._areas
@@ -1210,13 +1212,14 @@ class Mesh(MeshBase):
             log.error("Local mesh compatibility failure.")
         elif self._status == 7:  # Unsolvable: unkown issue.
             log.error("Could not solve mesh. Unrecognised problem.")
+            input()
         self._update = True
 
     def _store_region(self):
         """Private method to record the deformation of the boundary and exclusions."""
         exclusion_obj_warp = []
         for i in range(np.shape(self._exclusion_objs)[0]):
-            if self._exclusion_objs[i]._rigid:  # Track if rigid.
+            if self._exclusion_objs[i]._option == "R":
                 subset = gp.subset.Subset(
                     f_img=self._f_img,
                     g_img=self._g_img,
@@ -1235,11 +1238,13 @@ class Mesh(MeshBase):
                 else:
                     exclusion_obj_warp.append(subset._p.flatten())
                     del subset
-            else:
+            elif self._exclusion_objs[i]._option == "F":
                 exclusion_obj_warp.append(self._displacements[self._exclusions[i]])
-        self._boundary_obj._store(self._displacements[self._boundary])
+            else:
+                exclusion_obj_warp.append(None)
         for i in range(np.shape(self._exclusion_objs)[0]):
             self._exclusion_objs[i]._store(exclusion_obj_warp[i])
+        self._boundary_obj._store(self._displacements[self._boundary])
 
     def _update_region(self):
         """
@@ -1325,6 +1330,8 @@ class Mesh(MeshBase):
         """
         message = "Adaptively remeshing..."
         with alive_bar(dual_line=True, bar=None, title=message) as bar:
+            print("AM")
+            print(np.shape(self._areas))
             D = (
                 abs(self._warps[:, 3] + self._warps[:, 4]) * self._areas
             )  # Elemental shear strain-area products.
@@ -1332,6 +1339,10 @@ class Mesh(MeshBase):
             self._areas *= (
                 np.clip(D / D_b, self._alpha, 1 / self._alpha)
             ) ** -2  # Target element areas calculated.
+            print(np.shape(self._areas))
+            print(np.shape(self._nodes))
+            print(np.shape(self._elements))
+            print()
 
             def f(scale):
                 return self._adaptive_remesh(
@@ -1465,6 +1476,20 @@ class Mesh(MeshBase):
             ((0, 0), (0, 0), (0, 2)),
             mode="constant",
         )  # Prepare data input (coordinates and buffer).
+        print("PM")
+        print(np.shape(lengths))
+        print(np.shape(np.repeat(lengths, 3)))
+        print(np.shape(np.reshape(np.repeat(lengths, 3), (-1, 3))))
+        print(
+            np.shape(
+                np.pad(
+                    nodes[elements[:, :3]],
+                    ((0, 0), (0, 0), (0, 2)),
+                    mode="constant",
+                )
+            )
+        )
+        print()
         data[:, :, 3] = np.reshape(
             np.repeat(lengths, 3), (-1, 3)
         )  # Fill data input buffer with target weights.
@@ -1718,7 +1743,10 @@ class Mesh(MeshBase):
             return
         self._element_area()
         self._element_strains()
-        if any(self._subset_solved != -1) or any(self._C_ZNCC < self._tolerance):
+        if any(self._subset_solved != -1):
+            self._unsolvable = True
+            self._status = 5
+        elif any(self._C_ZNCC < self._tolerance):
             self._unsolvable = True
             self._status = 3
 
@@ -1968,7 +1996,6 @@ class Mesh(MeshBase):
                 elif self._subsets[idx].data["unsolvable"]:
                     self._status = 5
                     self._unsolvable = True
-                    return
                 else:
                     # 2. Use projected pre-conditioning.
                     diff = self._nodes[idx] - self._nodes[cur_idx]
@@ -2010,7 +2037,6 @@ class Mesh(MeshBase):
                     elif self._subsets[idx].data["unsolvable"]:
                         self._status = 5
                         self._unsolvable = True
-                        return
                     else:
                         # 3. Use the NCC initial guess.
                         self._subsets[idx].solve(
@@ -2021,18 +2047,13 @@ class Mesh(MeshBase):
                             tolerance=self._tolerance,
                             order=self._subset_order,
                         )
-                        if self._subsets[idx].data["solved"]:
-                            self._store_variables(idx=idx, flag=1)
-                        elif self._subsets[idx].data["unsolvable"] or np.isnan(
+                        if self._subsets[idx].data["unsolvable"] or np.isnan(
                             self._subsets[idx].data["results"]["C_ZNCC"]
                         ):
                             self._status = 5
                             self._unsolvable = True
-                            return
                         else:
-                            self._C_ZNCC[idx] = self._subsets[idx].data["results"][
-                                "C_ZNCC"
-                            ]
+                            self._store_variables(idx=idx, flag=1)
 
     def _store_variables(self, idx, flag):
         """

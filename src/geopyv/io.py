@@ -119,7 +119,7 @@ def save(*, object, directory=None, filename=None):
         return False
     if isinstance(object, gp.object.Object):
         solved = object.data["solved"]
-        if solved is True or object.data["type"] == "sequence":
+        if solved is True or object.data["type"] == "Sequence":
             ext = ".pyv"
             filepath = directory + "/" + filename + ext
             with open(filepath, "wb") as outfile:
@@ -138,7 +138,11 @@ def save(*, object, directory=None, filename=None):
                 )
                 return True
         else:
-            log.warn("Object not solved therefore no data to save.")
+            log.warn(
+                "`{}` object not solved therefore no data to save.".format(
+                    object.data["type"]
+                )
+            )
             return False
     else:
         log.error("Nothing saved. Object supplied not a valid geopyv type.")

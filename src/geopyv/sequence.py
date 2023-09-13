@@ -810,6 +810,7 @@ class Sequence(SequenceBase):
         # Data.
         file_settings = {
             "image_dir": self._image_dir,
+            "common_name": self._common_name,
             "images": self._images,
             "file_format": self._file_format,
             "image_indices": self._image_indices,
@@ -853,6 +854,9 @@ class Sequence(SequenceBase):
         guide=True,
         override=False,
         sequential=False,
+        history=None,
+        _f_index=0,
+        _g_index=1,
     ):
         """
         Method to solve for the sequence.
@@ -1069,15 +1073,16 @@ class Sequence(SequenceBase):
         self._guide = guide
         self._sequential = sequential
         self._override = override
+        self._mesh_override = False
+        self._history = history
         self._seed_warp = np.zeros(6 * self._subset_order)
 
         # Solve.
-        _f_index = 0
-        _g_index = 1
         _seed_coord_t = self._seed_coord
         _seed_displacement = np.zeros(2)
         _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
         _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
+        _prev_mesh = None
         while _g_index < len(self._image_indices):
             log.info(
                 "Solving for image pair {}-{}.".format(
@@ -1108,11 +1113,30 @@ class Sequence(SequenceBase):
                 tolerance=self._tolerance,
                 seed_tolerance=self._seed_tolerance,
                 alpha=self._alpha,
+                history=_prev_mesh,
+                override=self._mesh_override,
             )  # Solve mesh.
             if mesh.solved:
+                # Mesh override reset.
+                if self._mesh_override:
+                    if np.any(mesh._C_ZNCC < self._tolerance):
+                        log.warning(
+                            (
+                                "Warning, correlation thresholds overriden to "
+                                "prevent sequence curtailment:\n{x} subsets with "
+                                "correlation between: {min}-{tol}."
+                            ).format(
+                                x=(mesh._C_ZNCC < self._tolerance).sum(),
+                                min=round(np.min(mesh._C_ZNCC), 2),
+                                tol=self._tolerance,
+                            )
+                        )
+                    self._mesh_override = False
                 # Save/store mesh.
                 self._save_store_mesh(_f_index, _g_index, mesh)
-
+                if self._history:
+                    del _prev_mesh
+                    _prev_mesh = mesh
                 # Target image update.
                 _g_index, _g_img = self._target_update(_g_index, _g_img)
                 if self.solved:
@@ -1130,8 +1154,9 @@ class Sequence(SequenceBase):
                         _f_img,
                         _seed_coord_t,
                         _seed_displacement,
+                        _prev_mesh,
                     ) = self._reference_update(
-                        _g_index, _f_img, _seed_coord_t, _seed_displacement
+                        _g_index, _f_img, _seed_coord_t, _seed_displacement, _prev_mesh
                     )
 
             elif _f_index + 1 < _g_index:
@@ -1140,54 +1165,26 @@ class Sequence(SequenceBase):
                     _f_img,
                     _seed_coord_t,
                     _seed_displacement,
+                    _prev_mesh,
                 ) = self._reference_update(
-                    _g_index, _f_img, _seed_coord_t, _seed_displacement
+                    _g_index, _f_img, _seed_coord_t, _seed_displacement, _prev_mesh
                 )
+                if self._override:
+                    self._mesh_override = True
             else:
-                if mesh._status == 3 and self._override:
-                    log.warning(
-                        (
-                            "Warning, correlation thresholds overriden to "
-                            "prevent sequence curtailment: {x} subsets with "
-                            "correlation between: {min}-{tol}"
-                        ).format(
-                            x=(mesh._C_ZNCC < self._tolerance).sum(),
-                            min=np.min(mesh._C_ZNCC),
-                            tol=self._tolerance,
-                        )
+                log.error(
+                    "Mesh for consecutive image pair {a}-{b} is unsolvable. "
+                    "Sequence curtailed.".format(
+                        a=self._image_indices[_f_index],
+                        b=self._image_indices[_g_index],
                     )
-                    # Save/store mesh.
-                    mesh.data["solved"] = True
-                    self._save_store_mesh(_f_index, _g_index, mesh)
-
-                    # Target image update.
-                    _g_index, _g_img = self._target_update(_g_index, _g_img)
-                    if self.solved:
-                        break
-
-                    # Reference image update.
-                    (
-                        _f_index,
-                        _f_img,
-                        _seed_coord_t,
-                        _seed_displacement,
-                    ) = self._reference_update(
-                        _g_index, _f_img, _seed_coord_t, _seed_displacement
-                    )
-                else:
-                    log.error(
-                        "Mesh for consecutive image pair {a}-{b} is unsolvable. "
-                        "Sequence curtailed.".format(
-                            a=self._image_indices[_f_index],
-                            b=self._image_indices[_g_index],
-                        )
-                    )
-                    self.data["meshes"] = np.asarray(self.data["meshes"])
-                    self._unsolvable = True
-                    del mesh
-                    return self.solved
+                )
+                self.data["meshes"] = np.asarray(self.data["meshes"])
+                self._unsolvable = True
+                del mesh
+                break
             del mesh
-        del _f_img
+        del _f_img, _prev_mesh
 
         # Pack data.
         self.data["solved"] = self.solved
@@ -1226,6 +1223,7 @@ class Sequence(SequenceBase):
                 1, : 6 * min(self._mesh_order, self._subset_order)
             ]
             return _seed_displacement
+        return None
 
     def _target_update(self, _g_index, _g_img):
         _g_index += 1
@@ -1237,13 +1235,17 @@ class Sequence(SequenceBase):
             self.solved = True
             return _g_index, None
 
-    def _reference_update(self, _g_index, _f_img, _seed_coord_t, _seed_displacement):
+    def _reference_update(
+        self, _g_index, _f_img, _seed_coord_t, _seed_displacement, _prev_mesh
+    ):
         _f_index = _g_index - 1
         del _f_img
         _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
         _seed_coord_t += _seed_displacement
         _seed_displacement = np.zeros(2)
-        return _f_index, _f_img, _seed_coord_t, _seed_displacement
+        if self._history:
+            _prev_mesh._nodes += _prev_mesh._displacements
+        return _f_index, _f_img, _seed_coord_t, _seed_displacement, _prev_mesh
 
     def load(self):
         try:
@@ -1296,6 +1298,106 @@ class SequenceResults(SequenceBase):
     def __init__(self, data):
         """Initialisation of geopyv SequenceResults class."""
         self.data = data
+
+    def regenerate(self, *, override=False, sequential=False, guide=True):
+        """Create a Sequence class object."""
+        meshes = self.data["meshes"]
+        image_dir = self.data["file_settings"]["image_dir"]
+        common_name = self.data["file_settings"]["common_name"]
+        images = self.data["file_settings"]["images"]
+        file_format = self.data["file_settings"]["file_format"]
+        image_indices = self.data["file_settings"]["image_indices"]
+        save_by_reference = self.data["file_settings"]["save_by_reference"]
+        mesh_dir = self.data["file_settings"]["mesh_dir"]
+        target_nodes = self.data["mesh_settings"]["target_nodes"]
+        boundary_obj = self.data["mesh_settings"]["boundary_obj"]
+        exclusion_objs = self.data["mesh_settings"]["exclusion_objs"]
+        size_lower_bound = self.data["mesh_settings"]["size_lower_bound"]
+        size_upper_bound = self.data["mesh_settings"]["size_upper_bound"]
+
+        sequence = gp.sequence.Sequence(
+            image_dir=image_dir,
+            common_name=common_name,
+            file_format=file_format,
+            target_nodes=target_nodes,
+            boundary_obj=boundary_obj,
+            exclusion_objs=exclusion_objs,
+            size_lower_bound=size_lower_bound,
+            size_upper_bound=size_upper_bound,
+            save_by_reference=save_by_reference,
+            mesh_dir=mesh_dir,
+        )
+
+        sequence.data["meshes"] = meshes
+        if save_by_reference:
+            _f_index = np.argwhere(
+                image_indices == int(re.findall(r"\d+", meshes[-1])[-2])
+            )[0][0]
+            _g_index = (
+                np.argwhere(image_indices == int(re.findall(r"\d+", meshes[-1])[-1]))[
+                    0
+                ][0]
+                + 1
+            )
+            mesh = sequence._load_mesh(mesh_index=_g_index - 2, verbose=False)
+        else:
+            mesh = [i for i in meshes if i][-1]
+            _f_index = np.argwhere(
+                image_indices == int(re.findall(r"\d+", mesh["images"]["f_img"])[-1])
+            )[0][0]
+            _g_index = (
+                np.argwhere(
+                    image_indices
+                    == int(re.findall(r"\d+", mesh["images"]["g_img"])[-1])
+                )[0][0]
+                + 1
+            )
+
+        if _g_index < np.shape(images)[0]:
+            mesh_order = mesh["mesh_order"]
+            max_iterations = mesh["settings"]["max_iterations"]
+            max_norm = mesh["settings"]["max_norm"]
+            adaptive_iterations = mesh["settings"]["adaptive_iterations"]
+            method = mesh["settings"]["method"]
+            tolerance = mesh["settings"]["tolerance"]
+            seed_tolerance = mesh["settings"]["seed_tolerance"]
+            correction = mesh["settings"]["correction"]
+            alpha = mesh["settings"]["alpha"]
+            seed = mesh["results"]["subsets"][mesh["results"]["seed"]]
+            subset_order = seed["settings"]["order"]
+            seed_displacement = seed["results"]["p"][:2].flatten()
+            seed_warp = seed["results"]["p"][:6].flatten()
+            template_shape = seed["template"]["shape"]
+            template_size = seed["template"]["size"]
+            seed_coord = mesh["nodes"][mesh["results"]["seed"]]
+
+            if template_shape == "circle":
+                template = gp.templates.Circle(template_size)
+            elif template_shape == "square":
+                template = gp.templates.Square(template_size)
+
+            sequence.solve(
+                seed_coord=seed_coord + seed_displacement,
+                seed_warp=seed_warp,
+                template=template,
+                max_norm=max_norm,
+                max_iterations=max_iterations,
+                adaptive_iterations=adaptive_iterations,
+                correction=correction,
+                method=method,
+                mesh_order=mesh_order,
+                subset_order=subset_order,
+                tolerance=tolerance,
+                seed_tolerance=seed_tolerance,
+                alpha=alpha,
+                guide=guide,
+                override=override,
+                sequential=sequential,
+                _f_index=_f_index,
+                _g_index=_g_index,
+            )
+
+        return sequence
 
     def load(self, ref=True):
         """Load all meshes in sequence object mesh directory."""

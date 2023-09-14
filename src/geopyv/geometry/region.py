@@ -88,14 +88,12 @@ class Region(RegionBase):
             "specifics": self._specifics,
             "centres": centres,
             "nodes": nodes,
+            "counter": 0,
+            "ref_index": None,
         }
         self._reference_update_register = []
-        self._ref_index = None
 
     def _store(self, warp):
-        # if self._option == "D":
-        #    self.data["nodes"].append(self.data["full_nodes"][np.shape(self.data["nodes"])[0]+1])
-        #    self.data["centres"].append(np.mean(self.data["nodes"][-1], axis=0))
         if self._option == "R":
             local_coordinates = self._nodes - self._centre
             theta = (warp[3] - warp[4]) / 2
@@ -109,26 +107,21 @@ class Region(RegionBase):
             self.data["centres"].append(self._centre + np.mean(warp, axis=0))
         self._solved = True
         self.data["solved"] = self._solved
+        self.data["counter"] += 1
 
     def _update(self, f_img_filepath):
         if self._option != "S":
-            index = int(
+            f_index = int(
                 re.findall(
                     r"\d+",
                     f_img_filepath,
                 )[-1]
             )
-            if index != self._ref_index:
-                self._ref_index = index
-                self._reference_update_register.append(index)
-                self._nodes = self.data["nodes"][
-                    self._reference_update_register[-1]
-                    - self._reference_update_register[0]
-                ]
-                self._centre = self.data["centres"][
-                    self._reference_update_register[-1]
-                    - self._reference_update_register[0]
-                ]
+            if f_index != self.data["ref_index"]:
+                self.data["ref_index"] = f_index
+                self._reference_update_register.append(f_index)
+                self._nodes = self.data["nodes"][self.data["counter"]]
+                self._centre = self.data["centres"][self.data["counter"]]
 
 
 class Circle(Region):

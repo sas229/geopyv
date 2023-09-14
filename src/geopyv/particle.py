@@ -12,7 +12,6 @@ import re
 from alive_progress import alive_bar
 import math
 import geomat
-import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -508,20 +507,6 @@ class Particle(ParticleBase):
                     boundary=self._series[m]["nodes"][self._series[m]["boundary"]],
                 )
             )
-            fig, ax = plt.subplots()
-            ax.plot(
-                np.append(
-                    nodes[self._series[m]["exclusions"][0]][:, 0],
-                    nodes[self._series[m]["exclusions"][0]][0, 0],
-                ),
-                np.append(
-                    nodes[self._series[m]["exclusions"][0]][:, 1],
-                    nodes[self._series[m]["exclusions"][0]][0, 1],
-                ),
-            )
-            ax.plot(self._coordinates[:m, 0], self._coordinates[:m, 1])
-            print(m)
-            plt.show()
             raise ValueError("Particle outside of boundary.")
         return index
 

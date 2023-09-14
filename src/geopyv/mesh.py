@@ -867,6 +867,8 @@ class Mesh(MeshBase):
         adaptive_iterations=0,
         correction=True,
         alpha=0.5,
+        history=None,
+        override=False,
     ):
         r"""
 
@@ -1091,6 +1093,8 @@ class Mesh(MeshBase):
         self._alpha = alpha
         self._update = False
         self._seed_warp = seed_warp
+        self._history = history
+        self._override = override
         self._status = 0
 
         # Initialize gmsh if not already initialized.
@@ -1107,7 +1111,7 @@ class Mesh(MeshBase):
         self._find_seed_node()
         try:
             self._reliability_guided()
-            if self._unsolvable:
+            if self._unsolvable and not (self._status == 3 and self._override):
                 self._check_status()
                 return self.solved
             # Solve adaptive iterations.
@@ -1117,18 +1121,16 @@ class Mesh(MeshBase):
                 self._update_mesh()
                 self._find_seed_node()
                 self._reliability_guided()
-                if self._unsolvable and self._status != 3:
+                if self._unsolvable and not (self._status == 3 and self._override):
                     self._check_status()
                     return self.solved
             self._store_region()
-            if self._unsolvable and self._status != 3:
+            if self._unsolvable and not (self._status == 3 and self._override):
                 self._check_status()
                 return self.solved
-
             if self._status == 0:
                 self._status = 1
-                self.solved = True
-            self._check_status()
+            self.solved = True
 
             # Pack data.
             self.data["nodes"] = self._nodes
@@ -1139,7 +1141,6 @@ class Mesh(MeshBase):
             self.data.update(
                 {"centroids": np.mean(self._nodes[self._elements], axis=-2)}
             )
-
             # Pack settings.
             self._settings = {
                 "max_iterations": self._max_iterations,
@@ -1147,15 +1148,16 @@ class Mesh(MeshBase):
                 "adaptive_iterations": self._adaptive_iterations,
                 "method": self._method,
                 "tolerance": self._tolerance,
+                "seed_tolerance": self._seed_tolerance,
                 "correction": self._correction,
+                "alpha": self._alpha,
+                "override": self._override,
             }
             self.data.update({"settings": self._settings})
-
             # Extract data from subsets.
             subset_data = []
             for subset in self._subsets:
                 subset_data.append(subset.data)
-
             # Pack results.
             self._results = {
                 "subsets": subset_data,
@@ -1165,7 +1167,7 @@ class Mesh(MeshBase):
                 "seed": self._seed_node,
             }
             self.data.update({"results": self._results})
-
+            del self._history
         except Exception:
             self._status = 7
             self._unsolvable = True
@@ -1330,8 +1332,6 @@ class Mesh(MeshBase):
         """
         message = "Adaptively remeshing..."
         with alive_bar(dual_line=True, bar=None, title=message) as bar:
-            print("AM")
-            print(np.shape(self._areas))
             D = (
                 abs(self._warps[:, 3] + self._warps[:, 4]) * self._areas
             )  # Elemental shear strain-area products.
@@ -1339,10 +1339,6 @@ class Mesh(MeshBase):
             self._areas *= (
                 np.clip(D / D_b, self._alpha, 1 / self._alpha)
             ) ** -2  # Target element areas calculated.
-            print(np.shape(self._areas))
-            print(np.shape(self._nodes))
-            print(np.shape(self._elements))
-            print()
 
             def f(scale):
                 return self._adaptive_remesh(
@@ -1476,20 +1472,7 @@ class Mesh(MeshBase):
             ((0, 0), (0, 0), (0, 2)),
             mode="constant",
         )  # Prepare data input (coordinates and buffer).
-        print("PM")
-        print(np.shape(lengths))
-        print(np.shape(np.repeat(lengths, 3)))
-        print(np.shape(np.reshape(np.repeat(lengths, 3), (-1, 3))))
-        print(
-            np.shape(
-                np.pad(
-                    nodes[elements[:, :3]],
-                    ((0, 0), (0, 0), (0, 2)),
-                    mode="constant",
-                )
-            )
-        )
-        print()
+
         data[:, :, 3] = np.reshape(
             np.repeat(lengths, 3), (-1, 3)
         )  # Fill data input buffer with target weights.
@@ -1675,13 +1658,7 @@ class Mesh(MeshBase):
         # Store if solved.
         self._store_variables(idx=self._seed_node, flag=-1)
 
-    def _reliability_guided(self):
-        """
-
-        Private method to perform reliability-guided (RG) PIV analysis.
-
-        """
-
+    def _output_preparation(self):
         # Set up.
         m = np.shape(self._nodes)[0]
         n = np.shape(self._seed_warp)[0]
@@ -1694,6 +1671,15 @@ class Mesh(MeshBase):
         self._displacements = np.zeros(
             (m, 2), dtype=np.float64
         )  # Displacement output array.
+
+    def _reliability_guided(self):
+        """
+
+        Private method to perform reliability-guided (RG) PIV analysis.
+
+        """
+
+        self._output_preparation()
 
         # Subset instantiation with template masking.
         self._subset_instantiation()
@@ -1708,7 +1694,7 @@ class Mesh(MeshBase):
             # Solve for seed.
             self._bar.text = "-> Solving seed subset..."
             self._seed_solve()
-            if self._unsolvable:
+            if self._unsolvable and not (self._status == 3 and self._override):
                 return
             self._bar()
 
@@ -1716,9 +1702,8 @@ class Mesh(MeshBase):
             self._neighbours(
                 self._seed_node, self._subsets[self._seed_node].data["results"]["p"]
             )
-            if self._unsolvable:
+            if self._unsolvable and not (self._status == 3 and self._override):
                 return
-
             # Solve through sorted queue.
             self._bar.text = (
                 "-> Solving remaining subsets using reliability guided approach..."
@@ -1732,14 +1717,13 @@ class Mesh(MeshBase):
                 self._bar()
                 if self._bar.current == np.shape(self._nodes)[0]:
                     break
-                if self._unsolvable:
+                if self._unsolvable and not (self._status == 3 and self._override):
                     return
-
         # Corrections, calculations and checks.
         if self._correction:
             self._corrections()
         # self._compatibility()
-        if self._unsolvable:
+        if self._unsolvable and not (self._status == 3 and self._override):
             return
         self._element_area()
         self._element_strains()
@@ -1982,6 +1966,32 @@ class Mesh(MeshBase):
         # Iterate through list of neighbours.
         for idx in neighbours:
             if self._subset_solved[idx] == 0:  # If not previously solved.
+                # if self._history:
+                #     # 0. Use history pre-conditioning
+                #     particle = gp.particle.Particle(
+                #             series = self._history,
+                #             coordinate_0 = self._nodes[idx]
+                #         )
+                #     try:
+                #         particle.solve()
+                #         p_h = particle._warps[-1]
+                #         self._subsets[idx].solve(
+                #             max_norm=self._max_norm,
+                #             max_iterations=self._max_iterations,
+                #             order=self._subset_order,
+                #             warp_0=p_h,
+                #             method=self._method,
+                #             tolerance=self._tolerance,
+                #         )
+                #     except Exception:
+                #         pass
+                #     del particle
+                # if self._subsets[idx].data["solved"]:  # Check against tolerance.
+                #    self._store_variables(idx=idx, flag=1)
+                # elif self._subsets[idx].data["unsolvable"]:
+                #    self._status = 5
+                #    self._unsolvable = True
+                # else:
                 # 1. Use nearest-neighbour pre-conditioning.
                 self._subsets[idx].solve(
                     max_norm=self._max_norm,

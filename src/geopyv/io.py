@@ -149,7 +149,7 @@ def save(*, object, directory=None, filename=None):
         return False
 
 
-def _load_img(message):
+def _img_loader(message, load):
     """
 
     Private method to open a file dialog and select an image.
@@ -158,8 +158,10 @@ def _load_img(message):
     directory = os.getcwd()
     dialog = gp.gui.selectors.image.ImageSelector()
     imgpath = dialog.get_path(directory, message)
-    img = gp.image.Image(imgpath)
-    return img
+    if load:
+        return gp.image.Image(imgpath)
+    else:
+        return imgpath
 
 
 def _load_f_img():
@@ -167,7 +169,7 @@ def _load_f_img():
     Private method to load the reference image.
     """
     log.warn("No reference image supplied. Please select the reference image.")
-    return _load_img("Select reference image.")
+    return _img_loader("Select reference image.")
 
 
 def _load_g_img():
@@ -175,7 +177,15 @@ def _load_g_img():
     Private method to load the target image.
     """
     log.warn("No target image supplied. Please select the target image.")
-    return _load_img("Select target image.")
+    return _img_loader("Select target image.")
+
+
+def _load_img(name, load=True):
+    """
+    Private method to load an image.
+    """
+    log.warn("No {} image supplied. Please select the {} image.".format(name, name))
+    return _img_loader("Select {} image.".format(name), load)
 
 
 def _get_folder(message):

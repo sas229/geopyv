@@ -180,7 +180,7 @@ class FieldBase(Object):
             obj_type = "Field"
             data = self.data
         else:
-            log.info("Tracing particle...")
+            log.info("Tracing particle {}...".format(particle_index))
             obj_type = "Particle"
             data = self.data["particles"][particle_index]
         fig, ax = gp.plots.trace_particle(
@@ -290,7 +290,7 @@ class FieldBase(Object):
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
         self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
         self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
-
+        log.info("Particle {} history...".format(particle_index))
         fig, ax = gp.plots.history_particle(
             data=self.data["particles"][particle_index],
             quantity=quantity,
@@ -692,6 +692,7 @@ class Field(FieldBase):
             particle_no, dual_line=True, bar="blocks", title="Solving particles..."
         ) as bar:
             for i in range(particle_no):
+                print(self._coordinates[i])
                 particle = gp.particle.Particle(
                     series=self._series,
                     coordinate_0=self._coordinates[i],

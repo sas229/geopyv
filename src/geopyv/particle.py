@@ -12,6 +12,7 @@ import re
 from alive_progress import alive_bar
 import math
 import geomat
+import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -507,7 +508,31 @@ class Particle(ParticleBase):
                     boundary=self._series[m]["nodes"][self._series[m]["boundary"]],
                 )
             )
+            fig, ax = plt.subplots()
+            ax.plot(
+                self._series[m]["nodes"][self._series[m]["boundary"]][
+                    [0, 1, 2, 3, 0], 0
+                ],
+                self._series[m]["nodes"][self._series[m]["boundary"]][
+                    [0, 1, 2, 3, 0], 1
+                ],
+            )
+
+            ax.plot(
+                self._series[m]["nodes"][self._series[m]["exclusions"][0]][:, 0],
+                self._series[m]["nodes"][self._series[m]["exclusions"][0]][:, 1],
+            )
+            ax.plot(
+                self._series[0]["nodes"][self._series[0]["exclusions"][0]][:, 0],
+                self._series[0]["nodes"][self._series[0]["exclusions"][0]][:, 1],
+            )
+            ax.scatter(
+                self._coordinates[self._reference_index][0],
+                self._coordinates[self._reference_index][1],
+            )
+            plt.show()
             raise ValueError("Particle outside of boundary.")
+            del self_series
         return index
 
     def _local_coordinates(self, element_nodes):
@@ -732,8 +757,7 @@ class Particle(ParticleBase):
         if model == "MCC":
             # Put input checks here!
             model = geomat.models.MCC(
-                parameters=parameters,
-                state=state,  # log_severity="verbose"
+                parameters=parameters, state=state, log_severity="verbose"
             )
         elif model == "SMCC":
             # Put input checks here!

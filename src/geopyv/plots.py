@@ -1432,3 +1432,207 @@ def inspect_calibration(data, image_index):
     plt.show()
 
     return fig, ax
+
+
+def visualise_calibration(data, block, show, save):
+    fig, ax = plt.subplots()
+    for corner in data["calibration"]["corners"]:
+        ax.scatter(
+            corner[:, :, 0],
+            corner[:, :, 1],
+            color="r",
+        )
+    ax.set_xlim(0, data["file_settings"]["image_size"][0])
+    ax.set_ylim(0, data["file_settings"]["image_size"][1])
+    ax.axis("equal")
+
+    # Save
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def contour_calibration(
+    data,
+    quantity,
+    points,
+    colorbar,
+    ticks,
+    alpha,
+    levels,
+    axis,
+    xlim,
+    ylim,
+    block,
+    show,
+    save,
+):
+    # Undistort the image points
+
+    image_points = np.concatenate(data["calibration"]["corners"], axis=0)
+    object_points = cv2.undistortImagePoints(
+        image_points,
+        data["calibration"]["camera_matrix"],
+        data["calibration"]["distortion"],
+    ).reshape(-1, 2)
+    image_points = image_points.reshape(-1, 2)
+    # Calculate the reprojection error for each point
+    if quantity == "R":
+        values = np.sqrt(np.sum((image_points - object_points) ** 2, axis=1))
+    elif quantity == "u":
+        values = (image_points - object_points)[:, 0]
+    elif quantity == "v":
+        values = (image_points - object_points)[:, 1]
+
+    fig, ax = plt.subplots(num="Reprojection Errors")
+
+    # Set levels and extend.
+    extend = "neither"
+    if not isinstance(levels, type(None)):
+        if np.max(values) > np.max(levels) and np.min(values) < np.min(levels):
+            extend = "both"
+        elif np.max(values) > np.max(levels):
+            extend = "max"
+        elif np.min(values) < np.min(levels):
+            extend = "min"
+    extend = "both"
+
+    contours = ax.tricontourf(
+        image_points[:, 0],
+        image_points[:, 1],
+        values,
+        alpha=alpha,
+        levels=levels,
+        extend=extend,
+    )
+    if points:
+        ax.scatter(image_points[:, 0], image_points[:, 1], color="k")
+
+    # Axis control.
+    if axis is False:
+        ax.set_axis_off()
+    ax.axis("equal")
+    plt.tight_layout()
+    # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    else:
+        ax.set_xlim(0, data["file_settings"]["image_size"][1])
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    else:
+        ax.set_ylim(0, data["file_settings"]["image_size"][0])
+
+    if colorbar is True:
+        if quantity == "R":
+            label = r"Resultant, $R$ ($px$)"
+        if quantity == "u":
+            label = r"Horizontal displacement, $u$ ($px$)"
+        if quantity == "v":
+            label = r"Vertical displacement, $v$ ($px$)"
+        fig.colorbar(contours, label=label, ticks=ticks)
+
+    # Save
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def error_calibration(
+    data,
+    quantity,
+    points,
+    colorbar,
+    ticks,
+    alpha,
+    levels,
+    axis,
+    xlim,
+    ylim,
+    block,
+    show,
+    save,
+):
+    reimgpnts = np.concatenate(data["projection"]["reimgpnts"])
+    imgpnts = np.concatenate(data["projection"]["imgpnts"])
+    if quantity == "R":
+        error = np.sqrt(np.sum((reimgpnts - imgpnts) ** 2, axis=1))
+    elif quantity == "u":
+        error = (reimgpnts - imgpnts)[:, 0]
+    elif quantity == "v":
+        error = (reimgpnts - imgpnts)[:, 1]
+
+    fig, ax = plt.subplots(num="Reprojection Errors: image space")
+
+    # Set levels and extend.
+    extend = "neither"
+    if not isinstance(levels, type(None)):
+        if np.max(error) > np.max(levels) and np.min(error) < np.min(levels):
+            extend = "both"
+        elif np.max(error) > np.max(levels):
+            extend = "max"
+        elif np.min(error) < np.min(levels):
+            extend = "min"
+    extend = "both"
+
+    contours = ax.tricontourf(
+        imgpnts[:, 0], imgpnts[:, 1], error, alpha=alpha, levels=levels, extend=extend
+    )
+    if points:
+        for p in range(len(data["projection"]["imgpnts"])):
+            ax.scatter(
+                data["projection"]["imgpnts"][p][:, 0],
+                data["projection"]["imgpnts"][p][:, 1],
+                label=data["file_settings"]["calibration_images"][p],
+            )
+            ax.legend()
+
+    # Axis control.
+    if axis is False:
+        ax.set_axis_off()
+    ax.axis("equal")
+    plt.tight_layout()
+    # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    else:
+        ax.set_xlim(0, data["file_settings"]["image_size"][1])
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    else:
+        ax.set_ylim(0, data["file_settings"]["image_size"][0])
+
+    if colorbar is True:
+        if quantity == "R":
+            label = r"Resultant, $R$ ($px$)"
+        if quantity == "u":
+            label = r"Horizontal displacement, $u$ ($px$)"
+        if quantity == "v":
+            label = r"Vertical displacement, $v$ ($px$)"
+        fig.colorbar(contours, label=label, ticks=ticks)
+
+    # Save
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax

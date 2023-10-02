@@ -7,6 +7,7 @@ Speckle module for geopyv.
 import logging
 import geopyv as gp
 import numpy as np
+import scipy as sp
 from geopyv.object import Object
 from PIL import Image as Im
 from alive_progress import alive_bar
@@ -160,6 +161,7 @@ class Speckle(SpeckleBase):
         self._tmi = tmi
         self._speckle_size = speckle_size
         self.solved = False
+        self._ref_speckle = None
 
         # Data.
         self.data = {
@@ -176,12 +178,13 @@ class Speckle(SpeckleBase):
             "speckle_size": self._speckle_size,
         }
 
-    def solve(self, *, wrap=False, number=None):
+    def solve(self, *, wrap=False, number=None, generate=True):
         self._wrap = wrap
         [self.X, self.Y] = np.meshgrid(
             range(self._image_size_x), range(self._image_size_y)
         )
-        self._ref_speckle = self._speckle_distribution(number)
+        if generate:
+            self._ref_speckle = self._speckle_distribution(number)
         self._mult()
         self.data.update(
             {"wrap": self._wrap, "ref_speckle": self._ref_speckle, "pm": self._pm}
@@ -232,6 +235,7 @@ class Speckle(SpeckleBase):
                     mi = np.mean(final_grid)
                     i += 1
                     bar(min(mi / self._tmi, 1))
+                    print(i)
 
         return np.asarray(speckles)
 
@@ -259,46 +263,68 @@ class Speckle(SpeckleBase):
             self._image_no, dual_line=True, bar="blocks", title="Generating images..."
         ) as bar:
             for i in range(self._image_no):
-                _tar_speckle = (
-                    self._warp(i, self._ref_speckle)[:, :2] + self._ref_speckle
-                )
-                if self._wrap:
-                    _tar_speckle[:, 0] %= self._image_size_x
-                    _tar_speckle[:, 1] %= self._image_size_y
-                _grid = self._grid(i, _tar_speckle)
+                warp = self._warp(i, self._ref_speckle)
+                warp[:, :2] += self._ref_speckle
+                # _tar_speckle = (
+                #     self._warp(i, self._ref_speckle)[:, :2] + self._ref_speckle
+                # )
+                # if self._wrap:
+                #     _tar_speckle[:, 0] %= self._image_size_x
+                #     _tar_speckle[:, 1] %= self._image_size_y
+                # _grid = self._grid(i, _tar_speckle)
+                _grid = self._grid(i, warp)
                 self._create(i, _grid)
                 bar()
 
-    def _grid(self, i, _tar_speckle):
+    def _grid(self, i, warp):
         grid = np.zeros((self._image_size_y, self._image_size_x))
         if self.noisem[i, 0] != 0.0:
-            _tar_speckle = np.random.normal(loc=_tar_speckle, scale=self.noisem[i, 0])
-        for j in range(len(_tar_speckle)):
-            a = max(int(_tar_speckle[j, 1]) - 100, 0)
-            b = min(int(_tar_speckle[j, 1]) + 101, self._image_size_y)
-            c = max(int(_tar_speckle[j, 0]) - 100, 0)
-            d = min(int(_tar_speckle[j, 0]) + 101, self._image_size_x)
-            di = np.exp(
-                -(
-                    (
-                        self.X[
-                            a:b,
-                            c:d,
-                        ]
-                        - _tar_speckle[j, 0]
-                    )
-                    ** 2
-                    + (
-                        self.Y[
-                            a:b,
-                            c:d,
-                        ]
-                        - _tar_speckle[j, 1]
-                    )
-                    ** 2
-                )
-                / ((self._speckle_size**2) / 4)
+            warp[:, :2] = np.random.normal(loc=warp[:, :2], scale=self.noisem[i, 0])
+        # covs = np.reshape(warp[:,2:6], (-1,2,2))*self._speckle_size**2
+        for j in range(len(warp)):
+            cov = np.identity(2)
+            cov[0, 0] += warp[j, 2]
+            cov[1, 1] += warp[j, 5]
+            cov *= (self._speckle_size**2) / 8
+            shear_matrix = np.asarray([[1.0, warp[j, 4]], [warp[j, 3], 1.0]])
+            cov = np.dot(shear_matrix, np.dot(cov, shear_matrix.T))
+            distribution = sp.stats.multivariate_normal(
+                mean=warp[j, :2], cov=cov, allow_singular=True
             )
+
+            a = max(int(warp[j, 1]) - 500, 0)
+            b = min(int(warp[j, 1]) + 501, self._image_size_y)
+            c = max(int(warp[j, 0]) - 100, 0)
+            d = min(int(warp[j, 0]) + 101, self._image_size_x)
+            positions = np.dstack((self.X[a:b, c:d], self.Y[a:b, c:d]))
+            di = distribution.pdf(positions)
+            di /= 1 / (2 * np.pi * np.sqrt(cov[0, 0]) * np.sqrt(cov[1, 1]))
+
+            # 1/np.max(distribution.pdf(warp[j,:2]))
+            # di = np.exp(
+            #     -(
+            #         (
+            #             self.X[
+            #                 a:b,
+            #                 c:d,
+            #             ]
+            #             - _tar_speckle[j, 0]
+            #         )
+            #         ** 2
+            #         + (
+            #             self.Y[
+            #                 a:b,
+            #                 c:d,
+            #             ]
+            #             - _tar_speckle[j, 1]
+            #         )
+            #         ** 2
+            #     )
+            #     / ((self._speckle_size**2) / 4)
+            # )
+            # fig, ax = plt.subplots()
+            # ax.contourf(self.X[a:b,c:d], self.Y[a:b,c:d], di)
+            # plt.show()
             grid[
                 a:b,
                 c:d,

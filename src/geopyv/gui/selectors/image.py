@@ -38,4 +38,5 @@ class ImageSelector:
             message,
             "Image files (*.png *.bmp *.jpg)",
         )
+
         return path

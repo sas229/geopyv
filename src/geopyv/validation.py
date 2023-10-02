@@ -280,7 +280,7 @@ class Validation(ValidationBase):
             "fields": self._fields,
         }
 
-    def solve(self, *, rot=False):
+    def solve(self, *, rot=False, cumulative=True):
         self._applied = []  # field, image,point, warp
         self._observed = []
 
@@ -299,10 +299,27 @@ class Validation(ValidationBase):
                     12,
                 )
             )
-            for i in range(1, self._speckle.data["image_no"]):
-                applied[i - 1] = self._speckle._warp(
-                    i, field.data["field"]["coordinates"], rot=rot
+            if cumulative:
+                for i in range(1, self._speckle.data["image_no"]):
+                    applied[i - 1] = self._speckle._warp(
+                        i, field.data["field"]["coordinates"], rot=rot
+                    )
+            else:
+                particle_coordinates = np.zeros(
+                    (
+                        np.shape(field.data["particles"])[0],
+                        self._speckle.data["image_no"],
+                        2,
+                    )
                 )
+                for j in range(np.shape(field.data["particles"])[0]):
+                    particle_coordinates[j] = field.data["particles"][j]["results"][
+                        "coordinates"
+                    ]
+                for i in range(1, self._speckle.data["image_no"]):
+                    applied[i - 1] = self._speckle._warp(
+                        i, field.data["field"]["coordinates"], rot=rot
+                    ) - self._speckle._warp(i - 1, field.data)
             for i in range(np.shape(field.data["particles"])[0]):
                 if np.shape(field.data["particles"][i]["results"]["warps"])[1] == 6:
                     observed[

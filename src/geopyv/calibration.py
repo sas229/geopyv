@@ -13,7 +13,6 @@ from cv2 import aruco
 import matplotlib.pyplot as plt
 import glob
 import re
-import matplotlib as mpl
 from scipy.optimize import root
 from alive_progress import alive_bar
 import traceback
@@ -387,12 +386,12 @@ class Calibration(CalibrationBase):
         }
 
         if show:
-            imboard = self._board.generateImage((2000, 2000))
+            imboard = self._board.generateImage((290, 180))
             if save:
                 cv2.imwrite(save + ".tiff", imboard)
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
-            plt.imshow(imboard, cmap=mpl.cm.frame, interpolation="nearest")
+            plt.imshow(imboard, interpolation="nearest")
             ax.axis("off")
             plt.show()
 
@@ -446,6 +445,7 @@ class Calibration(CalibrationBase):
 
         # Post-processing.
         self._extrinsic_matrix_generator()
+        self._camera_angles()
         self._reprojection()
 
         # Store data.
@@ -453,6 +453,7 @@ class Calibration(CalibrationBase):
         self.data["solved"] = self.solved
         self.data.update({"intrinsic_matrix": self._intmat})
         self.data.update({"extrinsic_matrix": self._extmat})
+        self.data.update({"camera_angles": [self._alpha, self._beta, self._gamma]})
         self.data.update({"distortion": self._dist})
         self.data.update(
             {
@@ -607,8 +608,9 @@ class Calibration(CalibrationBase):
 
         # Checks for format of objpnts (should be [x,y,0,1]).
         if np.shape(objpnts)[-1] == 2:
-            objpnts = np.pad(objpnts, (0, 1))
-            objpnts = np.pad(objpnts, (0, 1), constant_values=(0, 1))[:-2]
+            objpnts = np.pad(objpnts, (0, 1))[:-1]
+        if np.shape(objpnts)[-1] == 3:
+            objpnts = np.pad(objpnts, (0, 1), constant_values=(0, 1))[:-1]
 
         # Mapping.
         X_c = self._extmat @ objpnts.T
@@ -618,13 +620,13 @@ class Calibration(CalibrationBase):
         X_pp = np.ones((np.shape(objpnts)[0], 3))
         X_pp[:, 0] = (
             X_c[0] * f
-            + 2 * self._dist[2] * r2 * X_c[0] * X_c[1]
+            + 2 * self._dist[2] * X_c[0] * X_c[1]
             + self._dist[3] * (r2 + 2 * X_c[0] ** 2)
         )
         X_pp[:, 1] = (
             X_c[1] * f
             + self._dist[2] * (r2 + 2 * X_c[1] ** 2)
-            + 2 * self._dist[3] * r2 * X_c[0] * X_c[1]
+            + 2 * self._dist[3] * X_c[0] * X_c[1]
         )
 
         return (self._intmat @ X_pp.T).T[:, :2]
@@ -645,71 +647,61 @@ class Calibration(CalibrationBase):
             self._extmats[i, :3, :3], _ = cv2.Rodrigues(self._rot[i])
         self._extmat = self._extmats[self._index]
 
+    def _camera_angles(self):
+        self._beta = -np.arcsin(self._extmat[2, 0])
+        self._gamma = np.arcsin(self._extmat[2, 1] / np.cos(self._beta))
+        self._alpha = np.arcsin(self._extmat[1, 0] / np.cos(self._beta))
+
     def i2o(self, *, imgpnts):
         # Checks for format of imgpnts as in o2i.
+        if np.ndim(imgpnts) <= 1:
+            imgpnts = imgpnts[np.newaxis, ...]
         if np.shape(imgpnts)[-1] == 2:
             imgpnts = np.pad(imgpnts, (0, 1), constant_values=(0, 1))[:-1]
 
         # Mapping.
-        print(imgpnts)
-        print(self._intmat)
         X_pp = np.linalg.inv(self._intmat) @ imgpnts.T
-        X_c = np.pad(self._simult(X_pp), (0, 1), constant_values=(0, 1))
-        X_c *= self._extmat[2, 3]
-        X_c = np.pad(X_c, (0, 1), constant_values=(0, 1))
-        print("here")
-        input()
+        X_c = np.pad(self._simult(X_pp), (0, 1), constant_values=(0, 1))[:, :-1]
+        X_c = self._depth_recovery(X_c)
+        X_c = np.pad(X_c, (0, 1), constant_values=(0, 1))[:, :-1]
+        objpnts = (np.linalg.inv(self._extmat) @ X_c).T[:, :3]
 
-        # # Find distance to object plane using specified image.
-        # image_indices = np.asarray(
-        #     [int(re.findall(r"\d+", x)[-1]) for x in self._calibration_images]
-        # )
-        # index = np.argwhere(image_indices == index)[0][0]
-        # objpnts = self._find_objpnts(index)
-        # X_c = self._extmats[index] @ objpnts.T
-        # Z_c = np.mean(X_c[2])
-        # # Map imgpnt to objpnt.
-        # imgpnt = np.pad(imgpnt, (0, 1), constant_values=(0, 1))
-        # X_pp = np.linalg.inv(self._intmat) @ imgpnt.T
-        # X_c = np.pad(self._simult(X_pp), (0, 1), constant_values=(0, 1))
-        # X_c *= Z_c
-        # X_c = np.pad(X_c, (0, 1), constant_values=(0, 1))
-        # a = np.identity(4)
-        # objpnt = np.linalg.inv(a) @ X_c
-        # return objpnt
+        return objpnts
+
+    def _depth_recovery(self, X_c):
+        invextmat = np.linalg.inv(self._extmat)
+        X_c *= -invextmat[2, 3] / (
+            invextmat[2, 0] * X_c[0] + invextmat[2, 1] * X_c[1] + invextmat[2, 2]
+        )
+
+        return X_c
 
     def _simult(self, X_pp):
-        initial_guess = np.asarray([0.5, 0.5])
         solution = root(
-            lambda X_c: [
-                self._equation1(X_c[0], X_c[1], X_pp),
-                self._equation2(X_c[0], X_c[1], X_pp),
-            ],
-            initial_guess,
+            lambda X_c: self._equations(X_c, X_pp), np.zeros((2, np.shape(X_pp)[-1]))
         )
-        return solution.x
 
-    def _equation1(self, x, y, X_pp):
-        r2 = x**2 + y**2
+        return solution.x.reshape(2, -1)
+
+    def _equations(self, X_c, X_pp):
+        X_c = np.reshape(X_c, (2, -1))
+        r2 = X_c[0] ** 2 + X_c[1] ** 2
         f = 1 + self._dist[0] * r2 + self._dist[1] * r2**2 + self._dist[4] * r2**3
         a = (
-            x * f
-            + 2 * self._dist[2] * r2 * x * y
-            + self._dist[3] * (r2 + 2 * x**2)
+            X_c[0] * f
+            + 2 * self._dist[2] * X_c[0] * X_c[1]
+            + self._dist[3] * (r2 + 2 * X_c[0] ** 2)
             - X_pp[0]
         )
-        return a
-
-    def _equation2(self, x, y, X_pp):
-        r2 = x**2 + y**2
-        f = 1 + self._dist[0] * r2 + self._dist[1] * r2**2 + self._dist[4] * r2**3
         b = (
-            y * f
-            + self._dist[2] * (r2 + 2 * y**2)
-            + 2 * self._dist[3] * r2 * x * y
+            X_c[1] * f
+            + self._dist[2] * (r2 + 2 * X_c[1] ** 2)
+            + 2 * self._dist[3] * X_c[0] * X_c[1]
             - X_pp[1]
         )
-        return b
+        X_c = np.asarray([a, b]).flatten()
+
+        return X_c
 
 
 class CalibrationResults(CalibrationBase):

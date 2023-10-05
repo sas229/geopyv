@@ -38,21 +38,6 @@ class CalibrationBase(Object):
     def inspect(self, *, image_index=0):
         fig, ax = gp.plots.inspect_calibration(data=self.data, image_index=image_index)
 
-    def inspect_(self, *, image_index=0):
-        plt.figure()
-        frame = cv2.imread(self._calibration_images[image_index])
-        img_undist = cv2.undistort(frame, self._intmat, self._dist, None)
-        plt.subplot(1, 2, 1)
-        plt.imshow(frame)
-
-        plt.title("Raw image")
-        plt.axis("off")
-        plt.subplot(1, 2, 2)
-        plt.imshow(img_undist)
-        plt.title("Corrected image")
-        plt.axis("off")
-        plt.show()
-
     def visualise(
         self,
         *,
@@ -231,6 +216,253 @@ class CalibrationBase(Object):
             save,
         )
 
+    def o2i(self, objpnts):
+        """Method for mapping coordinates from object space to image space."""
+
+        # Checks for format of objpnts (should be [x,y,0,1]).
+        if np.shape(objpnts)[-1] == 2:
+            objpnts = np.pad(objpnts, (0, 1))[:-1]
+        if np.shape(objpnts)[-1] == 3:
+            objpnts = np.pad(objpnts, (0, 1), constant_values=(0, 1))[:-1]
+
+        # Mapping.
+        X_c = self._extmat @ objpnts.T
+        X_c /= X_c[2]
+        r2 = X_c[0] ** 2 + X_c[1] ** 2
+        f = 1 + self._dist[0] * r2 + self._dist[1] * r2**2 + self._dist[4] * r2**3
+        X_pp = np.ones((np.shape(objpnts)[0], 3))
+        X_pp[:, 0] = (
+            X_c[0] * f
+            + 2 * self._dist[2] * X_c[0] * X_c[1]
+            + self._dist[3] * (r2 + 2 * X_c[0] ** 2)
+        )
+        X_pp[:, 1] = (
+            X_c[1] * f
+            + self._dist[2] * (r2 + 2 * X_c[1] ** 2)
+            + 2 * self._dist[3] * X_c[0] * X_c[1]
+        )
+
+        return (self._intmat @ X_pp.T).T[:, :2]
+
+    def i2o(self, *, imgpnts, both=False):
+        # Checks for format of imgpnts as in o2i.
+        if np.ndim(imgpnts) <= 1:
+            imgpnts = imgpnts[np.newaxis, ...]
+        if np.shape(imgpnts)[-1] == 2:
+            imgpnts = np.pad(imgpnts, (0, 1), constant_values=(0, 1))[:-1]
+
+        # Mapping.
+        X_pp = np.linalg.inv(self._intmat) @ imgpnts.T
+        X_c = np.pad(self._simult(X_pp), (0, 1), constant_values=(0, 1))[:, :-1]
+        X_c = self._depth_recovery(X_c)
+        X_c = np.pad(X_c, (0, 1), constant_values=(0, 1))[:, :-1]
+        objpnts = (np.linalg.inv(self._extmat) @ X_c).T[:, :3]
+        if both is True:
+            return objpnts, imgpnts
+        else:
+            return objpnts
+
+    def _depth_recovery(self, X_c):
+        invextmat = np.linalg.inv(self._extmat)
+        X_c *= -invextmat[2, 3] / (
+            invextmat[2, 0] * X_c[0] + invextmat[2, 1] * X_c[1] + invextmat[2, 2]
+        )
+
+        return X_c
+
+    def _simult(self, X_pp):
+        solution = root(
+            lambda X_c: self._equations(X_c, X_pp), np.zeros((2, np.shape(X_pp)[-1]))
+        )
+
+        return solution.x.reshape(2, -1)
+
+    def _equations(self, X_c, X_pp):
+        X_c = np.reshape(X_c, (2, -1))
+        r2 = np.sum(np.square(X_c), axis=0)  # X_c[0] ** 2 + X_c[1] ** 2
+        f = 1 + self._dist[0] * r2 + self._dist[1] * r2**2 + self._dist[4] * r2**3
+        # a = (
+        #     X_c[0] * f
+        #     + 2 * self._dist[2] * X_c[0] * X_c[1]
+        #     + self._dist[3] * (r2 + 2 * X_c[0]**2)
+        #     - X_pp[0]
+        # )
+        # b = (
+        #     X_c[1] * f
+        #     + 2 * self._dist[3] * X_c[0] * X_c[1]
+        #     + self._dist[2] * (r2 + 2 * X_c[1]**2)
+        #     - X_pp[1]
+        # )
+        # return np.asarray([a,b]).flatten()
+
+        c = (
+            X_c * f
+            + 2 * self._dist[2:4, None] * (X_c[0] * X_c[1])
+            + self._dist[3:1:-1, None] * (r2 + 2 * X_c**2)
+            - X_pp[:2]
+        )
+        return c.flatten()
+
+    def calibrate(self, *, opt=1, verbose=True, object=None):
+        if self.data["solved"] is not True:
+            log.error(
+                "Calibration not yet solved therefore nothing to inspect. "
+                "First, run :meth:`~geopyv.calibration.Calibration.solve()` to solve."
+            )
+            raise ValueError(
+                "Calibration not yet solved therefore nothing to inspect. "
+                "First, run :meth:`~geopyv.calibration.Calibration.solve()` to solve."
+            )
+        self._report(
+            gp.check._check_type(
+                object,
+                "object",
+                [
+                    gp.sequence.Sequence,
+                    gp.sequence.SequenceResults,
+                    gp.mesh.Mesh,
+                    gp.mesh.MeshResults,
+                    gp.subset.Subset,
+                    gp.subset.SubsetResults,
+                    dict,
+                ],
+            ),
+            "TypeError",
+        )
+
+        if type(object) == dict:
+            data = object
+        else:
+            data = object.data
+
+        if data["type"] == "Subset":
+            if verbose:
+                log.info("Calibrating Subset ...")
+            # Calibrating.
+            X, x = self.i2o(
+                imgpnts=np.asarray(
+                    [
+                        [
+                            data["position"]["x"],
+                            data["position"]["y"],
+                        ],
+                        [
+                            data["position"]["x"] + data["results"]["u"],
+                            data["position"]["y"] + data["results"]["v"],
+                        ],
+                    ]
+                ),
+                both=True,
+            )
+            # Storing.
+            data["position"].update(
+                {"X": X[0, 0], "Y": X[0, 1], "x": x[0, 0], "y": x[0, 1]}
+            )
+            data["results"].update(
+                {
+                    "U": X[1, 0] - X[0, 0],
+                    "V": X[1, 1] - X[0, 1],
+                    "u": x[1, 0] - x[0, 0],
+                    "v": x[1, 1] - x[0, 1],
+                }
+            )
+            data["calibrated"] = True
+            # Assigning.
+            if type(object) == gp.subset.Subset:
+                object._X = X[0, 0]
+                object._Y = X[0, 1]
+                object._U = X[1, 0] - X[0, 0]
+                object._V = X[1, 1] - X[0, 1]
+                object._x = x[0, 0]
+                object._y = x[0, 1]
+                object._u = x[1, 0] - x[0, 0]
+                object._v = x[1, 1] - x[0, 1]
+                object._calibrated = True
+        elif data["type"] == "Mesh":
+            if verbose:
+                log.info("Calibrating Mesh ...")
+            # Calibrating.
+            Nodes, nodes = self.i2o(
+                imgpnts=data["nodes"],
+                both=True,
+            )
+            Nodes = Nodes[:, :2]
+            nodes = nodes[:, :2]
+            centroids = np.mean(nodes[data["elements"]], axis=-2)
+            Centroids = np.mean(Nodes[data["elements"]], axis=-2)
+            Displacements, displacements = self.i2o(
+                imgpnts=(data["nodes"] + data["results"]["displacements"]), both=True
+            )
+            displacements = displacements[:, :2] - nodes
+            Displacements = Displacements[:, :2] - Nodes
+            # Distribute.
+            for i in range(len(data["results"]["subsets"])):
+                s = data["results"]["subsets"][i]
+                s["position"].update(
+                    {
+                        "X": Nodes[i, 0],
+                        "Y": Nodes[i, 1],
+                        "x": nodes[i, 0],
+                        "y": nodes[i, 1],
+                    }
+                )
+                s["results"].update(
+                    {
+                        "U": Displacements[i, 0],
+                        "V": Displacements[i, 1],
+                        "u": displacements[i, 0],
+                        "v": displacements[i, 1],
+                    }
+                )
+                s["calibrated"] = True
+            # Storing.
+            data.update(
+                {
+                    "calibrated": True,
+                    "Nodes": Nodes,
+                    "nodes": nodes,
+                    "Centroids": Centroids,
+                    "centroids": centroids,
+                }
+            )
+            data["results"].update(
+                {
+                    "Displacements": Displacements,
+                    "displacements": displacements,
+                }
+            )
+            # Assigning.
+            if type(object) == gp.mesh.Mesh:
+                object._Nodes = Nodes
+                object._nodes = nodes
+                object._Centroids = Centroids
+                object._centroids = centroids
+                object._Displacements = Displacements
+                object._displacements = displacements
+                object._calibrated = True
+            if verbose:
+                log.info("... Mesh Calibrated.")
+        elif data["type"] == "Sequence":
+            with alive_bar(
+                len(data["meshes"]), bar="blocks", title="Calibrating Sequence ..."
+            ) as bar:
+                # Recursive.
+                if data["file_settings"]["save_by_reference"] is True:
+                    for i in range(len(data["meshes"])):
+                        mesh = object._load_mesh(i, obj=True, verbose=False)
+                        self.calibrate(object=mesh, verbose=False)
+                        object._save_mesh(mesh, i, verbose=False)
+                        bar()
+                else:
+                    for i in range(len(data["meshes"])):
+                        self.calibrate(object=data["meshes"][i], verbose=False)
+                        bar()
+            # Storing.
+            data["calibrated"] = True
+            # Assigning.
+            if type(object) == gp.sequence.Sequence:
+                object._calibrated = True
+
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":
             log.error(msg)
@@ -376,7 +608,6 @@ class Calibration(CalibrationBase):
         self._board_corners = self._board.getChessboardCorners()
         board_settings = {
             # "dictionary": self._dictionary,
-            "board": self._board,
             "columns": columns,
             "rows": rows,
             "corners": self._board_corners,
@@ -450,28 +681,31 @@ class Calibration(CalibrationBase):
 
         # Store data.
         self.solved = True
-        self.data["solved"] = self.solved
-        self.data.update({"intrinsic_matrix": self._intmat})
-        self.data.update({"extrinsic_matrix": self._extmat})
-        self.data.update({"camera_angles": [self._alpha, self._beta, self._gamma]})
-        self.data.update({"distortion": self._dist})
         self.data.update(
             {
+                "solved": self.solved,
+                "intrinsic_matrix": self._intmat,
+                "extrinsic_matrix": self._extmat,
+                "distortion": self._dist,
+                "camera_angles": [
+                    self._alpha,
+                    self._beta,
+                    self._gamma,
+                ],
                 "projection": {
                     "imgpnts": self._imgpnts,
                     "objpnts": self._objpnts,
                     "reimgpnts": self._reimgpnts,
-                }
+                },
+                "calibration": {
+                    "ret": self._ret,
+                    "rotation": self._rot,
+                    "translation": self._trans,
+                    "corners": self._allCorners,
+                    "ids": self._allIds,
+                },
             }
         )
-        self._calibration = {
-            "ret": self._ret,
-            "rotation": self._rot,
-            "translation": self._trans,
-            "corners": self._allCorners,
-            "ids": self._allIds,
-        }
-        self.data.update({"calibration": self._calibration})
 
     def _read_chessboards(self, threshold):
         allCorners = []
@@ -603,34 +837,6 @@ class Calibration(CalibrationBase):
             )
             self._reimgpnts.append(((self._intmat @ X_pp.T).T)[:, :2])
 
-    def o2i(self, objpnts):
-        """Method for mapping coordinates from object space to image space."""
-
-        # Checks for format of objpnts (should be [x,y,0,1]).
-        if np.shape(objpnts)[-1] == 2:
-            objpnts = np.pad(objpnts, (0, 1))[:-1]
-        if np.shape(objpnts)[-1] == 3:
-            objpnts = np.pad(objpnts, (0, 1), constant_values=(0, 1))[:-1]
-
-        # Mapping.
-        X_c = self._extmat @ objpnts.T
-        X_c /= X_c[2]
-        r2 = X_c[0] ** 2 + X_c[1] ** 2
-        f = 1 + self._dist[0] * r2 + self._dist[1] * r2**2 + self._dist[4] * r2**3
-        X_pp = np.ones((np.shape(objpnts)[0], 3))
-        X_pp[:, 0] = (
-            X_c[0] * f
-            + 2 * self._dist[2] * X_c[0] * X_c[1]
-            + self._dist[3] * (r2 + 2 * X_c[0] ** 2)
-        )
-        X_pp[:, 1] = (
-            X_c[1] * f
-            + self._dist[2] * (r2 + 2 * X_c[1] ** 2)
-            + 2 * self._dist[3] * X_c[0] * X_c[1]
-        )
-
-        return (self._intmat @ X_pp.T).T[:, :2]
-
     def _find_objpnts(self, index):
         objpnts = np.ones((len(self._allIds[index]), 4))
         objpnts[:, :3] = self._objpnts[self._allIds[index]].flatten().reshape(-1, 3)
@@ -651,57 +857,6 @@ class Calibration(CalibrationBase):
         self._beta = -np.arcsin(self._extmat[2, 0])
         self._gamma = np.arcsin(self._extmat[2, 1] / np.cos(self._beta))
         self._alpha = np.arcsin(self._extmat[1, 0] / np.cos(self._beta))
-
-    def i2o(self, *, imgpnts):
-        # Checks for format of imgpnts as in o2i.
-        if np.ndim(imgpnts) <= 1:
-            imgpnts = imgpnts[np.newaxis, ...]
-        if np.shape(imgpnts)[-1] == 2:
-            imgpnts = np.pad(imgpnts, (0, 1), constant_values=(0, 1))[:-1]
-
-        # Mapping.
-        X_pp = np.linalg.inv(self._intmat) @ imgpnts.T
-        X_c = np.pad(self._simult(X_pp), (0, 1), constant_values=(0, 1))[:, :-1]
-        X_c = self._depth_recovery(X_c)
-        X_c = np.pad(X_c, (0, 1), constant_values=(0, 1))[:, :-1]
-        objpnts = (np.linalg.inv(self._extmat) @ X_c).T[:, :3]
-
-        return objpnts
-
-    def _depth_recovery(self, X_c):
-        invextmat = np.linalg.inv(self._extmat)
-        X_c *= -invextmat[2, 3] / (
-            invextmat[2, 0] * X_c[0] + invextmat[2, 1] * X_c[1] + invextmat[2, 2]
-        )
-
-        return X_c
-
-    def _simult(self, X_pp):
-        solution = root(
-            lambda X_c: self._equations(X_c, X_pp), np.zeros((2, np.shape(X_pp)[-1]))
-        )
-
-        return solution.x.reshape(2, -1)
-
-    def _equations(self, X_c, X_pp):
-        X_c = np.reshape(X_c, (2, -1))
-        r2 = X_c[0] ** 2 + X_c[1] ** 2
-        f = 1 + self._dist[0] * r2 + self._dist[1] * r2**2 + self._dist[4] * r2**3
-        a = (
-            X_c[0] * f
-            + 2 * self._dist[2] * X_c[0] * X_c[1]
-            + self._dist[3] * (r2 + 2 * X_c[0] ** 2)
-            - X_pp[0]
-        )
-        b = (
-            X_c[1] * f
-            + self._dist[2] * (r2 + 2 * X_c[1] ** 2)
-            + 2 * self._dist[3] * X_c[0] * X_c[1]
-            - X_pp[1]
-        )
-        X_c = np.asarray([a, b]).flatten()
-
-        return X_c
 
 
 class CalibrationResults(CalibrationBase):
@@ -724,59 +879,6 @@ class CalibrationResults(CalibrationBase):
     def __init__(self, data):
         """Initialisation of geopyv CalibrationResults class."""
         self.data = data
-
-
-#     def solve(
-#         self, *, image_dir=".", common_name="", file_format=".jpg", output_dir="."
-#     ):
-#         """
-#         Method to solve for the calibration.
-#         """
-#         # Check types.
-#         self._report(gp.check._check_type(image_dir, "image_dir", [str]), "TypeError")
-#         if self._report(gp.check._check_path(image_dir, "image_dir"), "Warning"):
-#             image_dir = gp.io._get_image_dir()
-#         image_dir = gp.check._check_character(image_dir, "/", -1)
-#         self._report(
-#             gp.check._check_type(file_format, "file_format", [str]), "TypeError"
-#         )
-#         file_format = gp.check._check_character(file_format, ".", 0)
-#         self._report(
-#             gp.check._check_value(
-#                 file_format,
-#                 "file_format",
-#                 [".jpg", ".png", ".bmp", ".JPG", ".PNG", ".BMP"],
-#             ),
-#             "ValueError",
-#         )
-#         if self._report(gp.check._check_path(output_dir, "output_dir"), "Warning"):
-#             output_dir = gp.io._get_image_dir()
-#         output_dir = gp.check._check_character(output_dir, "/", -1)
-#
-#         self._image_dir = image_dir
-#
-#         self._common_name = common_name
-#         self._file_format = file_format
-#         _images = glob.glob(
-#             self._image_dir + self._common_name + "*" + self._file_format
-#         )
-#         _image_indices_unordered = [int(re.findall(r"\d+", x)[-1]) for x in _images]
-#         _image_indices_arguments = np.argsort(_image_indices_unordered)
-#         self._images = [_images[index] for index in _image_indices_arguments]
-#         self._image_indices = np.sort(_image_indices_unordered)
-#
-#         i = 0
-#         for image in self._images:
-#             frame = cv2.imread(image)
-#             img_undist = cv2.undistort(frame, self._intmat, self._dist, None)
-#             cv2.imwrite(
-#                 output_dir + "calibrated_" + str(i) + self._file_format, img_undist
-#             )
-#             del frame
-#             i += 1
-
-
-# def calibrate(
-#    image_folder=".",
-#    common_name="",
-#    file_format=".jpg",)
+        self._intmat = self.data["intrinsic_matrix"]
+        self._extmat = self.data["extrinsic_matrix"]
+        self._dist = self.data["distortion"]

@@ -426,6 +426,7 @@ class Particle(ParticleBase):
 
         self._reference_index = 0
         self.solved = False
+        self._calibrated = series.data["calibrated"]
 
         self._initialised = True
         self.data = {
@@ -447,7 +448,6 @@ class Particle(ParticleBase):
         Method to solve for the particle.
 
         """
-        self.data.update({"parameters": parameters, "state": state})
         self.solved += self._strain_path()
         if model:
             self._ps = np.zeros((len(self._series) + 1))
@@ -470,10 +470,17 @@ class Particle(ParticleBase):
                 "warps": self._warps,
                 "volumes": self._volumes,
             }
+        self.solved = bool(self.solved)
+        self.data.update(
+            {
+                "parameters": parameters,
+                "state": state,
+                "results": self._results,
+                "reference_update_register": self._reference_update_register,
+                "solved": self.solved,
+            }
+        )
 
-        self.data.update({"results": self._results})
-        self.data.update({"reference_update_register": self._reference_update_register})
-        self.data["solved"] = bool(self.solved)
         return self.solved
 
     def _element_locator(self, m):

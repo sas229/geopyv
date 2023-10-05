@@ -605,15 +605,28 @@ class SequenceBase(Object):
         )
         return fig, ax
 
-    def _load_mesh(self, mesh_index, verbose=True):
+    def _load_mesh(self, mesh_index, obj=False, verbose=True):
         if self.data["file_settings"]["save_by_reference"]:
-            return gp.io.load(
+            mesh = gp.io.load(
                 filename=self.data["file_settings"]["mesh_dir"]
                 + self.data["meshes"][mesh_index],
                 verbose=verbose,
-            ).data
+            )
+            if obj is True:
+                return mesh
+            else:
+                return mesh.data
         else:
             return self.data["meshes"][mesh_index]
+
+    def _save_mesh(self, mesh, mesh_index, verbose=True):
+        if self.data["file_settings"]["save_by_reference"]:
+            gp.io.save(
+                object=mesh,
+                filename=self.data["file_settings"]["mesh_dir"]
+                + self.data["meshes"][mesh_index],
+                verbose=verbose,
+            )
 
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":
@@ -806,6 +819,7 @@ class Sequence(SequenceBase):
             meshes = np.empty(np.shape(self._image_indices)[0] - 1, dtype=dict)
         self.solved = False
         self._unsolvable = False
+        self._calibrated = False
 
         # Data.
         file_settings = {
@@ -828,6 +842,7 @@ class Sequence(SequenceBase):
             "type": "Sequence",
             "solved": self.solved,
             "unsolvable": self._unsolvable,
+            "calibrated": self._calibrated,
             "meshes": meshes,
             "mesh_settings": mesh_settings,
             "file_settings": file_settings,
@@ -1187,9 +1202,14 @@ class Sequence(SequenceBase):
         del _f_img, _prev_mesh
 
         # Pack data.
-        self.data["solved"] = self.solved
-        self.data["unsolvable"] = self._unsolvable
-        self.data["meshes"] = np.asarray(self.data["meshes"])
+        self.data.update(
+            {
+                "solved": self.solved,
+                "unsolvable": self._unsolvable,
+                "meshes": np.asarray(self.data["meshes"]),
+            }
+        )
+
         return self.solved
 
     def _save_store_mesh(self, _f_index, _g_index, mesh):

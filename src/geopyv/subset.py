@@ -337,6 +337,7 @@ class Subset(SubsetBase):
         self._sigma_intensity = output[4][1][0]
         self.solved = False
         self._unsolvable = False
+        self._calibrated = False
         self._initialised = True
         self._quality = {
             "SSSIG": self._SSSIG,
@@ -348,6 +349,7 @@ class Subset(SubsetBase):
             "type": "Subset",
             "solved": self.solved,
             "unsolvable": self._unsolvable,
+            "calibrated": self._calibrated,
             "images": {
                 "f_img": self._f_img.filepath,
                 "g_img": self._g_img.filepath,
@@ -574,8 +576,12 @@ class Subset(SubsetBase):
             self._unsolvable = True
 
         # Pack results.
-        self.data["solved"] = self.solved
-        self.data["unsolvable"] = self._unsolvable
+        self.data.update(
+            {
+                "solved": self.solved,
+                "unsolvable": self._unsolvable,
+            }
+        )
 
         return self.solved
 

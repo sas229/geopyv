@@ -88,7 +88,7 @@ def load(*, filename=None, directory=None, old_format=False, verbose=True):
         raise FileExistsError
 
 
-def save(*, object, directory=None, filename=None):
+def save(*, object, directory=None, filename=None, verbose=True):
     """
 
     Function to save data from a geopyv object. If no filename is
@@ -123,19 +123,23 @@ def save(*, object, directory=None, filename=None):
             ext = ".pyv"
             filepath = directory + "/" + filename + ext
             with open(filepath, "wb") as outfile:
-                message = "Saving geopyv object"
-                with alive_bar(dual_line=True, bar=None, title=message) as bar:
-                    bar.text = "-> Saving object to {filepath}...".format(
-                        filepath=filepath
-                    )
+                if verbose:
+                    message = "Saving geopyv object"
+                    with alive_bar(dual_line=True, bar=None, title=message) as bar:
+                        bar.text = "-> Saving object to {filepath}...".format(
+                            filepath=filepath
+                        )
+                        pickle.dump(object.data, outfile)
+                        bar()
+                else:
                     pickle.dump(object.data, outfile)
-                    bar()
                 object_type = object.data["type"]
-                log.info(
-                    "Saved {object_type} object to {filepath}.".format(
-                        object_type=object_type, filepath=filepath
+                if verbose:
+                    log.info(
+                        "Saved {object_type} object to {filepath}.".format(
+                            object_type=object_type, filepath=filepath
+                        )
                     )
-                )
                 return True
         else:
             log.warn(

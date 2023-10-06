@@ -718,6 +718,7 @@ class Mesh(MeshBase):
         self._hard_boundary = boundary_obj._hard
         self.solved = False
         self._unsolvable = False
+        self._calibrated = False
 
         # Checks.
         self._target_checks()  # Size bounds and target nodes.
@@ -758,6 +759,7 @@ class Mesh(MeshBase):
             "type": "Mesh",
             "solved": self.solved,
             "unsolvable": self._unsolvable,
+            "calibrated": self._calibrated,
             "images": {
                 "f_img": self._f_img.filepath,
                 "g_img": self._g_img.filepath,
@@ -1132,28 +1134,6 @@ class Mesh(MeshBase):
                 self._status = 1
             self.solved = True
 
-            # Pack data.
-            self.data["nodes"] = self._nodes
-            self.data["elements"] = self._elements
-            self.data["areas"] = self._areas
-            self.data["solved"] = self.solved
-            self.data["unsolvable"] = self._unsolvable
-            self.data.update(
-                {"centroids": np.mean(self._nodes[self._elements], axis=-2)}
-            )
-            # Pack settings.
-            self._settings = {
-                "max_iterations": self._max_iterations,
-                "max_norm": self._max_norm,
-                "adaptive_iterations": self._adaptive_iterations,
-                "method": self._method,
-                "tolerance": self._tolerance,
-                "seed_tolerance": self._seed_tolerance,
-                "correction": self._correction,
-                "alpha": self._alpha,
-                "override": self._override,
-            }
-            self.data.update({"settings": self._settings})
             # Extract data from subsets.
             subset_data = []
             for subset in self._subsets:
@@ -1166,7 +1146,31 @@ class Mesh(MeshBase):
                 "C_ZNCC": self._C_ZNCC,
                 "seed": self._seed_node,
             }
-            self.data.update({"results": self._results})
+            # Pack settings.
+            self._settings = {
+                "max_iterations": self._max_iterations,
+                "max_norm": self._max_norm,
+                "adaptive_iterations": self._adaptive_iterations,
+                "method": self._method,
+                "tolerance": self._tolerance,
+                "seed_tolerance": self._seed_tolerance,
+                "correction": self._correction,
+                "alpha": self._alpha,
+                "override": self._override,
+            }
+            # Pack data.
+            self.data.update(
+                {
+                    "nodes": self._nodes,
+                    "elements": self._elements,
+                    "areas": self._areas,
+                    "solved": self._solved,
+                    "unsolvable": self._unsolvable,
+                    "centroids": np.mean(self._nodes[self._elements], axis=-2),
+                    "settings": self._settings,
+                    "results": self._results,
+                }
+            )
             del self._history
         except Exception:
             self._status = 7

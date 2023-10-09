@@ -12,7 +12,6 @@ import re
 from alive_progress import alive_bar
 import math
 import geomat
-import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -298,6 +297,7 @@ class Particle(ParticleBase):
         stress_0=np.zeros(6),
         volume_0=1.0,
         track=True,
+        space="O"
     ):
         """Initialisation of geopyv particle object.
 
@@ -384,6 +384,8 @@ class Particle(ParticleBase):
             self._series = np.asarray([series.data])
         self._mesh_order = self._series[0]["mesh_order"]
         self._track = track
+        if series.data["calibrated"] is not True:
+            space = "I"
         if self._report(
             gp.check._check_type(coordinate_0, "coordinate_0", [np.ndarray]), "Warning"
         ):
@@ -427,11 +429,14 @@ class Particle(ParticleBase):
         self._reference_index = 0
         self.solved = False
         self._calibrated = series.data["calibrated"]
+        self._space = space
 
         self._initialised = True
         self.data = {
             "type": "Particle",
             "solved": self.solved,
+            "calibrated": self._calibrated,
+            "space": self._space,
             "series_type": self._series_type,
             "track": self._track,
             "coordinate_0": self._coordinates[0],
@@ -496,8 +501,12 @@ class Particle(ParticleBase):
 
         """
         elements = self._series[m]["elements"]
-        nodes = self._series[m]["nodes"]
-        centroids = self._series[m]["centroids"]
+        if self._space == "I":
+            nodes = self._series[m]["nodes"]
+            centroids = self._series[m]["centroids"]
+        else:
+            nodes = self._series[m]["Nodes"]
+            centroids = self._series[m]["Centroids"]
         flag = False
         diff = centroids - self._coordinates[self._reference_index]
         dist = np.einsum("ij,ij->i", diff, diff)
@@ -512,34 +521,33 @@ class Particle(ParticleBase):
                 "Particle {particle} is outside of boundary {boundary}.\n"
                 " Check for convex boundary update.".format(
                     particle=self._coordinates[self._reference_index],
-                    boundary=self._series[m]["nodes"][self._series[m]["boundary"]],
+                    boundary=nodes[self._series[m]["boundary"]],
                 )
             )
-            fig, ax = plt.subplots()
-            ax.plot(
-                self._series[m]["nodes"][self._series[m]["boundary"]][
-                    [0, 1, 2, 3, 0], 0
-                ],
-                self._series[m]["nodes"][self._series[m]["boundary"]][
-                    [0, 1, 2, 3, 0], 1
-                ],
-            )
-
-            ax.plot(
-                self._series[m]["nodes"][self._series[m]["exclusions"][0]][:, 0],
-                self._series[m]["nodes"][self._series[m]["exclusions"][0]][:, 1],
-            )
-            ax.plot(
-                self._series[0]["nodes"][self._series[0]["exclusions"][0]][:, 0],
-                self._series[0]["nodes"][self._series[0]["exclusions"][0]][:, 1],
-            )
-            ax.scatter(
-                self._coordinates[self._reference_index][0],
-                self._coordinates[self._reference_index][1],
-            )
-            plt.show()
+            # fig, ax = plt.subplots()
+            # ax.plot(
+            #     self._series[m]["nodes"][self._series[m]["boundary"]][
+            #         [0, 1, 2, 3, 0], 0
+            #     ],
+            #     self._series[m]["nodes"][self._series[m]["boundary"]][
+            #         [0, 1, 2, 3, 0], 1
+            #     ],
+            # )
+            # ax.plot(
+            #     self._series[m]["nodes"][self._series[m]["exclusions"][0]][:, 0],
+            #     self._series[m]["nodes"][self._series[m]["exclusions"][0]][:, 1],
+            # )
+            # ax.plot(
+            #     self._series[0]["nodes"][self._series[0]["exclusions"][0]][:, 0],
+            #     self._series[0]["nodes"][self._series[0]["exclusions"][0]][:, 1],
+            # )
+            # ax.scatter(
+            #     self._coordinates[self._reference_index][0],
+            #     self._coordinates[self._reference_index][1],
+            # )
+            # plt.show()
             raise ValueError("Particle outside of boundary.")
-            del self_series
+
         return index
 
     def _local_coordinates(self, element_nodes):
@@ -661,10 +669,16 @@ class Particle(ParticleBase):
         """
 
         self._warp_inc = np.zeros(6 * self._mesh_order)
-        x = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
-        u = self._series[m]["results"]["displacements"][
-            self._series[m]["elements"][tri_idx]
-        ]
+        if self._space == "I":
+            x = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
+            u = self._series[m]["results"]["displacements"][
+                self._series[m]["elements"][tri_idx]
+            ]
+        else:
+            x = self._series[m]["Nodes"][self._series[m]["elements"][tri_idx]]
+            u = self._series[m]["results"]["Displacements"][
+                self._series[m]["elements"][tri_idx]
+            ]
 
         # Get local coordinates.
         zeta, eta, theta, A = self._local_coordinates(x)

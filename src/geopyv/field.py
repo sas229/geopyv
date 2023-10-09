@@ -329,6 +329,7 @@ class Field(FieldBase):
         coordinates=None,
         volumes=None,
         stresses=np.zeros(6),
+        space="I",
     ):
         """
         Initialisation of geopyv field object.
@@ -523,51 +524,48 @@ class Field(FieldBase):
         self._track = track
         self.solved = False
         self._unsolvable = False
+        self._space = space
+        self._calibrated = series.data["calibrated"]
 
         if coordinates is not None:
             _auto_distribute = False
-            image = gp.image.Image(self._image_0)
-            for coord in coordinates:
-                if (
-                    coord[0] > np.shape(image.image_gs)[1]
-                    or coord[0] < 0
-                    or coord[1] > np.shape(image.image_gs)[0]
-                    or coord[1] < 0
-                ):
-                    log.error(
-                        (
-                            "User-specified coordinate {value} "
-                            "outside image boundary."
-                        ).format(value=coord)
-                    )
-                    raise ValueError(
-                        (
-                            "User-specified coordinate {value} "
-                            "outside image boundary."
-                        ).format(value=coord)
-                    )
-            del image
+            if self._space == "I":
+                image = gp.image.Image(self._image_0)
+                for coord in coordinates:
+                    if (
+                        coord[0] > np.shape(image.image_gs)[1]
+                        or coord[0] < 0
+                        or coord[1] > np.shape(image.image_gs)[0]
+                        or coord[1] < 0
+                    ):
+                        log.error(
+                            (
+                                "User-specified coordinate {value} "
+                                "outside image boundary."
+                            ).format(value=coord)
+                        )
+                        raise ValueError(
+                            (
+                                "User-specified coordinate {value} "
+                                "outside image boundary."
+                            ).format(value=coord)
+                        )
+                del image
             if volumes is None:
                 volumes = np.ones(np.shape(coordinates)[0])
             self._target_particles = np.shape(coordinates)[0]
         else:
             self._target_particles = target_particles
 
-        self.data = {
-            "type": "Field",
-            "solved": self.solved,
-            "series_type": self._series_type,
-            "number_images": self._number_images,
-            "track": self._track,
-            "target_particles": self._target_particles,
-            "image_0": self._image_0,
-        }
-
         # Particle distribution.
         if _auto_distribute is True:
             if boundary_obj is not None:
                 self._boundary_obj = boundary_obj
                 self._exclusion_objs = exclusion_objs
+            elif series.data["type"] == "Sequence":
+                self._boundary_obj = series.data["mesh_settings"]["boundary_obj"]
+                self._exclusion_objs = series.data["mesh_settings"]["exclusion_objs"]
+
             else:
                 self._boundary_obj = mesh_0["boundary_obj"]
                 self._exclusion_objs = mesh_0["exclusion_objs"]
@@ -577,9 +575,9 @@ class Field(FieldBase):
                 self._borders,
                 self._segments,
                 self._curves,
-                self._mask,
             ) = gp.geometry.meshing._define_RoI(
-                gp.image.Image(self._image_0), self._boundary_obj, self._exclusion_objs
+                boundary_obj=self._boundary_obj,
+                exclusion_objs=self._exclusion_objs,
             )
             # Initialize gmsh if not already initialized.
             if gmsh.isInitialized() == 0:
@@ -616,7 +614,19 @@ class Field(FieldBase):
                 "stresses": self._stresses,
             }
 
-        self.data.update({"field": self._field})
+        self.data = {
+            "type": "Field",
+            "solved": self.solved,
+            "calibrated": self._calibrated,
+            "space": self._space,
+            "series_type": self._series_type,
+            "number_images": self._number_images,
+            "track": self._track,
+            "target_particles": self._target_particles,
+            "image_0": self._image_0,
+            "field": self._field,
+        }
+
         self._initialised = True
 
     def _initial_mesh(self):
@@ -692,13 +702,13 @@ class Field(FieldBase):
             particle_no, dual_line=True, bar="blocks", title="Solving particles..."
         ) as bar:
             for i in range(particle_no):
-                print(self._coordinates[i])
                 particle = gp.particle.Particle(
                     series=self._series,
                     coordinate_0=self._coordinates[i],
                     volume_0=self._volumes[i],
                     stress_0=self._stresses[i],
                     track=self._track,
+                    space=self._space,
                 )
                 _particle_solved = particle.solve(
                     model=model, state=state, parameters=parameters

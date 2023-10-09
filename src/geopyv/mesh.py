@@ -522,6 +522,129 @@ class MeshBase(Object):
         )
         return fig, ax
 
+    def _element_area(self, space="I"):
+        """
+        Private method to calculate the element areas based on corner nodes.
+
+        """
+        M = np.ones((len(self._elements), 3, 3))
+        if space == "I":
+            M[:, 1] = self._nodes[self._elements[:, :3]][:, :, 0]
+            M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
+            self._areas = 0.5 * np.linalg.det(M)
+        else:
+            M[:, 1] = self._Nodes[self._elements[:, :3]][:, :, 0]
+            M[:, 2] = self._Nodes[self._elements[:, :3]][:, :, 1]
+            self._Areas = 0.5 * np.linalg.det(M)
+
+    def _local_coordinates(self):
+        """
+        Private method to define the element centroid in terms of the local
+        coordinate system. Thereotically, this is constant but is calculated in
+        case of rounding error.
+
+        Return
+        ------
+        A : `numpy.ndarray` (N,3,4)
+            Element centroid local coordinates.
+        """
+
+        A = np.ones((np.shape(self._elements)[0], 3, 4))
+        A[:, 1:, 0] = np.mean(self._nodes[self._elements], axis=1)
+        A[:, 1:, 1:] = self._nodes[self._elements][:, :3, :2].transpose(0, 2, 1)
+
+        return A
+
+    def _shape_function(self):
+        """Private method for defining the shape functions at the
+        element centroid.
+
+        Return
+        ------
+        N : `numpy.ndarray`
+            Shape function.
+        dN : `numpy.ndarray`
+            Shape function 1st order derivative.
+        d2N : `numpy.ndarray`
+            Shape function 2nd order derivative.
+        """
+
+        if self._mesh_order == 1:
+            N = np.asarray([1 / 3, 1 / 3, 1 / 3])
+            dN = np.asarray([[1, 0, -1], [0, 1, -1]])
+            d2N = None
+        elif self._mesh_order == 2:
+            N = np.asarray([-1 / 9, -1 / 9, -1 / 9, 4 / 9, 4 / 9, 4 / 9])
+            dN = np.asarray(
+                [
+                    [1 / 3, 0, -1 / 3, 4 / 3, -4 / 3, 0],
+                    [0, 1 / 3, -1 / 3, 4 / 3, 0, -4 / 3],
+                ]
+            )
+            d2N = np.asarray(
+                [
+                    [4, 0, 4, 0, 0, -8],
+                    [0, 0, 4, 4, -4, -4],
+                    [0, 4, 4, 0, -8, 0],
+                ]
+            )
+        return N, dN, d2N
+
+    def _element_strains(self, space="I"):
+        """
+
+        Private method to calculate the elemental strain the "B" matrix
+        relating element node displacements to elemental strain.
+
+        """
+
+        # Setup.
+        self._warps = np.zeros((np.shape(self._elements)[0], 12))
+        x = self._nodes[self._elements]
+        u = self._displacements[self._elements]
+
+        # Coordinate matrix.
+        A = self._local_coordinates()
+
+        # Shape function and derivatives.
+        N, dN, d2N = self._shape_function()
+
+        # Displacements.
+        self._warps[:, :2] = N @ u
+
+        # 1st Order Strains
+        J_x_T = dN @ x
+        J_u_T = dN @ u
+
+        self._warps[:, 2:6] = (np.linalg.inv(J_x_T) @ J_u_T).reshape(
+            np.shape(self._elements)[0], -1
+        )
+
+        # 2nd Order Strains
+        if self._mesh_order == 2:
+            K_u = d2N @ u
+            dz = np.zeros((np.shape(self._elements)[0], 2, 2))
+            dz[:, 0, 0] = x[:, 1, 1] - x[:, 2, 1]
+            dz[:, 0, 1] = x[:, 2, 1] - x[:, 0, 1]
+            dz[:, 1, 0] = x[:, 2, 0] - x[:, 1, 0]
+            dz[:, 1, 1] = x[:, 0, 0] - x[:, 2, 0]
+            dz /= np.linalg.det(A[:, :, [1, 2, 3]])[:, None, None]
+
+            K_x_inv = np.zeros((np.shape(self._elements)[0], 3, 3))
+            K_x_inv[:, 0, 0] = dz[:, 0, 0] ** 2
+            K_x_inv[:, 0, 1] = 2 * dz[:, 0, 0] * dz[:, 0, 1]
+            K_x_inv[:, 0, 2] = dz[:, 0, 1] ** 2
+            K_x_inv[:, 1, 0] = dz[:, 0, 0] * dz[:, 1, 0]
+            K_x_inv[:, 1, 1] = dz[:, 0, 0] * dz[:, 1, 1] + dz[:, 0, 1] * dz[:, 1, 0]
+            K_x_inv[:, 1, 2] = dz[:, 0, 1] * dz[:, 1, 1]
+            K_x_inv[:, 2, 0] = dz[:, 1, 0] ** 2
+            K_x_inv[:, 2, 1] = 2 * dz[:, 1, 0] * dz[:, 1, 1]
+            K_x_inv[:, 2, 2] = dz[:, 1, 1] ** 2
+
+            self._warps[:, 6:] = (K_x_inv @ K_u).reshape(
+                np.shape(self._elements)[0], -1
+            )
+
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":
             log.error(msg)
@@ -732,7 +855,9 @@ class Mesh(MeshBase):
             self._curves,
             self._mask,
         ) = gp.geometry.meshing._define_RoI(
-            self._f_img, self._boundary_obj, self._exclusion_objs
+            f_img=self._f_img,
+            boundary_obj=self._boundary_obj,
+            exclusion_objs=self._exclusion_objs,
         )
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
@@ -1133,7 +1258,6 @@ class Mesh(MeshBase):
             if self._status == 0:
                 self._status = 1
             self.solved = True
-
             # Extract data from subsets.
             subset_data = []
             for subset in self._subsets:
@@ -1164,7 +1288,7 @@ class Mesh(MeshBase):
                     "nodes": self._nodes,
                     "elements": self._elements,
                     "areas": self._areas,
-                    "solved": self._solved,
+                    "solved": self.solved,
                     "unsolvable": self._unsolvable,
                     "centroids": np.mean(self._nodes[self._elements], axis=-2),
                     "settings": self._settings,
@@ -1512,124 +1636,6 @@ class Mesh(MeshBase):
         nodes = np.column_stack((nc[0::3], nc[1::3]))  # Nodal coordinate array (x,y).
         error = (np.shape(nodes)[0] - target) ** 2
         return error
-
-    def _element_area(self):
-        """
-        Private method to calculate the element areas based on corner nodes.
-
-        """
-        M = np.ones((len(self._elements), 3, 3))
-        M[:, 1] = self._nodes[self._elements[:, :3]][:, :, 0]
-        M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
-        self._areas = 0.5 * np.linalg.det(M)
-
-    def _local_coordinates(self):
-        """
-        Private method to define the element centroid in terms of the local
-        coordinate system. Thereotically, this is constant but is calculated in
-        case of rounding error.
-
-        Return
-        ------
-        A : `numpy.ndarray` (N,3,4)
-            Element centroid local coordinates.
-        """
-
-        A = np.ones((np.shape(self._elements)[0], 3, 4))
-        A[:, 1:, 0] = np.mean(self._nodes[self._elements], axis=1)
-        A[:, 1:, 1:] = self._nodes[self._elements][:, :3, :2].transpose(0, 2, 1)
-
-        return A
-
-    def _shape_function(self):
-        """Private method for defining the shape functions at the
-        element centroid.
-
-        Return
-        ------
-        N : `numpy.ndarray`
-            Shape function.
-        dN : `numpy.ndarray`
-            Shape function 1st order derivative.
-        d2N : `numpy.ndarray`
-            Shape function 2nd order derivative.
-        """
-
-        if self._mesh_order == 1:
-            N = np.asarray([1 / 3, 1 / 3, 1 / 3])
-            dN = np.asarray([[1, 0, -1], [0, 1, -1]])
-            d2N = None
-        elif self._mesh_order == 2:
-            N = np.asarray([-1 / 9, -1 / 9, -1 / 9, 4 / 9, 4 / 9, 4 / 9])
-            dN = np.asarray(
-                [
-                    [1 / 3, 0, -1 / 3, 4 / 3, -4 / 3, 0],
-                    [0, 1 / 3, -1 / 3, 4 / 3, 0, -4 / 3],
-                ]
-            )
-            d2N = np.asarray(
-                [
-                    [4, 0, 4, 0, 0, -8],
-                    [0, 0, 4, 4, -4, -4],
-                    [0, 4, 4, 0, -8, 0],
-                ]
-            )
-        return N, dN, d2N
-
-    def _element_strains(self):
-        """
-
-        Private method to calculate the elemental strain the "B" matrix
-        relating element node displacements to elemental strain.
-
-        """
-
-        # Setup.
-        self._warps = np.zeros((np.shape(self._elements)[0], 12))
-        x = self._nodes[self._elements]
-        u = self._displacements[self._elements]
-
-        # Coordinate matrix.
-        A = self._local_coordinates()
-
-        # Shape function and derivatives.
-        N, dN, d2N = self._shape_function()
-
-        # Displacements.
-        self._warps[:, :2] = N @ u
-
-        # 1st Order Strains
-        J_x_T = dN @ x
-        J_u_T = dN @ u
-
-        self._warps[:, 2:6] = (np.linalg.inv(J_x_T) @ J_u_T).reshape(
-            np.shape(self._elements)[0], -1
-        )
-
-        # 2nd Order Strains
-        if self._mesh_order == 2:
-            K_u = d2N @ u
-            dz = np.zeros((np.shape(self._elements)[0], 2, 2))
-            dz[:, 0, 0] = x[:, 1, 1] - x[:, 2, 1]
-            dz[:, 0, 1] = x[:, 2, 1] - x[:, 0, 1]
-            dz[:, 1, 0] = x[:, 2, 0] - x[:, 1, 0]
-            dz[:, 1, 1] = x[:, 0, 0] - x[:, 2, 0]
-            dz /= np.linalg.det(A[:, :, [1, 2, 3]])[:, None, None]
-
-            K_x_inv = np.zeros((np.shape(self._elements)[0], 3, 3))
-            K_x_inv[:, 0, 0] = dz[:, 0, 0] ** 2
-            K_x_inv[:, 0, 1] = 2 * dz[:, 0, 0] * dz[:, 0, 1]
-            K_x_inv[:, 0, 2] = dz[:, 0, 1] ** 2
-            K_x_inv[:, 1, 0] = dz[:, 0, 0] * dz[:, 1, 0]
-            K_x_inv[:, 1, 1] = dz[:, 0, 0] * dz[:, 1, 1] + dz[:, 0, 1] * dz[:, 1, 0]
-            K_x_inv[:, 1, 2] = dz[:, 0, 1] * dz[:, 1, 1]
-            K_x_inv[:, 2, 0] = dz[:, 1, 0] ** 2
-            K_x_inv[:, 2, 1] = 2 * dz[:, 1, 0] * dz[:, 1, 1]
-            K_x_inv[:, 2, 2] = dz[:, 1, 1] ** 2
-
-            self._warps[:, 6:] = (K_x_inv @ K_u).reshape(
-                np.shape(self._elements)[0], -1
-            )
 
     def _seed_solve(self):
         """
@@ -2115,3 +2121,10 @@ class MeshResults(MeshBase):
     def __init__(self, data):
         """Initialisation of geopyv MeshResults class."""
         self.data = data
+
+        self._nodes = self.data["nodes"]
+        self._elements = self.data["elements"]
+        self._areas = self.data["areas"]
+        self._mesh_order = self.data["mesh_order"]
+        self._warps = self.data["results"]["warps"]
+        self._displacements = self.data["results"]["displacements"]

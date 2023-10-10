@@ -76,12 +76,13 @@ class Region(RegionBase):
             centres = [centre]
         self._hard = hard
         self._compensate = compensate
-
+        self._calibrated = False
         self.solved = False
 
         self.data = {
             "type": "geometry.Region",
             "solved": self.solved,
+            "calibrated": self._calibrated,
             "shape": self._shape,
             "hard": self._hard,
             "compensate": self._compensate,

@@ -250,13 +250,20 @@ class CalibrationBase(Object):
             imgpnts = imgpnts[np.newaxis, ...]
         if np.shape(imgpnts)[-1] == 2:
             imgpnts = np.pad(imgpnts, (0, 1), constant_values=(0, 1))[:-1]
+        if np.shape(imgpnts)[0] >= 30:
+            ind = [i for i in range(0, np.shape(imgpnts)[0], 30)]
+            ind.append(np.shape(imgpnts)[0])
+        else:
+            ind = [0, np.shape(imgpnts)[0]]
 
-        # Mapping.
-        X_pp = np.linalg.inv(self._intmat) @ imgpnts.T
-        X_c = np.pad(self._simult(X_pp), (0, 1), constant_values=(0, 1))[:, :-1]
-        X_c = self._depth_recovery(X_c)
-        X_c = np.pad(X_c, (0, 1), constant_values=(0, 1))[:, :-1]
-        objpnts = (np.linalg.inv(self._extmat) @ X_c).T[:, :3]
+        objpnts = np.empty((np.shape(imgpnts)[0], 3))
+        for i in range(len(ind) - 1):
+            X_pp = np.linalg.inv(self._intmat) @ imgpnts[ind[i] : ind[i + 1]].T
+            X_c = np.pad(self._simult(X_pp), (0, 1), constant_values=(0, 1))[:, :-1]
+            X_c = self._depth_recovery(X_c)
+            X_c = np.pad(X_c, (0, 1), constant_values=(0, 1))[:, :-1]
+            objpnts[ind[i] : ind[i + 1]] = (np.linalg.inv(self._extmat) @ X_c).T[:, :3]
+
         if both is True:
             return objpnts, imgpnts
         else:
@@ -303,7 +310,7 @@ class CalibrationBase(Object):
         )
         return c.flatten()
 
-    def calibrate(self, *, opt=1, verbose=True, object=None):
+    def calibrate(self, *, verbose=True, object=None):
         if self.data["solved"] is not True:
             log.error(
                 "Calibration not yet solved therefore nothing to inspect. "
@@ -324,6 +331,10 @@ class CalibrationBase(Object):
                     gp.mesh.MeshResults,
                     gp.subset.Subset,
                     gp.subset.SubsetResults,
+                    gp.geometry.region.Path,
+                    gp.geometry.region.Circle,
+                    gp.geometry.region.Region,
+                    gp.geometry.region.RegionResults,
                     dict,
                 ],
             ),
@@ -334,6 +345,13 @@ class CalibrationBase(Object):
             data = object
         else:
             data = object.data
+
+        # Check if already calibrated.
+        try:
+            if data["calibrated"] is True:
+                return
+        except Exception:
+            pass
 
         if data["type"] == "Subset":
             if verbose:
@@ -415,6 +433,7 @@ class CalibrationBase(Object):
                     }
                 )
                 s["calibrated"] = True
+
             # Storing.
             data.update(
                 {
@@ -432,19 +451,26 @@ class CalibrationBase(Object):
                 }
             )
             # Assigning.
-            if type(object) == gp.mesh.Mesh:
+            if type(object) != dict:
                 object._Nodes = Nodes
                 object._nodes = nodes
                 object._Centroids = Centroids
                 object._centroids = centroids
                 object._Displacements = Displacements
                 object._displacements = displacements
+                object._element_area(space="I")
+                object._element_area(space="O")
+                object._element_strains()
+                data["results"]["results"] = object._warps
+                data["areas"] = object._areas
+                data["Areas"] = object._Areas
                 object._calibrated = True
             if verbose:
                 log.info("... Mesh Calibrated.")
         elif data["type"] == "Sequence":
+            log.info("Calibrating Sequence ...")
             with alive_bar(
-                len(data["meshes"]), bar="blocks", title="Calibrating Sequence ..."
+                len(data["meshes"]), bar="blocks", title="Calibrating Meshes ..."
             ) as bar:
                 # Recursive.
                 if data["file_settings"]["save_by_reference"] is True:
@@ -457,11 +483,44 @@ class CalibrationBase(Object):
                     for i in range(len(data["meshes"])):
                         self.calibrate(object=data["meshes"][i], verbose=False)
                         bar()
+            with alive_bar(
+                len(data["mesh_settings"]["exclusion_objs"]) + 1,
+                bar="blocks",
+                title="Calibrating Regions ...",
+            ) as bar:
+                self.calibrate(object=data["mesh_settings"]["boundary_obj"])
+                bar()
+                for i in range(len(data["mesh_settings"]["exclusion_objs"])):
+                    self.calibrate(object=data["mesh_settings"]["exclusion_objs"][i])
+                    bar()
+
             # Storing.
             data["calibrated"] = True
             # Assigning.
             if type(object) == gp.sequence.Sequence:
                 object._calibrated = True
+        elif data["type"] == "geometry.Region":
+            if verbose:
+                log.info("Calibrating Region...")
+            # Calibrating.
+            Centres, centres = self.i2o(
+                imgpnts=data["centres"],
+                both=True,
+            )
+            shape = np.shape(np.asarray(data["nodes"]))
+            Nodes, nodes = self.i2o(
+                imgpnts=np.asarray(data["nodes"]).reshape(-1, 2),
+                both=True,
+            )
+            # Storing.
+            data.update(
+                {
+                    "centres": centres[:, :2],
+                    "Centres": Centres[:, :2],
+                    "nodes": nodes[:, :2].reshape(shape),
+                    "Nodes": Nodes[:, :2].reshape(shape),
+                }
+            )
 
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":
@@ -661,6 +720,7 @@ class Calibration(CalibrationBase):
         # Store input.
         self._binary = binary
         self._index = index
+        self._img_index = index + 1
 
         # Pre-process images for calibration.
         self._allCorners, self._allIds, self._imsize = self._read_chessboards(threshold)
@@ -771,8 +831,14 @@ class Calibration(CalibrationBase):
                             allIds.append(chids)
                             acceptedImages.append(self._calibration_images[i])
                 bar()
-
         self._calibration_images = acceptedImages
+        image_indices = np.asarray(
+            [int(re.findall(r"\d+", x)[-1]) for x in self._calibration_images]
+        )
+        try:
+            self._index = np.argwhere(image_indices == self._img_index)[0][0]
+        except Exception:
+            log.error("External matrix image of insufficient quality.")
         imsize = frame.shape
         return allCorners, allIds, imsize
 

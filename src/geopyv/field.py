@@ -704,9 +704,9 @@ class Field(FieldBase):
             for i in range(particle_no):
                 particle = gp.particle.Particle(
                     series=self._series,
-                    coordinate_0=self._coordinates[i],
-                    volume_0=self._volumes[i],
-                    stress_0=self._stresses[i],
+                    coordinate=self._coordinates[i],
+                    volume=self._volumes[i],
+                    stress=self._stresses[i],
                     track=self._track,
                     space=self._space,
                 )

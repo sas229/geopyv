@@ -537,7 +537,7 @@ class MeshBase(Object):
             M[:, 2] = self._Nodes[self._elements[:, :3]][:, :, 1]
             self._Areas = 0.5 * np.linalg.det(M)
 
-    def _local_coordinates(self):
+    def _local_coordinates(self, space="I"):
         """
         Private method to define the element centroid in terms of the local
         coordinate system. Thereotically, this is constant but is calculated in
@@ -550,8 +550,12 @@ class MeshBase(Object):
         """
 
         A = np.ones((np.shape(self._elements)[0], 3, 4))
-        A[:, 1:, 0] = np.mean(self._nodes[self._elements], axis=1)
-        A[:, 1:, 1:] = self._nodes[self._elements][:, :3, :2].transpose(0, 2, 1)
+        if space == "I":
+            A[:, 1:, 0] = np.mean(self._nodes[self._elements], axis=1)
+            A[:, 1:, 1:] = self._nodes[self._elements][:, :3, :2].transpose(0, 2, 1)
+        elif space == "O":
+            A[:, 1:, 0] = np.mean(self._Nodes[self._elements], axis=1)
+            A[:, 1:, 1:] = self._Nodes[self._elements][:, :3, :2].transpose(0, 2, 1)
 
         return A
 
@@ -599,9 +603,13 @@ class MeshBase(Object):
         """
 
         # Setup.
-        self._warps = np.zeros((np.shape(self._elements)[0], 12))
-        x = self._nodes[self._elements]
-        u = self._displacements[self._elements]
+        warps = np.zeros((np.shape(self._elements)[0], 12))
+        if space == "I":
+            x = self._nodes[self._elements]
+            u = self._displacements[self._elements]
+        else:
+            x = self._Nodes[self._elements]
+            u = self._Displacements[self._elements]
 
         # Coordinate matrix.
         A = self._local_coordinates()
@@ -610,13 +618,13 @@ class MeshBase(Object):
         N, dN, d2N = self._shape_function()
 
         # Displacements.
-        self._warps[:, :2] = N @ u
+        warps[:, :2] = N @ u
 
         # 1st Order Strains
         J_x_T = dN @ x
         J_u_T = dN @ u
 
-        self._warps[:, 2:6] = (np.linalg.inv(J_x_T) @ J_u_T).reshape(
+        warps[:, 2:6] = (np.linalg.inv(J_x_T) @ J_u_T).reshape(
             np.shape(self._elements)[0], -1
         )
 
@@ -641,9 +649,11 @@ class MeshBase(Object):
             K_x_inv[:, 2, 1] = 2 * dz[:, 1, 0] * dz[:, 1, 1]
             K_x_inv[:, 2, 2] = dz[:, 1, 1] ** 2
 
-            self._warps[:, 6:] = (K_x_inv @ K_u).reshape(
-                np.shape(self._elements)[0], -1
-            )
+            warps[:, 6:] = (K_x_inv @ K_u).reshape(np.shape(self._elements)[0], -1)
+        if space == "I":
+            self._warps = warps
+        else:
+            self._Warps = warps
 
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":

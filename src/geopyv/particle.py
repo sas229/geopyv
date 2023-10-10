@@ -292,10 +292,10 @@ class Particle(ParticleBase):
         self,
         *,
         series=None,
-        coordinate_0=np.zeros(2),
-        warp_0=np.zeros(12),
-        stress_0=np.zeros(6),
-        volume_0=1.0,
+        coordinate=np.zeros(2),
+        warp=np.zeros(12),
+        stress=np.zeros(6),
+        volume=1.0,
         track=True,
         space="O"
     ):
@@ -305,7 +305,7 @@ class Particle(ParticleBase):
         ----------
         meshes : `numpy.ndarray` of geopyv.mesh.Mesh objects
             Sequence for the particle object to track.
-        coordinate_0 : numpy.ndarray (2)
+        coordinate : numpy.ndarray (2)
             Initial particle coordinate (x,y)
         p_init : `numpy.ndarray` (12), optional
             Initial warp vector.
@@ -334,29 +334,25 @@ class Particle(ParticleBase):
             "TypeError",
         )
 
-        check = gp.check._check_type(warp_0, "warp_0", [np.ndarray])
+        check = gp.check._check_type(warp, "warp", [np.ndarray])
         if check:
             try:
-                warp_0 = np.asarray(warp_0)
-                self._report(
-                    gp.check._conversion(warp_0, "warp_0", np.ndarray), "Warning"
-                )
+                warp = np.asarray(warp)
+                self._report(gp.check._conversion(warp, "warp", np.ndarray), "Warning")
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_dim(warp_0, "warp_0", 1), "ValueError")
-        self._report(gp.check._check_axis(warp_0, "warp_0", 0, [6, 12]), "ValueError")
+        self._report(gp.check._check_dim(warp, "warp", 1), "ValueError")
+        self._report(gp.check._check_axis(warp, "warp", 0, [6, 12]), "ValueError")
         check = gp.check._check_type(
-            volume_0, "volume_0", [float, np.floating, np.float64, np.float32]
+            volume, "volume", [float, np.floating, np.float64, np.float32]
         )
         if check:
             try:
-                volume_0 = float(volume_0)
-                self._report(
-                    gp.check._conversion(volume_0, "volume_0", float), "Warning"
-                )
+                volume = float(volume)
+                self._report(gp.check._conversion(volume, "volume", float), "Warning")
             except Exception:
                 self._report(check, "TypeError")
-        self._report(gp.check._check_range(volume_0, "volume_0", 0.0), "ValueError")
+        self._report(gp.check._check_range(volume, "volume", 0.0), "ValueError")
         self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
 
         if series.data["type"] == "Sequence":
@@ -387,32 +383,30 @@ class Particle(ParticleBase):
         if series.data["calibrated"] is not True:
             space = "I"
         if self._report(
-            gp.check._check_type(coordinate_0, "coordinate_0", [np.ndarray]), "Warning"
+            gp.check._check_type(coordinate, "coordinate", [np.ndarray]), "Warning"
         ):
             selector = gp.gui.selectors.coordinate.CoordinateSelector()
             f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
-            coordinate_0 = selector.select(f_img, gp.templates.Circle(20))
+            coordinate = selector.select(f_img, gp.templates.Circle(20))
+        elif self._report(gp.check._check_dim(coordinate, "coordinate", 1), "Warning"):
+            selector = gp.gui.selectors.coordinate.CoordinateSelector()
+            f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
+            coordinate = selector.select(f_img, gp.templates.Circle(20))
         elif self._report(
-            gp.check._check_dim(coordinate_0, "coordinate_0", 1), "Warning"
+            gp.check._check_axis(coordinate, "coordinate", 0, [2]), "Warning"
         ):
             selector = gp.gui.selectors.coordinate.CoordinateSelector()
             f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
-            coordinate_0 = selector.select(f_img, gp.templates.Circle(20))
-        elif self._report(
-            gp.check._check_axis(coordinate_0, "coordinate_0", 0, [2]), "Warning"
-        ):
-            selector = gp.gui.selectors.coordinate.CoordinateSelector()
-            f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
-            coordinate_0 = selector.select(f_img, gp.templates.Circle(20))
+            coordinate = selector.select(f_img, gp.templates.Circle(20))
 
-        if self._series[0]["mask"][int(coordinate_0[1]), int(coordinate_0[0])] == 0:
+        if self._series[0]["mask"][int(coordinate[1]), int(coordinate[0])] == 0:
             log.warning(
-                "`coordinate_0` keyword argument value out of boundary.\n"
-                "Select `coordinate_0`..."
+                "`coordinate` keyword argument value out of boundary.\n"
+                "Select `coordinate`..."
             )
             selector = gp.gui.selectors.coordinate.CoordinateSelector()
             f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
-            coordinate_0 = selector.select(f_img, gp.templates.Circle(20))
+            coordinate = selector.select(f_img, gp.templates.Circle(20))
 
         self._coordinates = np.zeros((len(self._series) + 1, 2))
         self._warps = np.zeros((len(self._series) + 1, 6 * self._mesh_order))
@@ -421,10 +415,10 @@ class Particle(ParticleBase):
         self._works = np.zeros(len(self._series) + 1)
         self._strains = np.zeros((len(self._series) + 1, 6))
 
-        self._coordinates[0] = coordinate_0
-        self._warps[0] = warp_0[: np.shape(self._warps)[1]]
-        self._volumes[0] = volume_0
-        self._stresses[0] = stress_0
+        self._coordinates[0] = coordinate
+        self._warps[0] = warp[: np.shape(self._warps)[1]]
+        self._volumes[0] = volume
+        self._stresses[0] = stress
 
         self._reference_index = 0
         self.solved = False
@@ -439,9 +433,9 @@ class Particle(ParticleBase):
             "space": self._space,
             "series_type": self._series_type,
             "track": self._track,
-            "coordinate_0": self._coordinates[0],
-            "warp_0": self._warps[0],
-            "volume_0": self._volumes[0],
+            # "coordinate": self._coordinates[0],
+            # "warp": self._warps[0],
+            # "volume": self._volumes[0],
             "image_0": self._series[0]["images"]["f_img"],
         }
 

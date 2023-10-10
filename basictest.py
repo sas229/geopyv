@@ -1,5 +1,7 @@
 import numpy as np
 import geopyv as gp
+import cv2
+from cv2 import aruco
 import matplotlib.pyplot as plt
 
 # Subset test.
@@ -38,9 +40,7 @@ boundary = gp.geometry.region.Path(
     nodes=np.asarray(
         [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
     ),
-    rigid=False,
     hard=False,
-    track=True,
 )
 exclusions = []
 exclusions.append(
@@ -48,9 +48,8 @@ exclusions.append(
         centre=np.asarray([1925, 1470]),
         radius=430.0,
         size=100.0,
-        rigid=True,
+        option="F",
         hard=True,
-        track=True,
     )
 )
 seed = np.asarray([400, 400.0])
@@ -126,7 +125,7 @@ mesh.inspect(subset_index=0)
 mesh.convergence(subset_index=0)
 
 # If you supply a subset index that is out of range you get a ValueError.
-# mesh.convergence(subset_index=4000)
+mesh.convergence(subset_index=4000)
 
 # Sequence test.
 # Sequence setup.
@@ -135,9 +134,8 @@ boundary = gp.geometry.region.Path(
     nodes=np.asarray(
         [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
     ),
-    rigid=False,
+    option="F",
     hard=False,
-    track=True,
 )
 exclusions = []
 exclusions.append(
@@ -145,9 +143,8 @@ exclusions.append(
         centre=np.asarray([1925, 1470]),
         radius=430.0,
         size=100.0,
-        rigid=True,
+        option="F",
         hard=True,
-        track=True,
     )
 )
 seed = np.asarray([400, 400.0])
@@ -188,12 +185,54 @@ sequence.convergence(mesh_index=2, subset_index=4)
 sequence.contour(mesh_index=1, quantity="R", mesh=True)
 sequence.quiver(mesh_index=3)
 
+# Calibration.
+# So far, subset, mesh and sequence have been operating on the raw image data.
+# To track in object space or undistorted image space, we need to calibrate.
+
+# Calibration setup.
+
+dictionary = aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000)
+
+# Calibration instantiation.
+calibration = gp.calibration.Calibration(
+    calibration_dir="images/T-Bar/Calibration/",
+    dictionary=dictionary,
+    board_parameters=[29, 18, 10, 8],
+)
+
+# Calibration solving.
+calibration.solve(index=11, binary=110)
+
+# Calibration saving.
+gp.io.save(object=calibration, filename="calibration")
+del calibration
+
+# Calibration loading.
+calibration = gp.io.load(filename="calibration")
+
+# Calibration attributes.
+print("Intrinsic Matrix: \n{}\n".format(calibration.data["intrinsic_matrix"]))
+print("Extrinsic Matrix: \n{}\n".format(calibration.data["extrinsic_matrix"]))
+print("Distortion parameters: \n{}\n".format(calibration.data["distortion"]))
+
+# Calibration methods.
+# Map from image space to object space.
+imgpnts = np.asarray([[200.0, 100.0], [50.0, 75.0], [430.0, 1000.0]])
+objpnts = calibration.i2o(imgpnts=imgpnts)
+print("Object points: \n{}\n".format(objpnts))
+# Map from object space to image space.
+imgpnts = calibration.o2i(objpnts=objpnts)
+print("Image points: \n{}\n".format(imgpnts))
+# Calibrate objects.
+# calibration.calibrate(object = subset)
+# calibration.calibrate(object = mesh)
+calibration.calibrate(object=sequence)
 # Particle test.
 # Particle setup.
 coordinate_0 = np.asarray([1600.0, 1900.0])
-
+objpnt = calibration.i2o(imgpnts=np.asarray([coordinate_0]))
 # Particle instantiation.
-particle = gp.particle.Particle(series=sequence, coordinate_0=coordinate_0)
+particle = gp.particle.Particle(series=sequence, coordinate_0=objpnt[0, :2])
 
 # Particle solving.
 particle.solve()
@@ -213,7 +252,7 @@ particle.trace(quantity="warps", component=1)
 target_particles = 500
 
 # Field instantiation.
-field = gp.field.Field(series=sequence, target_particles=target_particles)
+field = gp.field.Field(series=sequence, target_particles=target_particles, space="I")
 
 # Field solving.
 field.solve()

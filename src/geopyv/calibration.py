@@ -244,7 +244,7 @@ class CalibrationBase(Object):
 
         return (self._intmat @ X_pp.T).T[:, :2]
 
-    def i2o(self, *, imgpnts, both=False):
+    def i2o(self, *, imgpnts):
         # Checks for format of imgpnts as in o2i.
         if np.ndim(imgpnts) <= 1:
             imgpnts = imgpnts[np.newaxis, ...]
@@ -264,10 +264,7 @@ class CalibrationBase(Object):
             X_c = np.pad(X_c, (0, 1), constant_values=(0, 1))[:, :-1]
             objpnts[ind[i] : ind[i + 1]] = (np.linalg.inv(self._extmat) @ X_c).T[:, :3]
 
-        if both is True:
-            return objpnts, imgpnts
-        else:
-            return objpnts
+        return objpnts
 
     def _depth_recovery(self, X_c):
         invextmat = np.linalg.inv(self._extmat)
@@ -288,20 +285,6 @@ class CalibrationBase(Object):
         X_c = np.reshape(X_c, (2, -1))
         r2 = np.sum(np.square(X_c), axis=0)  # X_c[0] ** 2 + X_c[1] ** 2
         f = 1 + self._dist[0] * r2 + self._dist[1] * r2**2 + self._dist[4] * r2**3
-        # a = (
-        #     X_c[0] * f
-        #     + 2 * self._dist[2] * X_c[0] * X_c[1]
-        #     + self._dist[3] * (r2 + 2 * X_c[0]**2)
-        #     - X_pp[0]
-        # )
-        # b = (
-        #     X_c[1] * f
-        #     + 2 * self._dist[3] * X_c[0] * X_c[1]
-        #     + self._dist[2] * (r2 + 2 * X_c[1]**2)
-        #     - X_pp[1]
-        # )
-        # return np.asarray([a,b]).flatten()
-
         c = (
             X_c * f
             + 2 * self._dist[2:4, None] * (X_c[0] * X_c[1])
@@ -357,7 +340,7 @@ class CalibrationBase(Object):
             if verbose:
                 log.info("Calibrating Subset ...")
             # Calibrating.
-            X, x = self.i2o(
+            X = self.i2o(
                 imgpnts=np.asarray(
                     [
                         [
@@ -370,18 +353,13 @@ class CalibrationBase(Object):
                         ],
                     ]
                 ),
-                both=True,
             )
             # Storing.
-            data["position"].update(
-                {"X": X[0, 0], "Y": X[0, 1], "x": x[0, 0], "y": x[0, 1]}
-            )
+            data["position"].update({"X": X[0, 0], "Y": X[0, 1]})
             data["results"].update(
                 {
                     "U": X[1, 0] - X[0, 0],
                     "V": X[1, 1] - X[0, 1],
-                    "u": x[1, 0] - x[0, 0],
-                    "v": x[1, 1] - x[0, 1],
                 }
             )
             data["calibrated"] = True
@@ -391,28 +369,21 @@ class CalibrationBase(Object):
                 object._Y = X[0, 1]
                 object._U = X[1, 0] - X[0, 0]
                 object._V = X[1, 1] - X[0, 1]
-                object._x = x[0, 0]
-                object._y = x[0, 1]
-                object._u = x[1, 0] - x[0, 0]
-                object._v = x[1, 1] - x[0, 1]
                 object._calibrated = True
         elif data["type"] == "Mesh":
             if verbose:
                 log.info("Calibrating Mesh ...")
             # Calibrating.
-            Nodes, nodes = self.i2o(
+            Nodes = self.i2o(
                 imgpnts=data["nodes"],
-                both=True,
-            )
-            Nodes = Nodes[:, :2]
-            nodes = nodes[:, :2]
-            centroids = np.mean(nodes[data["elements"]], axis=-2)
+            )[:, :2]
             Centroids = np.mean(Nodes[data["elements"]], axis=-2)
-            Displacements, displacements = self.i2o(
-                imgpnts=(data["nodes"] + data["results"]["displacements"]), both=True
+            Displacements = (
+                self.i2o(imgpnts=(data["nodes"] + data["results"]["displacements"]))[
+                    :, :2
+                ]
+                - Nodes
             )
-            displacements = displacements[:, :2] - nodes
-            Displacements = Displacements[:, :2] - Nodes
             # Distribute.
             for i in range(len(data["results"]["subsets"])):
                 s = data["results"]["subsets"][i]
@@ -420,16 +391,12 @@ class CalibrationBase(Object):
                     {
                         "X": Nodes[i, 0],
                         "Y": Nodes[i, 1],
-                        "x": nodes[i, 0],
-                        "y": nodes[i, 1],
                     }
                 )
                 s["results"].update(
                     {
                         "U": Displacements[i, 0],
                         "V": Displacements[i, 1],
-                        "u": displacements[i, 0],
-                        "v": displacements[i, 1],
                     }
                 )
                 s["calibrated"] = True
@@ -439,30 +406,22 @@ class CalibrationBase(Object):
                 {
                     "calibrated": True,
                     "Nodes": Nodes,
-                    "nodes": nodes,
                     "Centroids": Centroids,
-                    "centroids": centroids,
                 }
             )
             data["results"].update(
                 {
                     "Displacements": Displacements,
-                    "displacements": displacements,
                 }
             )
             # Assigning.
             if type(object) != dict:
                 object._Nodes = Nodes
-                object._nodes = nodes
                 object._Centroids = Centroids
-                object._centroids = centroids
                 object._Displacements = Displacements
-                object._displacements = displacements
-                object._element_area(space="I")
                 object._element_area(space="O")
-                object._element_strains()
-                data["results"]["results"] = object._warps
-                data["areas"] = object._areas
+                object._element_strains(space="O")
+                data["results"]["Warps"] = object._Warps
                 data["Areas"] = object._Areas
                 object._calibrated = True
             if verbose:
@@ -503,21 +462,13 @@ class CalibrationBase(Object):
             if verbose:
                 log.info("Calibrating Region...")
             # Calibrating.
-            Centres, centres = self.i2o(
-                imgpnts=data["centres"],
-                both=True,
-            )
+            Centres = self.i2o(imgpnts=data["centres"])
             shape = np.shape(np.asarray(data["nodes"]))
-            Nodes, nodes = self.i2o(
-                imgpnts=np.asarray(data["nodes"]).reshape(-1, 2),
-                both=True,
-            )
+            Nodes = self.i2o(imgpnts=np.asarray(data["nodes"]).reshape(-1, 2))
             # Storing.
             data.update(
                 {
-                    "centres": centres[:, :2],
                     "Centres": Centres[:, :2],
-                    "nodes": nodes[:, :2].reshape(shape),
                     "Nodes": Nodes[:, :2].reshape(shape),
                 }
             )

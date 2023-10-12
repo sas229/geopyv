@@ -838,11 +838,17 @@ def trace_particle(
         r"$d^2u/dy^2$ ($-$)",
         r"$d^2v/dy^2$ ($-$)",
     ]
+    if data["calibrated"] is True:
+        labels[0] = r"$u$ ($mm$)"
+        labels[1] = r"$v$ ($mm$)"
 
     fig, ax = plt.subplots(num=title)
 
     if obj_type == "Particle":
-        points = data["results"]["coordinates"].reshape(-1, 1, 2)
+        if data["calibrated"] is True:
+            points = data["plotting_coordinates"].reshape(-1, 1, 2)
+        else:
+            points = data["results"]["coordinates"].reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         values = np.diff(data["results"][quantity][:, component], axis=0)
         norm = plt.Normalize(values.min(), values.max())
@@ -872,7 +878,12 @@ def trace_particle(
             values[i] = np.diff(
                 data["particles"][i]["results"][quantity][:, component], axis=0
             )
-            points = data["particles"][i]["results"]["coordinates"].reshape(-1, 1, 2)
+            if data["calibrated"] is True:
+                points = data["particles"][i]["plotting_coordinates"].reshape(-1, 1, 2)
+            else:
+                points = data["particles"][i]["results"]["coordinates"].reshape(
+                    -1, 1, 2
+                )
             segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
         values = values.flatten()
         norm = plt.Normalize(values.min(), values.max())
@@ -888,6 +899,8 @@ def trace_particle(
         plt.imshow(image_gs, cmap="gray")
     else:
         ax.set_aspect("equal", "box")
+    if data["calibrated"] is True:
+        ax.axis("off")
 
     if colorbar is True:
         fig.colorbar(lines, label=labels[component])
@@ -1041,6 +1054,101 @@ def inspect_field(data, mesh, show, block, save):
     ax.set_axis_off()
     plt.tight_layout()
 
+    # Save
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def contour_field(
+    data,
+    mesh_index,
+    quantity,
+    component,
+    imshow,
+    colorbar,
+    ticks,
+    alpha,
+    levels,
+    axis,
+    xlim,
+    ylim,
+    show,
+    block,
+    save,
+):
+    # Plot setup.
+    title = "Contour"
+    fig, ax = plt.subplots(num=title)
+
+    points = np.zeros((len(data["particles"]), 3))
+    for i in range(len(data["particles"])):
+        points[i, :2] = data["particles"][i]["plotting_coordinates"][mesh_index]
+        points[i, 2] = data["particles"][i]["results"][quantity][0, component] + np.sum(
+            abs(
+                np.diff(
+                    data["particles"][i]["results"]["warps"][:mesh_index, component]
+                )
+            )
+        )
+
+    # Show image in background.
+    if imshow is True:
+        image = cv2.imread(data["image_0"], cv2.IMREAD_COLOR)
+        image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+        plt.imshow(image_gs, cmap="gray")
+    else:
+        ax.set_aspect("equal", "box")
+
+    # Set levels and extend.
+    extend = "neither"
+    value = points[:, 2]
+    if not isinstance(levels, type(None)):
+        if np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
+            extend = "both"
+        elif np.max(value) > np.max(levels):
+            extend = "max"
+        elif np.min(value) < np.min(levels):
+            extend = "min"
+    extend = "both"
+
+    contours = ax.tricontourf(
+        points[:, 0],
+        points[:, 1],
+        points[:, 2],
+        alpha=alpha,
+        levels=levels,
+        extend=extend,
+    )
+
+    if colorbar is True:
+        if quantity == "iterations":
+            label = "Iterations (-)"
+        elif quantity == "C_ZNCC":
+            label = r"$C_{ZNCC}$ (-)"
+        elif quantity == "norm":
+            label = r"$\Delta$ Norm (-)"
+        else:
+            label = quantity
+        fig.colorbar(contours, label=label, ticks=ticks)
+
+    # Axis control.
+    if axis is False:
+        ax.set_axis_off()
+
+    # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
     # Save
     if save is not None:
         plt.savefig(save, dpi=600)

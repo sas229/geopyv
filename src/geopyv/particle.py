@@ -12,6 +12,7 @@ import re
 from alive_progress import alive_bar
 import math
 import geomat
+import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -297,7 +298,7 @@ class Particle(ParticleBase):
         stress=np.zeros(6),
         volume=1.0,
         track=True,
-        space="O"
+        field=False,
     ):
         """Initialisation of geopyv particle object.
 
@@ -314,6 +315,10 @@ class Particle(ParticleBase):
         track : bool
             Boolean for Lagrangian (False) or Eulerian (True) specification.
             Defaults to False.
+
+        Note ::
+        If the series supplied has been calibrated, it is assumed
+        that the coordinate provided is in object space. Else, in image space.
         """
 
         # Set initialised boolean.
@@ -355,33 +360,19 @@ class Particle(ParticleBase):
         self._report(gp.check._check_range(volume, "volume", 0.0), "ValueError")
         self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
 
-        if series.data["type"] == "Sequence":
-            self._series_type = "Sequence"
-            if "file_settings" in series.data:
-                if series.data["file_settings"]["save_by_reference"]:
-                    mesh_no = np.shape(series.data["meshes"])[0]
-                    self._series = np.empty(mesh_no, dtype=object)
-                    with alive_bar(
-                        mesh_no, dual_line=True, bar="blocks", title="Loading meshes..."
-                    ) as bar:
-                        for i in range(mesh_no):
-                            self._series[i] = gp.io.load(
-                                filename=series.data["file_settings"]["mesh_dir"]
-                                + series.data["meshes"][i],
-                                verbose=False,
-                            ).data
-                            bar()
-                else:
-                    self._series = series.data["meshes"]
-            else:
-                self._series = series.data["meshes"]
+        self._series = series
+        if self._series.data["type"] == "Sequence":
+            self._inc_no = len(self._series.data["meshes"]) + 1
+            self._mesh_order = self._series.data["mesh_settings"]["mesh_order"]
         else:
-            self._series_type = "Mesh"
-            self._series = np.asarray([series.data])
-        self._mesh_order = self._series[0]["mesh_order"]
+            self._inc_no = 2
+            self._mesh_order = self._series.data["mesh_order"]
         self._track = track
-        if series.data["calibrated"] is not True:
-            space = "I"
+        self._field = field
+        self._update_mesh(0)
+        if self._field is False:
+            self._rm = self._cm
+
         if self._report(
             gp.check._check_type(coordinate, "coordinate", [np.ndarray]), "Warning"
         ):
@@ -399,59 +390,105 @@ class Particle(ParticleBase):
             f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
             coordinate = selector.select(f_img, gp.templates.Circle(20))
 
-        if self._series[0]["mask"][int(coordinate[1]), int(coordinate[0])] == 0:
-            log.warning(
-                "`coordinate` keyword argument value out of boundary.\n"
-                "Select `coordinate`..."
-            )
-            selector = gp.gui.selectors.coordinate.CoordinateSelector()
-            f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
-            coordinate = selector.select(f_img, gp.templates.Circle(20))
-
-        self._coordinates = np.zeros((len(self._series) + 1, 2))
-        self._warps = np.zeros((len(self._series) + 1, 6 * self._mesh_order))
-        self._volumes = np.zeros(len(self._series) + 1)
-        self._stresses = np.zeros((len(self._series) + 1, 6))
-        self._works = np.zeros(len(self._series) + 1)
-        self._strains = np.zeros((len(self._series) + 1, 6))
-
-        self._coordinates[0] = coordinate
-        self._warps[0] = warp[: np.shape(self._warps)[1]]
-        self._volumes[0] = volume
-        self._stresses[0] = stress
+        # Improve by checking boundary itself so image and object space are covered.
+        # if series.data["calibrated"] is False:
+        #     if self._series[0]["mask"][int(coordinate[1]), int(coordinate[0])] == 0:
+        #         log.warning(
+        #             "`coordinate` keyword argument value out of boundary.\n"
+        #             "Select `coordinate`..."
+        #         )
+        #         selector = gp.gui.selectors.coordinate.CoordinateSelector()
+        #         f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
+        #         coordinate = selector.select(f_img, gp.templates.Circle(20))
 
         self._reference_index = 0
         self.solved = False
         self._calibrated = series.data["calibrated"]
-        self._space = space
+        self._reference_update_register = []
+        self._incs = np.zeros((self._inc_no, 6 * self._mesh_order))
+        self._coordinates = np.zeros((self._inc_no, 2))
+        self._warps = np.zeros((self._inc_no, 6 * self._mesh_order))
+        self._volumes = np.zeros(self._inc_no)
+        self._stresses = np.zeros((self._inc_no, 6))
+        self._works = np.zeros(self._inc_no)
+        self._strains = np.zeros((self._inc_no, 6))
+
+        self._warps[0] = warp[: np.shape(self._warps)[1]]
+        self._volumes[0] = volume
+        self._stresses[0] = stress
+        self._coordinates[0] = coordinate
+        if self._calibrated is True:
+            self._nref = "Nodes"
+            self._cref = "Centroids"
+            if self._series.data["type"] == "Sequence":
+                self._plotting_coordinates = np.zeros((self._inc_no, 2))
+            else:
+                self._plotting_coordinates = np.zeros((2, 2))
+            self._plotting_coordinates[0] = self._coord_map()
+        else:
+            self._nref = "nodes"
+            self._cref = "centroids"
 
         self._initialised = True
         self.data = {
             "type": "Particle",
             "solved": self.solved,
             "calibrated": self._calibrated,
-            "space": self._space,
-            "series_type": self._series_type,
+            # "series_type": self._series_type,
+            "image_0": self._cm.data["images"]["f_img"],
             "track": self._track,
-            # "coordinate": self._coordinates[0],
-            # "warp": self._warps[0],
-            # "volume": self._volumes[0],
-            "image_0": self._series[0]["images"]["f_img"],
         }
+        if self._field:
+            del self._cm
+
+    def _update_mesh(self, index):
+        try:
+            del self._cm
+            ("Success")
+        except Exception:
+            pass
+        if self._series.data["type"] == "Sequence":
+            if self._series.data["file_settings"]["save_by_reference"] is True:
+                self._cm = self._series._load_mesh(index, obj=True, verbose=False)
+            else:
+                self._cm = self._series.data["meshes"][index]
+        else:
+            self._cm = self._series
+
+    def _coord_map(self):
+        """
+
+        Private method to map from image to object space (or vice versa)
+        from the user-given coordinate input. Note, this applies quadratic mapping
+        for a 2nd order mesh and linear mapping for a 1st order mesh.
+
+        """
+
+        tri_idx = self._element_locator()
+
+        x = self._cm.data["nodes"][self._cm.data["elements"][tri_idx]]
+        X = self._cm.data["Nodes"][self._cm.data["elements"][tri_idx]]
+        zeta, eta, theta, A = self._local_coordinates(X)
+        N, dN, d2N = self._shape_function(zeta, eta, theta)
+        return N @ x
 
     def solve(
-        self, *, model=None, state=None, parameters=None
+        self,
+        *,
+        model=None,
+        state=None,
+        parameters=None,
     ):  # model, state, parameters):
         """
 
         Method to solve for the particle.
 
         """
-        self.solved += self._strain_path()
+
+        # Solving.
+        if self._field is False:
+            self.solved += self._strain_path_full()
         if model:
-            self._ps = np.zeros((len(self._series) + 1))
-            self._qs = np.zeros((len(self._series) + 1))
-            self._states = np.zeros((len(self._series) + 1, len(state)))
             self.solved += self._stress_path(model, state, parameters)
             self._results = {
                 "coordinates": self._coordinates,
@@ -469,6 +506,8 @@ class Particle(ParticleBase):
                 "warps": self._warps,
                 "volumes": self._volumes,
             }
+        if self._calibrated is True:
+            self.data["plotting_coordinates"] = self._plotting_coordinates
         self.solved = bool(self.solved)
         self.data.update(
             {
@@ -482,7 +521,7 @@ class Particle(ParticleBase):
 
         return self.solved
 
-    def _element_locator(self, m):
+    def _element_locator(self):
         """
 
         Private method to identify the current element index
@@ -494,13 +533,9 @@ class Particle(ParticleBase):
             Series index.
 
         """
-        elements = self._series[m]["elements"]
-        if self._space == "I":
-            nodes = self._series[m]["nodes"]
-            centroids = self._series[m]["centroids"]
-        else:
-            nodes = self._series[m]["Nodes"]
-            centroids = self._series[m]["Centroids"]
+        elements = self._cm.data["elements"]
+        nodes = self._cm.data[self._nref]
+        centroids = self._cm.data[self._cref]
         flag = False
         diff = centroids - self._coordinates[self._reference_index]
         dist = np.einsum("ij,ij->i", diff, diff)
@@ -512,34 +547,26 @@ class Particle(ParticleBase):
                 break
         if flag is False:
             log.error(
-                "Particle {particle} is outside of boundary {boundary}.\n"
+                "Particle {particle} is outside of boundary:\n{boundary}.\n"
                 " Check for convex boundary update.".format(
                     particle=self._coordinates[self._reference_index],
-                    boundary=nodes[self._series[m]["boundary"]],
+                    boundary=self._cm.data[self._nref][self._cm.data["boundary"]],
                 )
             )
-            # fig, ax = plt.subplots()
-            # ax.plot(
-            #     self._series[m]["nodes"][self._series[m]["boundary"]][
-            #         [0, 1, 2, 3, 0], 0
-            #     ],
-            #     self._series[m]["nodes"][self._series[m]["boundary"]][
-            #         [0, 1, 2, 3, 0], 1
-            #     ],
-            # )
-            # ax.plot(
-            #     self._series[m]["nodes"][self._series[m]["exclusions"][0]][:, 0],
-            #     self._series[m]["nodes"][self._series[m]["exclusions"][0]][:, 1],
-            # )
-            # ax.plot(
-            #     self._series[0]["nodes"][self._series[0]["exclusions"][0]][:, 0],
-            #     self._series[0]["nodes"][self._series[0]["exclusions"][0]][:, 1],
-            # )
-            # ax.scatter(
-            #     self._coordinates[self._reference_index][0],
-            #     self._coordinates[self._reference_index][1],
-            # )
-            # plt.show()
+            fig, ax = plt.subplots()
+            ax.plot(
+                self._cm.data["nodes"][self._cm.data["boundary"]][[0, 1, 2, 3, 0], 0],
+                self._cm.data["nodes"][self._cm.data["boundary"]][[0, 1, 2, 3, 0], 1],
+            )
+            ax.plot(
+                self._cm.data["nodes"][self._cm.data["exclusions"][0]][:, 0],
+                self._cm.data["nodes"][self._cm.data["exclusions"][0]][:, 1],
+            )
+            ax.plot(
+                self._plotting_coordinates[:, 0],
+                self._plotting_coordinates[:, 1],
+            )
+            plt.show()
             raise ValueError("Particle outside of boundary.")
 
         return index
@@ -607,7 +634,7 @@ class Particle(ParticleBase):
             N = np.asarray([zeta, eta, theta])
             dN = np.asarray([[1, 0, -1], [0, 1, -1]])
             d2N = None
-        elif self._mesh_order == 2:
+        else:
             N = np.asarray(
                 [
                     zeta * (2 * zeta - 1),
@@ -663,22 +690,22 @@ class Particle(ParticleBase):
         """
 
         self._warp_inc = np.zeros(6 * self._mesh_order)
-        if self._space == "I":
-            x = self._series[m]["nodes"][self._series[m]["elements"][tri_idx]]
-            u = self._series[m]["results"]["displacements"][
-                self._series[m]["elements"][tri_idx]
-            ]
-        else:
-            x = self._series[m]["Nodes"][self._series[m]["elements"][tri_idx]]
-            u = self._series[m]["results"]["Displacements"][
-                self._series[m]["elements"][tri_idx]
-            ]
+        x = self._cm.data[self._nref][self._cm.data["elements"][tri_idx]]
+        u = self._cm.data["results"]["Displacements"][
+            self._cm.data["elements"][tri_idx]
+        ]
 
         # Get local coordinates.
         zeta, eta, theta, A = self._local_coordinates(x)
 
         # Shape function and derivatives.
         N, dN, d2N = self._shape_function(zeta, eta, theta)
+
+        # Plotting coordinates.
+        if self._calibrated is True:
+            self._plotting_coordinates[m + 1] = (
+                N @ self._cm.data["nodes"][self._cm.data["elements"][tri_idx]]
+            )
 
         # Displacements
         self._warp_inc[:2] = N @ u
@@ -716,52 +743,113 @@ class Particle(ParticleBase):
         if int(
             re.findall(
                 r"\d+",
-                self._series[self._reference_index]["images"]["f_img"],
+                self._rm.data["images"]["f_img"],
             )[-1]
-        ) != int(re.findall(r"\d+", self._series[m]["images"]["f_img"])[-1]):
+        ) != int(re.findall(r"\d+", self._cm.data["images"]["f_img"])[-1]):
             self._reference_index = m
             self._reference_update_register.append(m)
+            del self._rm
+            self._rm = self._series._load_mesh(m, obj=True, verbose=False)
 
-    def _strain_path(self):
-        self._reference_update_register = []
-        self._incs = np.zeros((len(self._series) + 1, 6 * self._mesh_order))
-        for m in range(np.shape(self._series)[0]):
-            self._check_update(m)
-            tri_idx = self._element_locator(m)
-            self._warp_increment(m, tri_idx)
-            self._incs[m + 1] = self._warp_inc
-            self._coordinates[m + 1] = self._coordinates[
-                self._reference_index
-            ] + self._warp_inc[:2] * int(self._track)
-            self._warps[m + 1, :2] = (
-                self._warps[self._reference_index, :2] + self._warp_inc[:2]
-            )
-            self._warps[m + 1, 2] = self._warps[self._reference_index, 2] + np.log(
-                1 + self._warp_inc[2]
-            )
-            self._warps[m + 1, 3] = (
-                self._warps[self._reference_index, 3] + self._warp_inc[3]
-            )
-            self._warps[m + 1, 4] = (
-                self._warps[self._reference_index, 4] + self._warp_inc[4]
-            )
-            self._warps[m + 1, 5] = self._warps[self._reference_index, 5] + np.log(
-                1 + self._warp_inc[5]
-            )
-            self._warps[m + 1, 6:] = (
-                self._warps[self._reference_index, 6:] + self._warp_inc[6:]
-            )
-            self._volumes[m + 1] = self._volumes[self._reference_index] * (
-                (1 + self._warp_inc[2]) * (1 + self._warp_inc[5])
-                - self._warp_inc[3] * self._warp_inc[4]
-            )
+    def _strain_path_full(self):
+        with alive_bar(
+            self._inc_no - 1, dual_line=True, bar="blocks", title="Solving particle ..."
+        ) as bar:
+            for m in range(self._inc_no - 1):
+                self._update_mesh(m)
+                self._check_update(m)
+                tri_idx = self._element_locator()
+                self._warp_increment(m, tri_idx)
+                self._incs[m + 1] = self._warp_inc
+                self._coordinates[m + 1] = self._coordinates[
+                    self._reference_index
+                ] + self._warp_inc[:2] * int(self._track)
+                self._warps[m + 1, :2] = (
+                    self._warps[self._reference_index, :2] + self._warp_inc[:2]
+                )
+                self._warps[m + 1, 2] = self._warps[self._reference_index, 2] + np.log(
+                    1 + self._warp_inc[2]
+                )
+                self._warps[m + 1, 3] = (
+                    self._warps[self._reference_index, 3] + self._warp_inc[3]
+                )
+                self._warps[m + 1, 4] = (
+                    self._warps[self._reference_index, 4] + self._warp_inc[4]
+                )
+                self._warps[m + 1, 5] = self._warps[self._reference_index, 5] + np.log(
+                    1 + self._warp_inc[5]
+                )
+                self._warps[m + 1, 6:] = (
+                    self._warps[self._reference_index, 6:] + self._warp_inc[6:]
+                )
+                self._volumes[m + 1] = self._volumes[self._reference_index] * (
+                    (1 + self._warp_inc[2]) * (1 + self._warp_inc[5])
+                    - self._warp_inc[3] * self._warp_inc[4]
+                )
+                bar()
 
         self._strain_def()
         return True
 
+    def _strain_path_inc(self, m, cm, rm):
+        self._update_cm_rm(m, cm, rm)
+        tri_idx = self._element_locator()
+        self._warp_increment(m, tri_idx)
+        self._incs[m + 1] = self._warp_inc
+        self._coordinates[m + 1] = self._coordinates[
+            self._reference_index
+        ] + self._warp_inc[:2] * int(self._track)
+        self._warps[m + 1, :2] = (
+            self._warps[self._reference_index, :2] + self._warp_inc[:2]
+        )
+        self._warps[m + 1, 2] = self._warps[self._reference_index, 2] + np.log(
+            1 + self._warp_inc[2]
+        )
+        self._warps[m + 1, 3] = (
+            self._warps[self._reference_index, 3] + self._warp_inc[3]
+        )
+        self._warps[m + 1, 4] = (
+            self._warps[self._reference_index, 4] + self._warp_inc[4]
+        )
+        self._warps[m + 1, 5] = self._warps[self._reference_index, 5] + np.log(
+            1 + self._warp_inc[5]
+        )
+        self._warps[m + 1, 6:] = (
+            self._warps[self._reference_index, 6:] + self._warp_inc[6:]
+        )
+        self._volumes[m + 1] = self._volumes[self._reference_index] * (
+            (1 + self._warp_inc[2]) * (1 + self._warp_inc[5])
+            - self._warp_inc[3] * self._warp_inc[4]
+        )
+
+        self._strain_def()
+        return True
+
+    def _update_cm_rm(self, m, cm, rm):
+        try:
+            if self._rm != rm:
+                self._reference_index = m
+                self._reference_update_register.append(m)
+            del self._cm
+            del self._rm
+        except Exception:
+            pass
+        self._cm = cm
+        self._rm = rm
+        # if int(
+        #     re.findall(
+        #         r"\d+",
+        #         self._rm.data["images"]["f_img"],
+        #     )[-1]
+        # ) != int(re.findall(r"\d+", self._cm.data["images"]["f_img"])[-1]):
+        #     self._reference_index = m
+        #     self._reference_update_register.append(m)
+
     def _stress_path(self, model, state, parameters):
         """Under construction"""
-
+        self._ps = np.zeros(self._inc_no)
+        self._qs = np.zeros(self._inc_no)
+        self._states = np.zeros((self._inc_no, len(state)))
         if model == "LinearElastic":
             # Put input checks here!
             model = geomat.models.LinearElastic(

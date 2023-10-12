@@ -10,6 +10,7 @@ from geopyv.object import Object
 import gmsh
 from scipy.optimize import minimize_scalar
 from alive_progress import alive_bar
+import re
 
 log = logging.getLogger(__name__)
 
@@ -201,6 +202,150 @@ class FieldBase(Object):
         )
         return fig, ax
 
+    def contour(
+        self,
+        *,
+        quantity="warps",
+        mesh_index=None,
+        component=0,
+        imshow=True,
+        colorbar=True,
+        ticks=None,
+        alpha=0.75,
+        levels=None,
+        axis=True,
+        xlim=None,
+        ylim=None,
+        show=True,
+        block=True,
+        save=None,
+    ):
+        """
+        Method to plot an incremental quantity along the particle position path.
+
+        Parameters
+        ----------
+        quantity : str, optional
+            Specifier for which metric to plot along the particle path.
+        component : int, optional
+            Specifier for which component of the metric to plot along the particle path.
+        imshow : bool, optional
+            Control whether the reference image is plotted.
+            Defaults to True.
+        colorbar : bool, optional
+            Control whether the colour bar is plotted.
+            Defaults to True.
+        ticks : list, optional
+            Overwrite default colourbar ticks.
+            Defaults to None.
+        alpha : float, optional
+            Control contour opacity. Must be between 0.0-1.0.
+            Defaults to 0.75.
+        axis : bool, optional
+            Control whether the axes are plotted.
+            Defaults to True.
+        xlim : array-like, optional
+            Set the plot x-limits (lower_limit,upper_limit).
+            Defaults to None.
+        ylim : array-like, optional
+            Set the plot y-limits (lower_limit,upper_limit).
+            Defaults to None.
+        show : bool, optional
+            Control whether the plot is displayed.
+            Defaults to True.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+            Defaults to False.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
+        """
+
+        # Check if solved.
+        if self.data["solved"] is not True:
+            log.error(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+            raise ValueError(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+        # Check input.
+        self._report(gp.check._check_type(quantity, "quantity", [str]), "TypeError")
+        if quantity:
+            self._report(
+                gp.check._check_value(
+                    quantity,
+                    "quantity",
+                    [
+                        "coordinates",
+                        "warps",
+                        "volumes",
+                        "stresses",
+                    ],
+                ),
+                "ValueError",
+            )
+        self._report(gp.check._check_type(component, "component", [int]), "TypeError")
+        self._report(
+            gp.check._check_index(
+                component,
+                "component",
+                1,
+                self.data["particles"][0]["results"][quantity],
+            ),
+            "IndexError",
+        )
+        self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
+        self._report(gp.check._check_type(colorbar, "colorbar", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(ticks, "ticks", types), "TypeError")
+        check = gp.check._check_type(alpha, "alpha", [float])
+        if check:
+            try:
+                alpha = float(alpha)
+                self._report(gp.check._conversion(alpha, "alpha", float), "Warning")
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
+        types = [int, tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(levels, "levels", types), "TypeError")
+        self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
+        if xlim is not None:
+            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
+            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
+        if ylim is not None:
+            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
+            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
+        if mesh_index is None:
+            mesh_index = self.data["number_images"] - 1
+        log.info("Contour field...")
+        data = self.data
+        fig, ax = gp.plots.contour_field(
+            data=data,
+            mesh_index=mesh_index,
+            quantity=quantity,
+            component=component,
+            imshow=imshow,
+            colorbar=True,
+            ticks=ticks,
+            alpha=alpha,
+            levels=levels,
+            axis=axis,
+            xlim=xlim,
+            ylim=ylim,
+            show=show,
+            block=block,
+            save=save,
+        )
+        return fig, ax
+
     def history(
         self,
         particle_index,
@@ -329,7 +474,6 @@ class Field(FieldBase):
         coordinates=None,
         volumes=None,
         stresses=np.zeros(6),
-        space="I",
     ):
         """
         Initialisation of geopyv field object.
@@ -491,66 +635,43 @@ class Field(FieldBase):
         self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
 
         # Store.
-        if series.data["type"] == "Sequence":
-            self._series_type = "Sequence"
-            if "file_settings" in series.data:
-                if series.data["file_settings"]["save_by_reference"]:
-                    mesh_no = np.shape(series.data["meshes"])[0]
-                    _meshes = np.empty(mesh_no, dtype=object)
-                    with alive_bar(
-                        mesh_no, dual_line=True, bar="blocks", title="Loading meshes..."
-                    ) as bar:
-                        for i in range(mesh_no):
-                            _meshes[i] = gp.io.load(
-                                filename=series.data["file_settings"]["mesh_dir"]
-                                + series.data["meshes"][i],
-                                verbose=False,
-                            ).data
-                            bar()
-                else:
-                    _meshes = series.data["meshes"]
-            else:
-                _meshes = series.data["meshes"]
-            series.data["meshes"] = _meshes
-            series.data["file_settings"]["save_by_reference"] = False
-            mesh_0 = series.data["meshes"][0]
-            self._number_images = np.shape(series.data["meshes"])[0] + 1
-        else:
-            self._series_type = "Mesh"
-            mesh_0 = series.data
-            self._number_images = 2
-        self._image_0 = mesh_0["images"]["f_img"]
         self._series = series
+        self._update_cm(0)
+        self._image_0 = self._cm.data["images"]["f_img"]
         self._track = track
         self.solved = False
         self._unsolvable = False
-        self._space = space
         self._calibrated = series.data["calibrated"]
+        self._reference_update_register = []
+        if self._series.data["type"] == "Sequence":
+            self._number_images = len(self._series.data["meshes"]) + 1
+        else:
+            self._number_images = 2
 
         if coordinates is not None:
             _auto_distribute = False
-            if self._space == "I":
-                image = gp.image.Image(self._image_0)
-                for coord in coordinates:
-                    if (
-                        coord[0] > np.shape(image.image_gs)[1]
-                        or coord[0] < 0
-                        or coord[1] > np.shape(image.image_gs)[0]
-                        or coord[1] < 0
-                    ):
-                        log.error(
-                            (
-                                "User-specified coordinate {value} "
-                                "outside image boundary."
-                            ).format(value=coord)
-                        )
-                        raise ValueError(
-                            (
-                                "User-specified coordinate {value} "
-                                "outside image boundary."
-                            ).format(value=coord)
-                        )
-                del image
+            # Develop boundary chekc that works for both spaces.
+            # image = gp.image.Image(self._image_0)
+            # for coord in coordinates:
+            #     if (
+            #         coord[0] > np.shape(image.image_gs)[1]
+            #         or coord[0] < 0
+            #         or coord[1] > np.shape(image.image_gs)[0]
+            #         or coord[1] < 0
+            #     ):
+            #         log.error(
+            #             (
+            #                 "User-specified coordinate {value} "
+            #                 "outside image boundary."
+            #             ).format(value=coord)
+            #         )
+            #         raise ValueError(
+            #             (
+            #                 "User-specified coordinate {value} "
+            #                 "outside image boundary."
+            #             ).format(value=coord)
+            #         )
+            # del image
             if volumes is None:
                 volumes = np.ones(np.shape(coordinates)[0])
             self._target_particles = np.shape(coordinates)[0]
@@ -561,16 +682,15 @@ class Field(FieldBase):
         if _auto_distribute is True:
             if boundary_obj is not None:
                 self._boundary_obj = boundary_obj
-                self._exclusion_objs = exclusion_objs
-            elif series.data["type"] == "Sequence":
-                self._boundary_obj = series.data["mesh_settings"]["boundary_obj"]
-                self._exclusion_objs = series.data["mesh_settings"]["exclusion_objs"]
-
             else:
-                self._boundary_obj = mesh_0["boundary_obj"]
-                self._exclusion_objs = mesh_0["exclusion_objs"]
-            self._size_lower_bound = mesh_0["size_lower_bound"]
-            self._size_upper_bound = mesh_0["size_upper_bound"]
+                self._boundary_obj = self._cm["boundary_obj"]
+            if self._exclusion_objs is not None:
+                self._exclusion_objs = exclusion_objs
+            else:
+                self._exclusion_objs = self._cm["exclusion_objs"]
+
+            self._size_lower_bound = 1  # mesh_0["size_lower_bound"]
+            self._size_upper_bound = 400  # mesh_0["size_upper_bound"]
             (
                 self._borders,
                 self._segments,
@@ -618,8 +738,7 @@ class Field(FieldBase):
             "type": "Field",
             "solved": self.solved,
             "calibrated": self._calibrated,
-            "space": self._space,
-            "series_type": self._series_type,
+            # "series_type": self._series_type,
             "number_images": self._number_images,
             "track": self._track,
             "target_particles": self._target_particles,
@@ -680,6 +799,41 @@ class Field(FieldBase):
         M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
         self._volumes = abs(0.5 * np.linalg.det(M))
 
+    def _update_cm(self, index):
+        try:
+            del self._cm
+            ("Success")
+        except Exception:
+            pass
+        if self._series.data["type"] == "Sequence":
+            if self._series.data["file_settings"]["save_by_reference"] is True:
+                self._cm = self._series._load_mesh(index, obj=True, verbose=False)
+            else:
+                self._cm = self._series.data["meshes"][index]
+        else:
+            self._cm = self._series
+
+    def _create_rm(self):
+        if self._series.data["type"] == "Sequence":
+            if self._series.data["file_settings"]["save_by_reference"] is True:
+                self._rm = self._series._load_mesh(0, obj=True, verbose=False)
+            else:
+                self._rm = self._series.data["meshes"][0]
+        else:
+            self._rm = self._series
+
+    def _check_update(self, m):
+        if int(
+            re.findall(
+                r"\d+",
+                self._rm.data["images"]["f_img"],
+            )[-1]
+        ) != int(re.findall(r"\d+", self._cm.data["images"]["f_img"])[-1]):
+            self._reference_index = m
+            self._reference_update_register.append(m)
+            del self._rm
+            self._rm = self._series._load_mesh(m, obj=True, verbose=False)
+
     def solve(
         self,
         *,
@@ -698,29 +852,73 @@ class Field(FieldBase):
         particle_no = np.shape(self._coordinates)[0]
         self._particles = np.empty(particle_no, dtype=dict)
         self._vol_totals = np.zeros(self.data["number_images"])
+        self._create_rm()
         with alive_bar(
-            particle_no, dual_line=True, bar="blocks", title="Solving particles..."
+            particle_no,
+            dual_line=True,
+            bar="blocks",
+            title="Instantiating particles ...",
         ) as bar:
             for i in range(particle_no):
-                particle = gp.particle.Particle(
+                self._particles[i] = gp.particle.Particle(
                     series=self._series,
                     coordinate=self._coordinates[i],
                     volume=self._volumes[i],
                     stress=self._stresses[i],
                     track=self._track,
-                    space=self._space,
+                    field=True,
                 )
-                _particle_solved = particle.solve(
-                    model=model, state=state, parameters=parameters
-                )
-                if _particle_solved is False:
+                bar()
+        with alive_bar(
+            self.data["number_images"] - 1,
+            dual_line=True,
+            bar="blocks",
+            title="Solving particles for mesh...",
+        ) as bar:
+            for i in range(self.data["number_images"] - 1):
+                self._update_cm(i)
+                self._check_update(i)
+                for j in range(particle_no):
+                    self.solved += self._particles[j]._strain_path_inc(
+                        i, self._cm, self._rm
+                    )
+                    if i == self.data["number_images"] - 2:
+                        self.solved += self._particles[j].solve(
+                            model=model, state=state, parameters=parameters
+                        )
+                if bool(self.solved) is False:
                     self._unsolvable = True
                     self.data["unsolvable"] = self._unsolvable
                     return self.solved
-                self._particles[i] = particle.data
-                self._vol_totals += self._particles[i]["results"]["volumes"]
-                del particle
                 bar()
+
+        for i in range(particle_no):
+            self._particles[i] = self._particles[i].data
+            self._vol_totals += self._particles[i]["results"]["volumes"]
+
+        # with alive_bar(
+        #     particle_no, dual_line=True, bar="blocks", title="Solving particles..."
+        # ) as bar:
+        #     for i in range(particle_no):
+        #         particle = gp.particle.Particle(
+        #             series=self._series,
+        #             coordinate=self._coordinates[i],
+        #             volume=self._volumes[i],
+        #             stress=self._stresses[i],
+        #             track=self._track,
+        #             field = True,
+        #         )
+        #         _particle_solved = particle.solve(
+        #             model=model, state=state, parameters=parameters
+        #         )
+        #         if _particle_solved is False:
+        #             self._unsolvable = True
+        #             self.data["unsolvable"] = self._unsolvable
+        #             return self.solved
+        #         self._particles[i] = particle.data
+        #         self._vol_totals += self._particles[i]["results"]["volumes"]
+        #         del particle
+        #         bar()
 
         if model is not None:
             self._works = np.zeros(self.data["number_images"])
@@ -728,7 +926,13 @@ class Field(FieldBase):
                 self._works += self._particles[i]["results"]["works"]
             self.data.update({"works": self._works})
 
-        self.data.update({"particles": self._particles, "volumes": self._vol_totals})
+        self.data.update(
+            {
+                "particles": self._particles,
+                "volumes": self._vol_totals,
+                "reference_update_register": self._reference_update_register,
+            }
+        )
         self.solved = True
         self.data["solved"] = self.solved
         return self.solved

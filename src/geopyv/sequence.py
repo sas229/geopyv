@@ -1234,7 +1234,7 @@ class Sequence(SequenceBase):
 
     def _deformation_preconditioning(self, mesh, _seed_coord_t):
         if self._guide:
-            seed = gp.particle.Particle(series=mesh, coordinate_0=_seed_coord_t)
+            seed = gp.particle.Particle(series=mesh, coordinate=_seed_coord_t)
             seed.solve()
             _seed_displacement = seed.data["results"]["warps"][1, :2]
             self._seed_warp[

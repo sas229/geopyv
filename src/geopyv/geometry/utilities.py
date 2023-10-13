@@ -83,3 +83,35 @@ def PolyArea(pts):
     x = pts[:, 0]
     y = pts[:, 1]
     return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+
+
+def polysect(n):
+    """
+    Function which iterates through the segments of a polygon checking for
+    intersection. Assumes input is clockwise/anti-clockwise ordered.
+
+    Returns
+    -------
+    True : Two (or more) segments intersect.
+    False: No intersection (spare that at nodes).
+    """
+    co = np.asarray(
+        [[0, 2], [0, 3], [0, 4], [1, 3], [1, 4], [1, 5], [2, 4], [2, 5], [3, 5]]
+    )
+    for i in range(len(co)):
+        if intersect(
+            n[co[i, 0] % 6],
+            n[(co[i, 0] + 1) % 6],
+            n[co[i, 1] % 6],
+            n[(co[i, 1] + 1) % 6],
+        ):
+            return co[i]
+    return False
+
+
+def ccw(A, B, C):
+    return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+
+
+def intersect(A, B, C, D):
+    return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)

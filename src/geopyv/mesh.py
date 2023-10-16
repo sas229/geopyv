@@ -6,7 +6,6 @@ Mesh module for geopyv.
 import logging
 import numpy as np
 import geopyv as gp
-import scipy as sp
 from geopyv.object import Object
 import gmsh
 from copy import deepcopy
@@ -1742,11 +1741,11 @@ class Mesh(MeshBase):
         # Corrections, calculations and checks.
         if self._correction:
             self._corrections()
-        # self._compatibility()
-        if self._unsolvable and not (self._status == 3 and self._override):
-            return
         self._element_area()
         self._element_strains()
+        self._compatibility()
+        if self._unsolvable and not (self._status == 3 and self._override):
+            return
         if any(self._subset_solved != -1):
             self._unsolvable = True
             self._status = 5
@@ -1801,51 +1800,19 @@ class Mesh(MeshBase):
         nowhere exceeds the displacement bounds of neighbouring subsets).
 
         """
-        for i in range(np.shape(self._subsets)[0]):
-            if i not in self._edges:
-                neighbours = self._connectivity(i, full=True)
-                if len(neighbours) > 2:
-                    hull = sp.spatial.Delaunay(
-                        self._nodes[neighbours] + self._displacements[neighbours]
-                    )
-                    if hull.find_simplex(self._nodes[i] + self._displacements[i]) < 0:
-                        fixed = self._compatability_correction(i, neighbours, hull)
-                        if fixed is not True:
-                            self._unsolvable = True
-                            self._status = 6
+        for i in range(len(self._elements)):
+            if self._warps[i, 2] < -1 or self._warps[i, 5] < -1:
+                self._unsolvable = True
+                self._status = 6
+                break
 
-    def _compatability_correction(self, idx, neighbours, hull):
-        """
-
-        Private method to correct subset displacement in the case of incompatibility.
-
-        """
-
-        subset = gp.subset.Subset(
-            f_coord=self._nodes[idx],
-            f_img=self._f_img,
-            g_img=self._g_img,
-            template=self._subsets[idx]._template,
-        )
-        warp = np.mean(
-            self._p[neighbours[self._C_ZNCC[neighbours] > self._tolerance]],
-            axis=0,
-        )
-        subset.solve(
-            max_norm=self._max_norm,
-            max_iterations=self._max_iterations,
-            warp_0=warp,
-            order=self._subset_order,
-            method=self._method,
-            tolerance=self._seed_tolerance,
-        )
-        coord = self._nodes[idx] + subset._p[:2].flatten()
-        if hull.find_simplex(coord) >= 0 and subset.solved:
-            self._subsets[idx] = subset
-            self._store_variables(idx=idx, flag=-1)
-            return True
-        else:
-            return False
+            if self._mesh_order == 2:
+                if gp.geometry.utilities.polysect(
+                    self._nodes[self._elements[i]][[0, 3, 1, 4, 2, 5]]
+                ):
+                    self._unsolvable = True
+                    self._status = 6
+                    break
 
     def _corrections(self):
         """

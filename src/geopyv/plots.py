@@ -1091,13 +1091,7 @@ def contour_field(
     points = np.zeros((len(data["particles"]), 3))
     for i in range(len(data["particles"])):
         points[i, :2] = data["particles"][i]["plotting_coordinates"][mesh_index]
-        points[i, 2] = data["particles"][i]["results"][quantity][0, component] + np.sum(
-            abs(
-                np.diff(
-                    data["particles"][i]["results"]["warps"][:mesh_index, component]
-                )
-            )
-        )
+        points[i, 2] = data["particles"][i]["results"][quantity][mesh_index, component]
 
     # Show image in background.
     if imshow is True:

@@ -11,8 +11,12 @@ from geopyv.object import Object
 import re
 from alive_progress import alive_bar
 import math
-import geomat
+
+# from geomat.abstract import Elastoplastic
+# from geomat.utilities import Derivatives
+from geomat.models import LinearElastic, MCC, SMCC  # , C2MC, EMC
 import matplotlib.pyplot as plt
+import traceback
 
 log = logging.getLogger(__name__)
 
@@ -363,13 +367,12 @@ class Particle(ParticleBase):
         self._series = series
         if self._series.data["type"] == "Sequence":
             self._inc_no = len(self._series.data["meshes"]) + 1
-            self._mesh_order = self._series.data["mesh_settings"]["mesh_order"]
         else:
             self._inc_no = 2
-            self._mesh_order = self._series.data["mesh_order"]
         self._track = track
         self._field = field
         self._update_mesh(0)
+        self._mesh_order = self._cm.data["mesh_order"]
         if self._field is False:
             self._rm = self._cm
 
@@ -420,6 +423,7 @@ class Particle(ParticleBase):
         if self._calibrated is True:
             self._nref = "Nodes"
             self._cref = "Centroids"
+            self._dref = "Displacements"
             if self._series.data["type"] == "Sequence":
                 self._plotting_coordinates = np.zeros((self._inc_no, 2))
             else:
@@ -428,6 +432,7 @@ class Particle(ParticleBase):
         else:
             self._nref = "nodes"
             self._cref = "centroids"
+            self._dref = "displacements"
 
         self._initialised = True
         self.data = {
@@ -488,6 +493,7 @@ class Particle(ParticleBase):
         # Solving.
         if self._field is False:
             self.solved += self._strain_path_full()
+        self._strain_def()
         if model:
             self.solved += self._stress_path(model, state, parameters)
             self._results = {
@@ -495,6 +501,7 @@ class Particle(ParticleBase):
                 "warps": self._warps,
                 "volumes": self._volumes,
                 "stresses": self._stresses,
+                "strains": self._strains,
                 "mean_effective_stresses": self._ps,
                 "deviatoric_stresses": self._qs,
                 "states": self._states,
@@ -504,6 +511,7 @@ class Particle(ParticleBase):
             self._results = {
                 "coordinates": self._coordinates,
                 "warps": self._warps,
+                "strains": self._strains,
                 "volumes": self._volumes,
             }
         if self._calibrated is True:
@@ -691,9 +699,7 @@ class Particle(ParticleBase):
 
         self._warp_inc = np.zeros(6 * self._mesh_order)
         x = self._cm.data[self._nref][self._cm.data["elements"][tri_idx]]
-        u = self._cm.data["results"]["Displacements"][
-            self._cm.data["elements"][tri_idx]
-        ]
+        u = self._cm.data["results"][self._dref][self._cm.data["elements"][tri_idx]]
 
         # Get local coordinates.
         zeta, eta, theta, A = self._local_coordinates(x)
@@ -788,7 +794,39 @@ class Particle(ParticleBase):
                 )
                 bar()
 
-        self._strain_def()
+                if np.isnan(self._warps[m + 1]).any():
+                    print(m)
+                    print("Warp, m-1:")
+                    print(self._warps[m - 1])
+                    print("Warp inc, m-1 -> m:")
+                    print(self._warps[m] - self._warps[m - 1])
+                    print("Warp, m:")
+                    print(self._warps[m])
+                    print("Warp inc, m->m+1:")
+                    print(self._warp_inc)
+                    print("Warp, m+1:")
+                    print(self._warps[m + 1])
+                    print("Position, m:")
+                    print(self._coordinates[self._reference_index])
+                    tri_idx = self._element_locator()
+                    nodes = self._cm.data[self._nref][
+                        self._cm.data["elements"][tri_idx]
+                    ]
+                    displacements = self._cm.data["results"][self._dref][
+                        self._cm.data["elements"][tri_idx]
+                    ]
+                    zeta, eta, theta, A = self._local_coordinates(nodes)
+                    N, dN, dN2 = self._shape_function(zeta, eta, theta)
+                    print("Element number: {}".format(tri_idx))
+                    print("Element nodes: \n{}".format(nodes))
+                    print("Element displacements: \n{}".format(displacements))
+                    print("Local coordinates: \n{}".format([zeta, eta, theta]))
+                    print("N: \n{}".format(N))
+                    print("dN: \n{}".format(dN))
+                    print("dN2: \n{}".format(dN2))
+                    print()
+                    input()
+
         return True
 
     def _strain_path_inc(self, m, cm, rm):
@@ -822,7 +860,6 @@ class Particle(ParticleBase):
             - self._warp_inc[3] * self._warp_inc[4]
         )
 
-        self._strain_def()
         return True
 
     def _update_cm_rm(self, m, cm, rm):
@@ -852,39 +889,45 @@ class Particle(ParticleBase):
         self._states = np.zeros((self._inc_no, len(state)))
         if model == "LinearElastic":
             # Put input checks here!
-            model = geomat.models.LinearElastic(
+            model = LinearElastic(
                 parameters=parameters,
                 state=state,
                 # log_severity = "verbose"
             )
         if model == "MCC":
             # Put input checks here!
-            model = geomat.models.MCC(
-                parameters=parameters, state=state, log_severity="verbose"
-            )
+            model = MCC(parameters=parameters, state=state, log_severity="verbose")
+
         elif model == "SMCC":
             # Put input checks here!
-            model = geomat.models.SMCC(
+            model = SMCC(
                 parameters=parameters,
-                state=state,  # log_severity="verbose"
+                state=state,
+                # log_severity="verbose"
             )
         strain_incs = np.diff(self._strains, axis=0)
         model.set_sigma_prime_tilde(self._stresses[0].T)
-        model.set_Delta_epsilon_tilde(strain_incs[0])
+        model.set_Delta_epsilon_tilde(-strain_incs[0])
         self._ps[0] = model.p_prime
         self._qs[0] = model.q
-        self._states[0] = model.state
-        for i in range(np.shape(self._series)[0]):
+        # self._states[0] = model.state
+        for i in range(self._inc_no - 1):
             try:
                 model.set_sigma_prime_tilde(self._stresses[i].T)
                 model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
                 model.solve()
             except Exception:
+                print(traceback.format_exc())
                 log.error("geomat error. Stress path curtailed.")
                 raise ValueError("geomat error. Stress path curtailed.")
+            print(
+                "Increment {}: p = {:.2f} ; q = {:.2f} ; q/p = {:.2f}".format(
+                    0, model.p_prime, model.q, model.q / model.p_prime
+                )
+            )
             self._ps[i + 1] = model.p_prime
             self._qs[i + 1] = model.q
-            self._states[i + 1] = model.state
+            # self._states[i + 1] = model.state
             self._stresses[i + 1] = model.sigma_prime_tilde
 
         self._works[1:] = (

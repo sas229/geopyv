@@ -33,46 +33,50 @@ class SpeckleBase(Object):
     def _warp(self, i, ref, rot=False):
         _warp = np.zeros((np.shape(ref)[0], np.shape(self.data["comp"])[0]))
         delta = ref - self.data["origin"]
-        _warp[:, 0] = (
-            self.data["pm"][i][0]
-            + self.data["pm"][i][2] * delta[:, 0]
-            + self.data["pm"][i][4] * delta[:, 1]
-            + 0.5 * self.data["pm"][i][6] * delta[:, 0] ** 2
-            + self.data["pm"][i][8] * delta[:, 0] * delta[:, 1]
-            + 0.5 * self.data["pm"][i][10] * delta[:, 1] ** 2
-        )
-        _warp[:, 1] = (
-            self.data["pm"][i][1]
-            + self.data["pm"][i][3] * delta[:, 0]
-            + self.data["pm"][i][5] * delta[:, 1]
-            + 0.5 * self.data["pm"][i][7] * delta[:, 0] ** 2
-            + self.data["pm"][i][9] * delta[:, 0] * delta[:, 1]
-            + 0.5 * self.data["pm"][i][11] * delta[:, 1] ** 2
-        )
-        _warp[:, 2] = (
-            self.data["pm"][i][2]
-            + self.data["pm"][i][6] * delta[:, 0]
-            + self.data["pm"][i][8] * delta[:, 1]
-        )
-        _warp[:, 3] = (
-            self.data["pm"][i][3]
-            + self.data["pm"][i][7] * delta[:, 0]
-            + self.data["pm"][i][9] * delta[:, 1]
-        )
-        _warp[:, 4] = (
-            self.data["pm"][i][4]
-            + self.data["pm"][i][8] * delta[:, 1]
-            + self.data["pm"][i][10] * delta[:, 1]
-        )
-        _warp[:, 5] = (
-            self.data["pm"][i][5]
-            + self.data["pm"][i][9] * delta[:, 1]
-            + self.data["pm"][i][11] * delta[:, 1]
-        )
-        _warp[:, 6:] = self.data["pm"][i][6:]
+        if self._bar:
+            _warp[:, 0] = self.data["pm"][i][2] * sp.special.erf(0.025 * delta[:, 1])
+        else:
+            _warp[:, 0] = (
+                self.data["pm"][i][0]
+                + self.data["pm"][i][2] * delta[:, 0]
+                + self.data["pm"][i][4] * delta[:, 1]
+                + 0.5 * self.data["pm"][i][6] * delta[:, 0] ** 2
+                + self.data["pm"][i][8] * delta[:, 0] * delta[:, 1]
+                + 0.5 * self.data["pm"][i][10] * delta[:, 1] ** 2
+            )
+            _warp[:, 1] = (
+                self.data["pm"][i][1]
+                + self.data["pm"][i][3] * delta[:, 0]
+                + self.data["pm"][i][5] * delta[:, 1]
+                + 0.5 * self.data["pm"][i][7] * delta[:, 0] ** 2
+                + self.data["pm"][i][9] * delta[:, 0] * delta[:, 1]
+                + 0.5 * self.data["pm"][i][11] * delta[:, 1] ** 2
+            )
+            _warp[:, 2] = (
+                self.data["pm"][i][2]
+                + self.data["pm"][i][6] * delta[:, 0]
+                + self.data["pm"][i][8] * delta[:, 1]
+            )
+            _warp[:, 3] = (
+                self.data["pm"][i][3]
+                + self.data["pm"][i][7] * delta[:, 0]
+                + self.data["pm"][i][9] * delta[:, 1]
+            )
+            _warp[:, 4] = (
+                self.data["pm"][i][4]
+                + self.data["pm"][i][8] * delta[:, 1]
+                + self.data["pm"][i][10] * delta[:, 1]
+            )
+            _warp[:, 5] = (
+                self.data["pm"][i][5]
+                + self.data["pm"][i][9] * delta[:, 1]
+                + self.data["pm"][i][11] * delta[:, 1]
+            )
+            _warp[:, 6:] = self.data["pm"][i][6:]
 
-        if rot:
-            _warp[:, :2] -= delta
+            if rot:
+                _warp[:, :2] -= delta
+
         return _warp
 
     def _report(self, msg, error_type):
@@ -178,8 +182,9 @@ class Speckle(SpeckleBase):
             "speckle_size": self._speckle_size,
         }
 
-    def solve(self, *, wrap=False, number=None, generate=True):
+    def solve(self, *, wrap=False, number=None, generate=True, bar=False):
         self._wrap = wrap
+        self._bar = bar
         [self.X, self.Y] = np.meshgrid(
             range(self._image_size_x), range(self._image_size_y)
         )

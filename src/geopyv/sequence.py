@@ -1114,6 +1114,7 @@ class Sequence(SequenceBase):
                 size_lower_bound=self._size_lower_bound,
                 size_upper_bound=self._size_upper_bound,
                 mesh_order=self._mesh_order,
+                hp=True,
             )  # Initialise mesh object.
             mesh.solve(
                 seed_coord=self._seed_coord,

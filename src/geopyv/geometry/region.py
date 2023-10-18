@@ -112,17 +112,27 @@ class Region(RegionBase):
 
     def _update(self, f_img_filepath):
         if self._option != "S":
-            f_index = int(
-                re.findall(
-                    r"\d+",
-                    f_img_filepath,
-                )[-1]
-            )
-            if f_index != self.data["ref_index"]:
-                self.data["ref_index"] = f_index
-                self._reference_update_register.append(f_index)
-                self._nodes = self.data["nodes"][self.data["counter"]]
-                self._centre = self.data["centres"][self.data["counter"]]
+            try:
+                f_index = int(
+                    re.findall(
+                        r"\d+",
+                        f_img_filepath,
+                    )[-1]
+                )
+                if f_index != self.data["ref_index"]:
+                    self.data["ref_index"] = f_index
+                    self._reference_update_register.append(f_index)
+                    self._nodes = self.data["nodes"][self.data["counter"]]
+                    self._centre = self.data["centres"][self.data["counter"]]
+            except Exception:
+                log.warning(
+                    (
+                        "Name deviates from convention.\nIf running a mesh, please"
+                        "ignore this warning.\nIf running a sequence, "
+                        "ensure the image names conform to:\n`string+str(integer).png` "
+                        "where the integer value indicates position in sequence.\n"
+                    )
+                )
 
 
 class Circle(Region):

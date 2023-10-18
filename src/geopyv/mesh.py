@@ -13,6 +13,9 @@ from scipy.optimize import minimize_scalar
 from alive_progress import alive_bar
 import traceback
 
+# import matplotlib.pyplot as plt
+# import cv2
+
 log = logging.getLogger(__name__)
 
 
@@ -714,6 +717,7 @@ class Mesh(MeshBase):
         size_lower_bound=1.0,
         size_upper_bound=1000.0,
         mesh_order=2,
+        hp=False,
     ):
         """
 
@@ -834,6 +838,10 @@ class Mesh(MeshBase):
         self._report(
             gp.check._check_value(mesh_order, "mesh_order", [1, 2]), "ValueError"
         )
+        self._report(
+            gp.check._check_type(hp, "hp", [bool]),
+            "TypeError",
+        )
 
         # Store.
         self._initialised = False
@@ -848,13 +856,15 @@ class Mesh(MeshBase):
         self._size_upper_bound = size_upper_bound
         self._mesh_order = mesh_order
         self._hard_boundary = boundary_obj._hard
+        self._hp = hp
         self.solved = False
         self._unsolvable = False
         self._calibrated = False
 
         # Checks.
         self._target_checks()  # Size bounds and target nodes.
-        self._update_region()  # Boundary and exclusion objects.
+        if self._hp is True:
+            self._update_region()  # Boundary and exclusion objects.
 
         # Creating the initial mesh.
         # Define region of interest.
@@ -1415,12 +1425,15 @@ class Mesh(MeshBase):
             (np.asarray(ent) - 1).flatten(), (-1, 3 * self._mesh_order)
         )  # Element connectivity array.
         self._boundary = gmsh.model.occ.getCurveLoops(0)[1][0]
-        self._edges = list(gmsh.model.mesh.getNodesForPhysicalGroup(1, 0)[0] - 1)
+        self._boundary_edges = list(
+            gmsh.model.mesh.getNodesForPhysicalGroup(1, 0)[0] - 1
+        )
         self._exclusions = []
+        self._exclusion_edges = []
         for i in range(len(self._exclusion_objs)):
             self._exclusions.append(np.sort(gmsh.model.occ.getCurveLoops(0)[1][i + 1]))
-            self._edges += list(
-                gmsh.model.mesh.getNodesForPhysicalGroup(1, i + 1)[0] - 1
+            self._exclusion_edges.append(
+                list(gmsh.model.mesh.getNodesForPhysicalGroup(1, i + 1)[0] - 1)
             )
 
     def _find_seed_node(self):
@@ -1757,41 +1770,34 @@ class Mesh(MeshBase):
         """Private method that instantiates the mesh subsets with masking."""
 
         for i in range(np.shape(self._nodes)[0]):
-            if i in self._edges:
-                template = deepcopy(self._template)
-                template.mask(self._nodes[i], self._mask)
-                check = False
-                for e in range(len(self._exclusions)):
-                    if i in self._exclusions[e]:
-                        if self._exclusion_objs[e]._compensate:
-                            check = True
-                            break
-                if (
-                    i in self._boundary and self._boundary_obj._compensate
-                ) or check is True:
-                    if template.n_px < self._template.n_px:
-                        size = int(
-                            self._template.size
-                            / np.sqrt(template.n_px / self._template.n_px)
-                        )
-                        if self._template.shape == "circle":
-                            template = gp.templates.Circle(radius=size)
-                        elif self._template.shape == "square":
-                            template = gp.templates.Square(length=size)
-                template.mask(self._nodes[i], self._mask)
-                self._subsets[i] = gp.subset.Subset(
-                    f_coord=self._nodes[i],
-                    f_img=self._f_img,
-                    g_img=self._g_img,
-                    template=template,
-                )  # Create masked boundary subset.
-            else:
-                self._subsets[i] = gp.subset.Subset(
-                    f_coord=self._nodes[i],
-                    f_img=self._f_img,
-                    g_img=self._g_img,
-                    template=self._template,
-                )  # Create full subset.
+            template = deepcopy(self._template)
+            template.mask(self._nodes[i], self._mask)
+            check = False
+            for e in range(len(self._exclusions)):
+                if (i in self._exclusion_edges[e]) and self._exclusion_objs[
+                    e
+                ]._compensate:
+                    check = True
+            if (
+                (i in self._boundary_edges) and self._boundary_obj._compensate
+            ) or check is True:
+                if template.n_px < self._template.n_px:
+                    size = int(
+                        self._template.size
+                        / np.sqrt(template.n_px / self._template.n_px)
+                    )
+                    if self._template.shape == "circle":
+                        template = gp.templates.Circle(radius=size)
+                    elif self._template.shape == "square":
+                        template = gp.templates.Square(length=size)
+                    template.mask(self._nodes[i], self._mask)
+
+            self._subsets[i] = gp.subset.Subset(
+                f_coord=self._nodes[i],
+                f_img=self._f_img,
+                g_img=self._g_img,
+                template=template,
+            )  # Create masked subset.
 
     def _compatibility(self):
         """
@@ -1810,6 +1816,39 @@ class Mesh(MeshBase):
                 if gp.geometry.utilities.polysect(
                     self._nodes[self._elements[i]][[0, 3, 1, 4, 2, 5]]
                 ):
+                    # n1 = self._nodes[self._elements[i]]
+                    # n2 = (
+                    #     self._nodes[self._elements[i]]
+                    #     + self._displacements[self._elements[i]]
+                    # )
+                    # fig,ax = plt.subplots()
+                    # image = cv2.imread(
+                    #     self.data["images"]["f_img"], cv2.IMREAD_COLOR
+                    # )
+                    # image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                    # image_gs = cv2.GaussianBlur(
+                    #     image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
+                    # )
+                    # plt.imshow(image_gs, cmap="gray")
+                    # ax.plot(
+                    #     n1[[0,3,1,4,2,5,0],0],n1[[0,3,1,4,2,5,0],1], color = "purple"
+                    # )
+                    # ax.plot(
+                    #     n2[[0,3,1,4,2,5,0],0],n2[[0,3,1,4,2,5,0],1],color = "orange"
+                    # )
+                    # ax.scatter(n1[0,0],n1[0,1],color = "r")
+                    # ax.scatter(n2[0,0],n2[0,1],color = "r")
+                    # ax.scatter(n1[1,0],n1[1,1],color = "b")
+                    # ax.scatter(n2[1,0],n2[1,1],color = "b")
+                    # ax.scatter(n1[2,0],n1[2,1],color = "g")
+                    # ax.scatter(n2[2,0],n2[2,1],color = "g")
+                    # ax.scatter(n1[3,0],n1[3,1],color = "c")
+                    # ax.scatter(n2[3,0],n2[3,1],color = "c")
+                    # ax.scatter(n1[4,0],n1[4,1],color = "m")
+                    # ax.scatter(n2[4,0],n2[4,1],color = "m")
+                    # ax.scatter(n1[5,0],n1[5,1],color = "k")
+                    # ax.scatter(n2[5,0],n2[5,1],color = "k")
+                    # plt.show()
                     self._unsolvable = True
                     self._status = 6
                     break
@@ -1991,6 +2030,12 @@ class Mesh(MeshBase):
                 if self._subsets[idx].data["solved"]:  # Check against tolerance.
                     self._store_variables(idx=idx, flag=1)
                 elif self._subsets[idx].data["unsolvable"]:
+                    # print(idx)
+                    # fig,ax=plt.subplots()
+                    # ax.imshow(self._subsets[idx]._template._local_masked)
+                    # plt.show()
+                    # self._subsets[idx].inspect()
+                    # self._subsets[idx].convergence()
                     self._status = 5
                     self._unsolvable = True
                 else:
@@ -2032,6 +2077,12 @@ class Mesh(MeshBase):
                     if self._subsets[idx].data["solved"]:  # Check against tolerance.
                         self._store_variables(idx=idx, flag=1)
                     elif self._subsets[idx].data["unsolvable"]:
+                        # print(idx)
+                        # fig,ax=plt.subplots()
+                        # ax.imshow(self._subsets[idx]._template._local_masked)
+                        # plt.show()
+                        # self._subsets[idx].inspect()
+                        # self._subsets[idx].convergence()
                         self._status = 5
                         self._unsolvable = True
                     else:
@@ -2047,6 +2098,12 @@ class Mesh(MeshBase):
                         if self._subsets[idx].data["unsolvable"] or np.isnan(
                             self._subsets[idx].data["results"]["C_ZNCC"]
                         ):
+                            # print(idx)
+                            # fig,ax=plt.subplots()
+                            # ax.imshow(self._subsets[idx]._template._local_masked)
+                            # plt.show()
+                            # self._subsets[idx].inspect()
+                            # self._subsets[idx].convergence()
                             self._status = 5
                             self._unsolvable = True
                         else:

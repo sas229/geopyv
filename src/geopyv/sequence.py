@@ -294,6 +294,7 @@ class SequenceBase(Object):
         *,
         mesh_index=None,
         quantity="C_ZNCC",
+        inter_order=1,
         imshow=True,
         colorbar=True,
         ticks=None,
@@ -317,7 +318,7 @@ class SequenceBase(Object):
             Index of the mesh to inspect.
         quantity : str, optional
             Selector for contour parameter. Must be in:
-            [`C_ZNCC`, `u`, `v`, `u_x`, `v_x`,`u_y`,`v_y`, `R`]
+            [`C_ZNCC`, `u`, `v`, `u_x`, `v_x`,`u_y`,`v_y`, `R`, `size`]
             Defaults to `C_ZNCC`.
         imshow : bool, optional
             Control whether the reference image is plotted.
@@ -413,6 +414,7 @@ class SequenceBase(Object):
             "u_y",
             "v_y",
             "R",
+            "size",
         ]
         if quantity:
             self._report(
@@ -459,6 +461,7 @@ class SequenceBase(Object):
             data=mesh_obj,
             imshow=imshow,
             quantity=quantity,
+            inter_order=inter_order,
             colorbar=colorbar,
             ticks=ticks,
             mesh=mesh,
@@ -870,6 +873,7 @@ class Sequence(SequenceBase):
         override=False,
         sequential=False,
         history=None,
+        subset_size_limits=None,
         _f_index=0,
         _g_index=1,
     ):
@@ -1029,6 +1033,12 @@ class Sequence(SequenceBase):
             ),
             "ValueError",
         )
+        self._report(
+            gp.check._check_type(
+                subset_size_limits, "subset_size_limits", [type(None), list, np.ndarray]
+            ),
+            "TypeError",
+        )
         self._report(gp.check._check_type(method, "method", [str]), "TypeError")
         self._report(
             gp.check._check_value(method, "method", ["FAGN", "ICGN"]), "ValueError"
@@ -1091,6 +1101,7 @@ class Sequence(SequenceBase):
         self._mesh_override = False
         self._history = history
         self._seed_warp = np.zeros(6 * self._subset_order)
+        self._subset_size_limits = subset_size_limits
 
         # Solve.
         _seed_coord_t = self._seed_coord
@@ -1114,6 +1125,7 @@ class Sequence(SequenceBase):
                 size_lower_bound=self._size_lower_bound,
                 size_upper_bound=self._size_upper_bound,
                 mesh_order=self._mesh_order,
+                hp=True,
             )  # Initialise mesh object.
             mesh.solve(
                 seed_coord=self._seed_coord,
@@ -1130,6 +1142,7 @@ class Sequence(SequenceBase):
                 alpha=self._alpha,
                 history=_prev_mesh,
                 override=self._mesh_override,
+                subset_size_limits=self._subset_size_limits,
             )  # Solve mesh.
             if mesh.solved:
                 # Mesh override reset.

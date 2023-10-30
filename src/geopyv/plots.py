@@ -457,6 +457,7 @@ def convergence_mesh(data, quantity, show, block, save):
 def contour_mesh(
     data,
     quantity,
+    inter_order,
     imshow,
     colorbar,
     ticks,
@@ -475,36 +476,9 @@ def contour_mesh(
     # Load data.
     nodes = data["nodes"]
     elements = data["elements"]
-    subsets = data["results"]["subsets"]
 
-    # Extract variables from data.
-    x = []
-    y = []
-    value = []
-    for s in subsets:
-        x.append(s["position"]["x"])
-        y.append(s["position"]["y"])
-
-        if quantity == "u":
-            value.append(float((s["results"]["p"])[0]))
-        elif quantity == "v":
-            value.append(float((s["results"]["p"])[1]))
-        elif quantity == "u_x":
-            value.append(float((s["results"]["p"])[2]))
-        elif quantity == "v_x":
-            value.append(float((s["results"]["p"])[3]))
-        elif quantity == "u_y":
-            value.append(float((s["results"]["p"])[4]))
-        elif quantity == "v_y":
-            value.append(float((s["results"]["p"])[5]))
-        elif quantity == "R":
-            value.append(np.sqrt(s["results"]["u"] ** 2 + s["results"]["v"] ** 2))
-        else:
-            value.append(s["results"][quantity])
-
-    x = np.asarray(x)
-    y = np.asarray(y)
-    value = np.asarray(value)
+    if quantity in ["u", "v", "R", "size", "C_ZNCC", "iterations", "norm"]:
+        inter_order = 0
 
     # Plot setup.
     try:
@@ -529,28 +503,6 @@ def contour_mesh(
         title = "Contour: variable = {variable}".format(variable=quantity)
     fig, ax = plt.subplots(num=title)
 
-    # Triangulation.
-    mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
-        elements, x, y, data["mesh_order"]
-    )
-
-    # Plot mesh.
-    if mesh is True:
-        for i in range(np.shape(x_p)[0]):
-            ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth=0.5)
-    triangulation = tri.Triangulation(nodes[:, 0], nodes[:, 1], mesh_triangulation)
-
-    # Set levels and extend.
-    extend = "neither"
-    if not isinstance(levels, type(None)):
-        if np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
-            extend = "both"
-        elif np.max(value) > np.max(levels):
-            extend = "max"
-        elif np.min(value) < np.min(levels):
-            extend = "min"
-    extend = "both"
-
     # Show image in background.
     if imshow is True:
         image = cv2.imread(data["images"]["f_img"], cv2.IMREAD_COLOR)
@@ -560,14 +512,86 @@ def contour_mesh(
     else:
         ax.set_aspect("equal", "box")
 
-    # Plot contours.
-    contours = ax.tricontourf(
-        triangulation,
-        value,
-        alpha=alpha,
-        levels=levels,
-        extend=extend,
+    # Plot mesh.
+    mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+        elements, nodes[:, 0], nodes[:, 1], data["mesh_order"]
     )
+    if mesh is True:
+        for i in range(np.shape(x_p)[0]):
+            ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth=0.5)
+
+    if inter_order == 1:
+        subsets = data["results"]["subsets"]
+        # Data extraction.
+        value = []
+        for s in subsets:
+            if quantity == "u":
+                value.append(float((s["results"]["p"])[0]))
+            elif quantity == "v":
+                value.append(float((s["results"]["p"])[1]))
+            elif quantity == "u_x":
+                value.append(float((s["results"]["p"])[2]))
+            elif quantity == "v_x":
+                value.append(float((s["results"]["p"])[3]))
+            elif quantity == "u_y":
+                value.append(float((s["results"]["p"])[4]))
+            elif quantity == "v_y":
+                value.append(float((s["results"]["p"])[5]))
+            elif quantity == "R":
+                value.append(np.sqrt(s["results"]["u"] ** 2 + s["results"]["v"] ** 2))
+            elif quantity == "size":
+                value.append(s["template"]["size"])
+            else:
+                value.append(s["results"][quantity])
+        value = np.asarray(value)
+
+        # Set levels and extend.
+        extend = "neither"
+        if not isinstance(levels, type(None)):
+            if np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
+                extend = "both"
+            elif np.max(value) > np.max(levels):
+                extend = "max"
+            elif np.min(value) < np.min(levels):
+                extend = "min"
+        extend = "both"
+
+        # Plot contours.
+        triangulation = tri.Triangulation(nodes[:, 0], nodes[:, 1], mesh_triangulation)
+        contours = ax.tricontourf(
+            triangulation,
+            value,
+            alpha=alpha,
+            levels=levels,
+            extend=extend,
+        )
+    elif inter_order == 0:
+        if quantity == "u_x":
+            warp_index = 2
+        elif quantity == "v_x":
+            warp_index = 3
+        elif quantity == "u_y":
+            warp_index = 4
+        elif quantity == "v_y":
+            warp_index = 5
+        value = data["results"]["warps"][:, warp_index]
+        if levels is not None:
+            vmin = levels[0]
+            vmax = levels[-1]
+        else:
+            vmin = None
+            vmax = None
+        contours = ax.tripcolor(
+            nodes[:, 0],
+            nodes[:, 1],
+            elements,
+            vmin=vmin,
+            vmax=vmax,
+            facecolors=value,
+            alpha=alpha,
+            cmap="viridis",
+        )
+
     if colorbar is True:
         if quantity == "iterations":
             label = "Iterations (-)"
@@ -575,6 +599,18 @@ def contour_mesh(
             label = r"$C_{ZNCC}$ (-)"
         elif quantity == "norm":
             label = r"$\Delta$ Norm (-)"
+        elif quantity == "u":
+            label = r"Horizontal Displacement, $u$ ($px$)"
+        elif quantity == "v":
+            label = r"Vertical Displacement, $v$ ($px$)"
+        elif quantity == "u_x":
+            label = r"Horizontal Deformation Gradient, $du/dx$ ($-$)"
+        elif quantity == "v_x":
+            label = r"Shear Deformation Gradient, $dv/dx$ ($-$)"
+        elif quantity == "u_y":
+            label = r"Shear Deformation Gradient, $du/dy$ ($-$)"
+        elif quantity == "v_y":
+            label = r"Vertical Deformation Gradient, $dv/dy$ ($-$)"
         else:
             label = quantity
         fig.colorbar(contours, label=label, ticks=ticks)
@@ -926,35 +962,51 @@ def trace_particle(
 
 def history_particle(data, quantity, components, xlim, ylim, show, block, save):
     title = "History; {quantity}".format(quantity=quantity)
-    labels = [
-        r"$u$ ($px$)",
-        r"$v$ ($px$)",
-        r"$du/dx$ ($-$)",
-        r"$dv/dx$ ($-$)",
-        r"$du/dy$ ($-$)",
-        r"$dv/dy$ ($-$)",
-        r"$d^2u/dx^2$ ($-$)",
-        r"$d^2v/dx^2$ ($-$)",
-        r"$d^2u/dxdy$ ($-$)",
-        r"$d^2v/dxdy$ ($-$)",
-        r"$d^2u/dy^2$ ($-$)",
-        r"$d^2v/dy^2$ ($-$)",
-    ]
+    if quantity == "warps":
+        labels = [
+            r"$u$ ($px$)",
+            r"$v$ ($px$)",
+            r"$du/dx$ ($-$)",
+            r"$dv/dx$ ($-$)",
+            r"$du/dy$ ($-$)",
+            r"$dv/dy$ ($-$)",
+            r"$d^2u/dx^2$ ($-$)",
+            r"$d^2v/dx^2$ ($-$)",
+            r"$d^2u/dxdy$ ($-$)",
+            r"$d^2v/dxdy$ ($-$)",
+            r"$d^2u/dy^2$ ($-$)",
+            r"$d^2v/dy^2$ ($-$)",
+        ]
+    elif quantity == "stresses":
+        labels = [
+            r"$\sigma_{xx}$ ($kPa$)",
+            r"$\sigma_{yy}$ ($kPa$)",
+            r"$\sigma_{zz}$ ($kPa$)",
+            r"$\sigma_{yz}$ ($kPa$)",
+            r"$\sigma_{zx}$ ($kPa$)",
+            r"$\sigma_{xy}$ ($kPa$)",
+        ]
 
     fig, ax = plt.subplots(num=title)
-    if components is None:
-        components = range(np.shape(data["results"][quantity])[1])
-    for component in components:
+    if quantity != "works":
+        if components is None:
+            components = range(np.shape(data["results"][quantity])[1])
+        for component in components:
+            ax.plot(
+                range(np.shape(data["results"][quantity])[0]),
+                data["results"][quantity][:, component],
+                label=labels[component],
+            )
+        # Legend.
+        plt.legend()  # bbox_to_anchor=(1.05, 0.5), loc="center left", borderaxespad=0)
+        ax.set_ylabel(r"Value")
+    else:
         ax.plot(
-            range(np.shape(data["results"][quantity])[0]),
-            data["results"][quantity][:, component],
-            label=labels[component],
+            range(np.shape(data["results"][quantity])[0]), data["results"][quantity]
         )
+        ax.set_ylabel(r"Work, $W$, ($kJ$)")
 
     # General formatting.
-    # Legend.
-    plt.legend(bbox_to_anchor=(1.05, 0.5), loc="center left", borderaxespad=0)
-
     # Logscale.
     ax.set_xscale("linear")
     ax.set_yscale("linear")
@@ -967,7 +1019,6 @@ def history_particle(data, quantity, components, xlim, ylim, show, block, save):
 
     # Axis labels.
     ax.set_xlabel(r"Image Number, $i$ ($-$)")
-    ax.set_ylabel(r"Value")
 
     # Save.
     if save is not None:
@@ -1169,6 +1220,8 @@ def standard_error_validation(
     show,
     block,
     save,
+    xlabel,
+    ylabel,
 ):
     labels = [
         r"$u$ ($px$)",
@@ -1186,12 +1239,7 @@ def standard_error_validation(
         r"$\theta$ ($^o$)",
         r"$\epsilon_{\gamma}$ ($-$)",
     ]
-    colours = [
-        "r",
-        "b",
-        "g",
-        "orange",
-    ]
+    colours = ["r", "b", "g", "orange", "purple", "k"]
     markers = [
         "o",
         "^",
@@ -1273,11 +1321,17 @@ def standard_error_validation(
         ax.set_ylim(ylim)
 
     # Axis labels.
-    ax.set_xlabel(r"Applied warp, {}".format(labels[component]))
-    if observing is not None:
-        ax.set_ylabel(r"Error, $\Delta$" + labels[observing])
+    if xlabel is None:
+        ax.set_xlabel(r"Applied warp, {}".format(labels[component]))
     else:
-        ax.set_ylabel(r"Standard error, $\rho_{px}$ ($px$)")
+        ax.set_xlabel(xlabel)
+    if ylabel is None:
+        if observing is not None:
+            ax.set_ylabel(r"Error, $\Delta$" + labels[observing])
+        else:
+            ax.set_ylabel(r"Standard error, $\rho_{px}$ ($px$)")
+    else:
+        ax.set_ylabel(ylabel)
 
     # Save.
     if save is not None:
@@ -1321,12 +1375,7 @@ def mean_error_validation(
         r"$\theta$ ($^o$)",
         r"$\epsilon_{\gamma}$ ($-$)",
     ]
-    colours = [
-        "r",
-        "b",
-        "g",
-        "orange",
-    ]
+    colours = ["r", "b", "g", "orange", "purple", "k"]
     markers = [
         "o",
         "^",

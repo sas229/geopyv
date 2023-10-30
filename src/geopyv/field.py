@@ -683,11 +683,11 @@ class Field(FieldBase):
             if boundary_obj is not None:
                 self._boundary_obj = boundary_obj
             else:
-                self._boundary_obj = self._cm["boundary_obj"]
-            if self._exclusion_objs is not None:
+                self._boundary_obj = self._cm.data["boundary_obj"]
+            if exclusion_objs is not None:
                 self._exclusion_objs = exclusion_objs
             else:
-                self._exclusion_objs = self._cm["exclusion_objs"]
+                self._exclusion_objs = self._cm.data["exclusion_objs"]
 
             self._size_lower_bound = 1  # mesh_0["size_lower_bound"]
             self._size_upper_bound = 400  # mesh_0["size_upper_bound"]

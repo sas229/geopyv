@@ -76,10 +76,16 @@ def _define_RoI(*, f_img=None, boundary_obj=None, exclusion_objs=None):
         boundary_nodes = boundary_obj._nodes
         exclusion_nodes = [exclusion_objs[i]._nodes for i in range(len(exclusion_objs))]
     else:
-        boundary_nodes = boundary_obj.data["Nodes"][0]
-        exclusion_nodes = [
-            exclusion_objs[i].data["Nodes"][0] for i in range(len(exclusion_objs))
-        ]
+        try:
+            boundary_nodes = boundary_obj.data["Nodes"][0]
+            exclusion_nodes = [
+                exclusion_objs[i].data["Nodes"][0] for i in range(len(exclusion_objs))
+            ]
+        except Exception:
+            boundary_nodes = boundary_obj.data["nodes"][0]
+            exclusion_nodes = [
+                exclusion_objs[i].data["nodes"][0] for i in range(len(exclusion_objs))
+            ]
 
     # Create objects for mesh generation.
     segments = np.empty(

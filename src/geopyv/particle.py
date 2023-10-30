@@ -11,10 +11,9 @@ from geopyv.object import Object
 import re
 from alive_progress import alive_bar
 import math
-
-# from geomat.abstract import Elastoplastic
-# from geomat.utilities import Derivatives
-from geomat.models import LinearElastic, MCC, SMCC  # , C2MC, EMC
+from geomat.abstract import Elastoplastic  # noqa: F401
+from geomat.utilities import Derivatives  # noqa: F401
+from geomat.models import LinearElastic, MCC, SMCC, C2MC, EMC  # noqa: F401
 import matplotlib.pyplot as plt
 import traceback
 
@@ -449,7 +448,6 @@ class Particle(ParticleBase):
     def _update_mesh(self, index):
         try:
             del self._cm
-            ("Success")
         except Exception:
             pass
         if self._series.data["type"] == "Sequence":
@@ -477,18 +475,40 @@ class Particle(ParticleBase):
         N, dN, d2N = self._shape_function(zeta, eta, theta)
         return N @ x
 
-    def solve(
-        self,
-        *,
-        model=None,
-        state=None,
-        parameters=None,
-    ):  # model, state, parameters):
+    def solve(self, *, model=None, state=None, parameters=None, inter_order=0):
         """
 
         Method to solve for the particle.
 
+        Parameters
+        ----------
+        model : str, optional
+            If specified, determines the constitutive model to be used
+            from the geomat package. Options are:
+            - LinearElastic
+            - MCC
+            - SMCC
+        state : np.ndarray, optional
+            If a model is specified, the corresponding initial state
+            variables must be specified. Formatting is as follows:
+            - LinearElastic : np.array([])
+        parameters : np.ndarray, optional
+            If a model is specified, the corresponding model parameters
+            must be specified. Formatting is as follows:
+            - LinearElastic
+            - MCC
+            - SMCC
+        inter_order : int, optional
+            Base interpolation order. Options are:
+            0 (default) : strains are interpolated from nodal displacements
+                i.e. strains from a 1st order mesh are singular per element.
+            1 : strains are interpolated from nodal strains i.e. strains from
+            a 1st order mesh are linearly interpolatable.
         """
+        # Checks.
+
+        # Store variables.
+        self._inter_order = inter_order
 
         # Solving.
         if self._field is False:
@@ -717,9 +737,17 @@ class Particle(ParticleBase):
         self._warp_inc[:2] = N @ u
 
         # 1st Order Strains
-        J_x_T = dN @ x
-        J_u_T = dN @ u
-        self._warp_inc[2:6] = (np.linalg.inv(J_x_T) @ J_u_T).flatten()
+        if self._inter_order == 0:
+            J_x_T = dN @ x
+            J_u_T = dN @ u
+            self._warp_inc[2:6] = (np.linalg.inv(J_x_T) @ J_u_T).flatten()
+        elif self._inter_order == 1:
+            u_prime = np.zeros((3, 4))
+            for i in range(3):
+                u_prime[i] = self._cm.data["results"]["subsets"][
+                    self._cm.data["elements"][tri_idx][i]
+                ]["results"]["p"][2:].flatten()
+            self._warp_inc[2:6] = N @ u_prime
 
         # 2nd Order Strains
         if self._mesh_order == 2:
@@ -793,40 +821,6 @@ class Particle(ParticleBase):
                     - self._warp_inc[3] * self._warp_inc[4]
                 )
                 bar()
-
-                if np.isnan(self._warps[m + 1]).any():
-                    print(m)
-                    print("Warp, m-1:")
-                    print(self._warps[m - 1])
-                    print("Warp inc, m-1 -> m:")
-                    print(self._warps[m] - self._warps[m - 1])
-                    print("Warp, m:")
-                    print(self._warps[m])
-                    print("Warp inc, m->m+1:")
-                    print(self._warp_inc)
-                    print("Warp, m+1:")
-                    print(self._warps[m + 1])
-                    print("Position, m:")
-                    print(self._coordinates[self._reference_index])
-                    tri_idx = self._element_locator()
-                    nodes = self._cm.data[self._nref][
-                        self._cm.data["elements"][tri_idx]
-                    ]
-                    displacements = self._cm.data["results"][self._dref][
-                        self._cm.data["elements"][tri_idx]
-                    ]
-                    zeta, eta, theta, A = self._local_coordinates(nodes)
-                    N, dN, dN2 = self._shape_function(zeta, eta, theta)
-                    print("Element number: {}".format(tri_idx))
-                    print("Element nodes: \n{}".format(nodes))
-                    print("Element displacements: \n{}".format(displacements))
-                    print("Local coordinates: \n{}".format([zeta, eta, theta]))
-                    print("N: \n{}".format(N))
-                    print("dN: \n{}".format(dN))
-                    print("dN2: \n{}".format(dN2))
-                    print()
-                    input()
-
         return True
 
     def _strain_path_inc(self, m, cm, rm):
@@ -896,7 +890,11 @@ class Particle(ParticleBase):
             )
         if model == "MCC":
             # Put input checks here!
-            model = MCC(parameters=parameters, state=state, log_severity="verbose")
+            model = MCC(
+                parameters=parameters,
+                state=state,
+                # log_severity="verbose"
+            )
 
         elif model == "SMCC":
             # Put input checks here!
@@ -917,14 +915,34 @@ class Particle(ParticleBase):
                 model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
                 model.solve()
             except Exception:
+                # fig, (ax, bx) = plt.subplots(2, 1)
+                # ax.plot(range(i + 1), self._strains[: i + 1, 0], label=r"$du/dx$")
+                # ax.plot(range(i + 1), self._strains[: i + 1, 1], label=r"$dv/dy$")
+                # ax.plot(range(i + 1), self._strains[: i + 1, 5], label=r"$\gamma$")
+                # bx.plot(
+                #     range(i + 1), self._stresses[: i + 1, 0], label=r"$\sigma_{xx}$"
+                # )
+                # bx.plot(
+                #     range(i + 1), self._stresses[: i + 1, 1], label=r"$\sigma_{yy}$"
+                # )
+                # bx.plot(
+                #     range(i + 1), self._stresses[: i + 1, 2], label=r"$\sigma_{zz}$"
+                # )
+                # bx.plot(
+                #     range(i + 1), self._stresses[: i + 1, 5], label=r"$\sigma_{xy}$"
+                # )
+                # ax.legend()
+                # bx.legend()
+                # plt.show()
+
                 print(traceback.format_exc())
                 log.error("geomat error. Stress path curtailed.")
                 raise ValueError("geomat error. Stress path curtailed.")
-            print(
-                "Increment {}: p = {:.2f} ; q = {:.2f} ; q/p = {:.2f}".format(
-                    0, model.p_prime, model.q, model.q / model.p_prime
-                )
-            )
+            # print(
+            #     "Increment {}: p = {:.2f} ; q = {:.2f} ; q/p = {:.2f}".format(
+            #         0, model.p_prime, model.q, model.q / model.p_prime
+            #     )
+            # )
             self._ps[i + 1] = model.p_prime
             self._qs[i + 1] = model.q
             # self._states[i + 1] = model.state
@@ -937,9 +955,21 @@ class Particle(ParticleBase):
         return True
 
     def _strain_def(self):
+        self._strains[:, 5] = -(self._warps[:, 3] + self._warps[:, 4]) / 2
+        # self._strains[:, 0] = (
+        #     self._warps[:,2]*np.cos(0.5*self._strains[:,5])**2
+        #     + self._warps[:,5]*np.sin(0.5*self._strains[:,5])**2
+        #     + self._strains[:,5]*np.sin(0.5*self._strains[:,5])
+        #     * np.cos(0.5*self._strains[:,5])
+        # )
+        # self._strains[:,1] = (
+        #     self._warps[:,2]*np.cos(-0.5*self._strains[:,5])**2
+        #     + self._warps[:,5]*np.sin(-0.5*self._strains[:,5])**2
+        #     + self._strains[:,5]*np.sin(-0.5*self._strains[:,5])
+        #     * np.cos(-0.5*self._strains[:,5])
+        # )
         self._strains[:, 0] = self._warps[:, 2]
         self._strains[:, 1] = self._warps[:, 5]
-        self._strains[:, 5] = self._warps[:, 3] + self._warps[:, 4]
 
 
 class ParticleResults(ParticleBase):

@@ -40,7 +40,9 @@ class ValidationBase(Object):
         plot="scatter",
         show=True,
         block=True,
-        save=None
+        save=None,
+        xlabel=None,
+        ylabel=None
     ):
         # Check if solved.
         if self.data["solved"] is not True:
@@ -97,6 +99,8 @@ class ValidationBase(Object):
             show=show,
             block=block,
             save=save,
+            xlabel=xlabel,
+            ylabel=ylabel,
         )
 
         return fig, ax

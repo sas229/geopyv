@@ -121,8 +121,8 @@ class Template:
             lx:ux,
         ]
         local = np.pad(local, ((lyp, uyp), (lxp, uxp)))
-        local_masked = local * self.subset_mask
-        self.coords = np.argwhere(local_masked == 1) - self.size
+        self._local_masked = local * self.subset_mask
+        self.coords = np.argwhere(self._local_masked == 1) - self.size
         self.n_px = np.shape(self.coords)[0]
         if flag:
             log.warning(

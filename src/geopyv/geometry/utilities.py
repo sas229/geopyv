@@ -82,7 +82,7 @@ def PolyArea(pts):
     """
     x = pts[:, 0]
     y = pts[:, 1]
-    return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+    return abs(0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1))))
 
 
 def polysect(n):

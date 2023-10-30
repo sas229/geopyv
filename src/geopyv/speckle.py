@@ -7,7 +7,6 @@ Speckle module for geopyv.
 import logging
 import geopyv as gp
 import numpy as np
-import scipy as sp
 from geopyv.object import Object
 from PIL import Image as Im
 from alive_progress import alive_bar
@@ -33,46 +32,77 @@ class SpeckleBase(Object):
     def _warp(self, i, ref, rot=False):
         _warp = np.zeros((np.shape(ref)[0], np.shape(self.data["comp"])[0]))
         delta = ref - self.data["origin"]
-        _warp[:, 0] = (
-            self.data["pm"][i][0]
-            + self.data["pm"][i][2] * delta[:, 0]
-            + self.data["pm"][i][4] * delta[:, 1]
-            + 0.5 * self.data["pm"][i][6] * delta[:, 0] ** 2
-            + self.data["pm"][i][8] * delta[:, 0] * delta[:, 1]
-            + 0.5 * self.data["pm"][i][10] * delta[:, 1] ** 2
-        )
-        _warp[:, 1] = (
-            self.data["pm"][i][1]
-            + self.data["pm"][i][3] * delta[:, 0]
-            + self.data["pm"][i][5] * delta[:, 1]
-            + 0.5 * self.data["pm"][i][7] * delta[:, 0] ** 2
-            + self.data["pm"][i][9] * delta[:, 0] * delta[:, 1]
-            + 0.5 * self.data["pm"][i][11] * delta[:, 1] ** 2
-        )
-        _warp[:, 2] = (
-            self.data["pm"][i][2]
-            + self.data["pm"][i][6] * delta[:, 0]
-            + self.data["pm"][i][8] * delta[:, 1]
-        )
-        _warp[:, 3] = (
-            self.data["pm"][i][3]
-            + self.data["pm"][i][7] * delta[:, 0]
-            + self.data["pm"][i][9] * delta[:, 1]
-        )
-        _warp[:, 4] = (
-            self.data["pm"][i][4]
-            + self.data["pm"][i][8] * delta[:, 1]
-            + self.data["pm"][i][10] * delta[:, 1]
-        )
-        _warp[:, 5] = (
-            self.data["pm"][i][5]
-            + self.data["pm"][i][9] * delta[:, 1]
-            + self.data["pm"][i][11] * delta[:, 1]
-        )
-        _warp[:, 6:] = self.data["pm"][i][6:]
+        if self.data["vars"] is not None:
+            b = self.data["vars"]["width"] / 2
+            a = b * self.data["pm"][i][4]
+            if self.data["vars"]["mode"] == "sin":
+                b = self.data["vars"]["width"] / 2
+                a = b * self.data["pm"][i][4]
+                _warp[:, 0] += (
+                    (abs(delta[:, 1]) < b)
+                    * a
+                    * np.sin(np.pi * delta[:, 1] / self.data["vars"]["width"])
+                )
+                _warp[:, 0] += (delta[:, 1] >= b) * a
+                _warp[:, 0] -= (delta[:, 1] <= -b) * a
+                _warp[:, 2] += (
+                    (abs(delta[:, 1]) < b)
+                    * a
+                    * np.pi
+                    / self.data["vars"]["width"]
+                    * np.cos(np.pi * delta[:, 1] / self.data["vars"]["width"])
+                )
+            elif self.data["vars"]["mode"] == "lin":
+                b = self.data["vars"]["width"] / 2
+                a = b * self.data["pm"][i][4]
+                _warp[:, 0] += (
+                    (abs(delta[:, 1]) < b) * self.data["pm"][i][4] * delta[:, 1]
+                )
+                _warp[:, 0] += (delta[:, 1] >= b) * a
+                _warp[:, 0] -= (delta[:, 1] <= -b) * a
+                _warp[:, 4] += (abs(delta[:, 1]) < b) * self.data["pm"][i][4]
+        else:
+            _warp[:, 0] = (
+                self.data["pm"][i][0]
+                + self.data["pm"][i][2] * delta[:, 0]
+                + self.data["pm"][i][4] * delta[:, 1]
+                + 0.5 * self.data["pm"][i][6] * delta[:, 0] ** 2
+                + self.data["pm"][i][8] * delta[:, 0] * delta[:, 1]
+                + 0.5 * self.data["pm"][i][10] * delta[:, 1] ** 2
+            )
+            _warp[:, 1] = (
+                self.data["pm"][i][1]
+                + self.data["pm"][i][3] * delta[:, 0]
+                + self.data["pm"][i][5] * delta[:, 1]
+                + 0.5 * self.data["pm"][i][7] * delta[:, 0] ** 2
+                + self.data["pm"][i][9] * delta[:, 0] * delta[:, 1]
+                + 0.5 * self.data["pm"][i][11] * delta[:, 1] ** 2
+            )
+            _warp[:, 2] = (
+                self.data["pm"][i][2]
+                + self.data["pm"][i][6] * delta[:, 0]
+                + self.data["pm"][i][8] * delta[:, 1]
+            )
+            _warp[:, 3] = (
+                self.data["pm"][i][3]
+                + self.data["pm"][i][7] * delta[:, 0]
+                + self.data["pm"][i][9] * delta[:, 1]
+            )
+            _warp[:, 4] = (
+                self.data["pm"][i][4]
+                + self.data["pm"][i][8] * delta[:, 1]
+                + self.data["pm"][i][10] * delta[:, 1]
+            )
+            _warp[:, 5] = (
+                self.data["pm"][i][5]
+                + self.data["pm"][i][9] * delta[:, 1]
+                + self.data["pm"][i][11] * delta[:, 1]
+            )
+            _warp[:, 6:] = self.data["pm"][i][6:]
 
-        if rot:
-            _warp[:, :2] -= delta
+            if rot:
+                _warp[:, :2] -= delta
+
         return _warp
 
     def _report(self, msg, error_type):
@@ -168,6 +198,10 @@ class Speckle(SpeckleBase):
             "type": "Speckle",
             "name": self._name,
             "solved": self.solved,
+            "image_size": [
+                self._image_size_x,
+                self._image_size_y,
+            ],
             "image_dir": self._image_dir,
             "file_format": self._file_format,
             "image_no": self._image_no,
@@ -178,8 +212,9 @@ class Speckle(SpeckleBase):
             "speckle_size": self._speckle_size,
         }
 
-    def solve(self, *, wrap=False, number=None, generate=True):
+    def solve(self, *, wrap=False, number=None, generate=True, vars=None):
         self._wrap = wrap
+        self._vars = vars
         [self.X, self.Y] = np.meshgrid(
             range(self._image_size_x), range(self._image_size_y)
         )
@@ -187,7 +222,12 @@ class Speckle(SpeckleBase):
             self._ref_speckle = self._speckle_distribution(number)
         self._mult()
         self.data.update(
-            {"wrap": self._wrap, "ref_speckle": self._ref_speckle, "pm": self._pm}
+            {
+                "wrap": self._wrap,
+                "ref_speckle": self._ref_speckle,
+                "pm": self._pm,
+                "vars": self._vars,
+            }
         )
         self._image_generation()
         self.solved = True
@@ -256,7 +296,7 @@ class Speckle(SpeckleBase):
             )
         for i in range(self._image_no):
             self._pm[i] = self._comp * self._mult[i]
-            self.noisem[i] = self._noise[0] * self._noise[1] * self._mult[i]
+            self.noisem[i] = self._noise[0] * self._noise[1]  # * self._mult[i]
 
     def _image_generation(self):
         with alive_bar(
@@ -282,49 +322,31 @@ class Speckle(SpeckleBase):
             warp[:, :2] = np.random.normal(loc=warp[:, :2], scale=self.noisem[i, 0])
         # covs = np.reshape(warp[:,2:6], (-1,2,2))*self._speckle_size**2
         for j in range(len(warp)):
-            cov = np.identity(2)
-            cov[0, 0] += warp[j, 2]
-            cov[1, 1] += warp[j, 5]
-            cov *= (self._speckle_size**2) / 8
-            shear_matrix = np.asarray([[1.0, warp[j, 4]], [warp[j, 3], 1.0]])
-            cov = np.dot(shear_matrix, np.dot(cov, shear_matrix.T))
-            distribution = sp.stats.multivariate_normal(
-                mean=warp[j, :2], cov=cov, allow_singular=True
-            )
-
-            a = max(int(warp[j, 1]) - 500, 0)
-            b = min(int(warp[j, 1]) + 501, self._image_size_y)
+            a = max(int(warp[j, 1]) - 100, 0)
+            b = min(int(warp[j, 1]) + 101, self._image_size_y)
             c = max(int(warp[j, 0]) - 100, 0)
             d = min(int(warp[j, 0]) + 101, self._image_size_x)
-            positions = np.dstack((self.X[a:b, c:d], self.Y[a:b, c:d]))
-            di = distribution.pdf(positions)
-            di /= 1 / (2 * np.pi * np.sqrt(cov[0, 0]) * np.sqrt(cov[1, 1]))
-
-            # 1/np.max(distribution.pdf(warp[j,:2]))
-            # di = np.exp(
-            #     -(
-            #         (
-            #             self.X[
-            #                 a:b,
-            #                 c:d,
-            #             ]
-            #             - _tar_speckle[j, 0]
-            #         )
-            #         ** 2
-            #         + (
-            #             self.Y[
-            #                 a:b,
-            #                 c:d,
-            #             ]
-            #             - _tar_speckle[j, 1]
-            #         )
-            #         ** 2
-            #     )
-            #     / ((self._speckle_size**2) / 4)
-            # )
-            # fig, ax = plt.subplots()
-            # ax.contourf(self.X[a:b,c:d], self.Y[a:b,c:d], di)
-            # plt.show()
+            di = np.exp(
+                -(
+                    (
+                        self.X[
+                            a:b,
+                            c:d,
+                        ]
+                        - warp[j, 0]
+                    )
+                    ** 2
+                    + (
+                        self.Y[
+                            a:b,
+                            c:d,
+                        ]
+                        - warp[j, 1]
+                    )
+                    ** 2
+                )
+                / ((self._speckle_size**2) / 4)
+            )
             grid[
                 a:b,
                 c:d,

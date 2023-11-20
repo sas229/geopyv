@@ -294,7 +294,8 @@ class SequenceBase(Object):
         *,
         mesh_index=None,
         quantity="C_ZNCC",
-        inter_order=1,
+        view="subset",
+        coords=None,
         imshow=True,
         colorbar=True,
         ticks=None,
@@ -450,7 +451,7 @@ class SequenceBase(Object):
         self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Load/access selected mesh object.
-        mesh_obj = self._load_mesh(mesh_index)
+        mesh_obj = self._load_mesh(mesh_index, obj=True)
 
         log.info(
             "Generating {quantity} contour plot for mesh {mesh}...".format(
@@ -461,7 +462,8 @@ class SequenceBase(Object):
             data=mesh_obj,
             imshow=imshow,
             quantity=quantity,
-            inter_order=inter_order,
+            view=view,
+            coords=coords,
             colorbar=colorbar,
             ticks=ticks,
             mesh=mesh,

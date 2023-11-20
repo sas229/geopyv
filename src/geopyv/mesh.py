@@ -11,9 +11,8 @@ import gmsh
 from copy import deepcopy
 from scipy.optimize import minimize_scalar
 from alive_progress import alive_bar
-
-# import matplotlib.pyplot as plt
-# import cv2
+import matplotlib.pyplot as plt
+import cv2
 import traceback
 
 # import matplotlib.pyplot as plt
@@ -246,7 +245,8 @@ class MeshBase(Object):
         self,
         *,
         quantity="C_ZNCC",
-        inter_order=1,
+        view="subset",
+        coords=None,
         imshow=True,
         colorbar=True,
         ticks=None,
@@ -394,10 +394,11 @@ class MeshBase(Object):
             "Generating {quantity} contour plot for mesh...".format(quantity=quantity)
         )
         fig, ax = gp.plots.contour_mesh(
-            data=self.data,
+            data=self,
             imshow=imshow,
             quantity=quantity,
-            inter_order=inter_order,
+            view=view,
+            coords=coords,
             colorbar=colorbar,
             ticks=ticks,
             mesh=mesh,
@@ -1626,7 +1627,7 @@ class Mesh(MeshBase):
             Error between target and actual number of nodes.
 
         """
-        lengths = order * gp.geometry.utilities.area_to_length(
+        lengths = gp.geometry.utilities.area_to_length(
             areas * scale
         )  # Convert target areas to target characteristic lengths.
         bg = gmsh.view.add("bg", 1)  # Create background view.
@@ -1860,33 +1861,27 @@ class Mesh(MeshBase):
         """
         for i in range(len(self._elements)):
             if self._warps[i, 2] < -1 or self._warps[i, 5] < -1:
-                # n1 = self._nodes[self._elements[i]]
-                # n2 = (
-                #     self._nodes[self._elements[i]]
-                #     + self._displacements[self._elements[i]]
-                # )
-                # fig,ax = plt.subplots()
-                # image = cv2.imread(
-                #     self.data["images"]["f_img"], cv2.IMREAD_COLOR
-                # )
-                # image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                # image_gs = cv2.GaussianBlur(
-                #     image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
-                # )
-                # plt.imshow(image_gs, cmap="gray")
-                # ax.plot(
-                #     n1[[0,1,2,0],0],n1[[0,1,2,0],1], color = "purple"
-                # )
-                # ax.plot(
-                #     n2[[0,1,2,0],0],n2[[0,1,2,0],1],color = "orange"
-                # )
-                # ax.scatter(n1[0,0],n1[0,1],color = "r")
-                # ax.scatter(n2[0,0],n2[0,1],color = "r")
-                # ax.scatter(n1[1,0],n1[1,1],color = "b")
-                # ax.scatter(n2[1,0],n2[1,1],color = "b")
-                # ax.scatter(n1[2,0],n1[2,1],color = "g")
-                # ax.scatter(n2[2,0],n2[2,1],color = "g")
-                # plt.show()
+                n1 = self._nodes[self._elements[i]]
+                n2 = (
+                    self._nodes[self._elements[i]]
+                    + self._displacements[self._elements[i]]
+                )
+                fig, ax = plt.subplots()
+                image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
+                image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                image_gs = cv2.GaussianBlur(
+                    image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
+                )
+                plt.imshow(image_gs, cmap="gray")
+                ax.plot(n1[[0, 1, 2, 0], 0], n1[[0, 1, 2, 0], 1], color="purple")
+                ax.plot(n2[[0, 1, 2, 0], 0], n2[[0, 1, 2, 0], 1], color="orange")
+                ax.scatter(n1[0, 0], n1[0, 1], color="r")
+                ax.scatter(n2[0, 0], n2[0, 1], color="r")
+                ax.scatter(n1[1, 0], n1[1, 1], color="b")
+                ax.scatter(n2[1, 0], n2[1, 1], color="b")
+                ax.scatter(n1[2, 0], n1[2, 1], color="g")
+                ax.scatter(n2[2, 0], n2[2, 1], color="g")
+                plt.show()
                 self._unsolvable = True
                 self._status = 6
                 break
@@ -1895,39 +1890,41 @@ class Mesh(MeshBase):
                 if gp.geometry.utilities.polysect(
                     self._nodes[self._elements[i]][[0, 3, 1, 4, 2, 5]]
                 ):
-                    # n1 = self._nodes[self._elements[i]]
-                    # n2 = (
-                    #     self._nodes[self._elements[i]]
-                    #     + self._displacements[self._elements[i]]
-                    # )
-                    # fig,ax = plt.subplots()
-                    # image = cv2.imread(
-                    #     self.data["images"]["f_img"], cv2.IMREAD_COLOR
-                    # )
-                    # image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                    # image_gs = cv2.GaussianBlur(
-                    #     image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
-                    # )
-                    # plt.imshow(image_gs, cmap="gray")
-                    # ax.plot(
-                    #     n1[[0,3,1,4,2,5,0],0],n1[[0,3,1,4,2,5,0],1], color = "purple"
-                    # )
-                    # ax.plot(
-                    #     n2[[0,3,1,4,2,5,0],0],n2[[0,3,1,4,2,5,0],1],color = "orange"
-                    # )
-                    # ax.scatter(n1[0,0],n1[0,1],color = "r")
-                    # ax.scatter(n2[0,0],n2[0,1],color = "r")
-                    # ax.scatter(n1[1,0],n1[1,1],color = "b")
-                    # ax.scatter(n2[1,0],n2[1,1],color = "b")
-                    # ax.scatter(n1[2,0],n1[2,1],color = "g")
-                    # ax.scatter(n2[2,0],n2[2,1],color = "g")
-                    # ax.scatter(n1[3,0],n1[3,1],color = "c")
-                    # ax.scatter(n2[3,0],n2[3,1],color = "c")
-                    # ax.scatter(n1[4,0],n1[4,1],color = "m")
-                    # ax.scatter(n2[4,0],n2[4,1],color = "m")
-                    # ax.scatter(n1[5,0],n1[5,1],color = "k")
-                    # ax.scatter(n2[5,0],n2[5,1],color = "k")
-                    # plt.show()
+                    n1 = self._nodes[self._elements[i]]
+                    n2 = (
+                        self._nodes[self._elements[i]]
+                        + self._displacements[self._elements[i]]
+                    )
+                    fig, ax = plt.subplots()
+                    image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
+                    image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                    image_gs = cv2.GaussianBlur(
+                        image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
+                    )
+                    plt.imshow(image_gs, cmap="gray")
+                    ax.plot(
+                        n1[[0, 3, 1, 4, 2, 5, 0], 0],
+                        n1[[0, 3, 1, 4, 2, 5, 0], 1],
+                        color="purple",
+                    )
+                    ax.plot(
+                        n2[[0, 3, 1, 4, 2, 5, 0], 0],
+                        n2[[0, 3, 1, 4, 2, 5, 0], 1],
+                        color="orange",
+                    )
+                    ax.scatter(n1[0, 0], n1[0, 1], color="r")
+                    ax.scatter(n2[0, 0], n2[0, 1], color="r")
+                    ax.scatter(n1[1, 0], n1[1, 1], color="b")
+                    ax.scatter(n2[1, 0], n2[1, 1], color="b")
+                    ax.scatter(n1[2, 0], n1[2, 1], color="g")
+                    ax.scatter(n2[2, 0], n2[2, 1], color="g")
+                    ax.scatter(n1[3, 0], n1[3, 1], color="c")
+                    ax.scatter(n2[3, 0], n2[3, 1], color="c")
+                    ax.scatter(n1[4, 0], n1[4, 1], color="m")
+                    ax.scatter(n2[4, 0], n2[4, 1], color="m")
+                    ax.scatter(n1[5, 0], n1[5, 1], color="k")
+                    ax.scatter(n2[5, 0], n2[5, 1], color="k")
+                    plt.show()
                     self._unsolvable = True
                     self._status = 6
                     break

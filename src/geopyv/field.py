@@ -834,13 +834,7 @@ class Field(FieldBase):
             del self._rm
             self._rm = self._series._load_mesh(m, obj=True, verbose=False)
 
-    def solve(
-        self,
-        *,
-        model=None,
-        state=None,
-        parameters=None,
-    ):
+    def solve(self, *, model=None, state=None, parameters=None, intype=0):
         """
         Method to solve for the field.
 
@@ -880,11 +874,14 @@ class Field(FieldBase):
                 self._check_update(i)
                 for j in range(particle_no):
                     self.solved += self._particles[j]._strain_path_inc(
-                        i, self._cm, self._rm
+                        i, self._cm, self._rm, intype
                     )
                     if i == self.data["number_images"] - 2:
                         self.solved += self._particles[j].solve(
-                            model=model, state=state, parameters=parameters
+                            model=model,
+                            state=state,
+                            parameters=parameters,
+                            intype=intype,
                         )
                 if bool(self.solved) is False:
                     self._unsolvable = True
@@ -895,30 +892,6 @@ class Field(FieldBase):
         for i in range(particle_no):
             self._particles[i] = self._particles[i].data
             self._vol_totals += self._particles[i]["results"]["volumes"]
-
-        # with alive_bar(
-        #     particle_no, dual_line=True, bar="blocks", title="Solving particles..."
-        # ) as bar:
-        #     for i in range(particle_no):
-        #         particle = gp.particle.Particle(
-        #             series=self._series,
-        #             coordinate=self._coordinates[i],
-        #             volume=self._volumes[i],
-        #             stress=self._stresses[i],
-        #             track=self._track,
-        #             field = True,
-        #         )
-        #         _particle_solved = particle.solve(
-        #             model=model, state=state, parameters=parameters
-        #         )
-        #         if _particle_solved is False:
-        #             self._unsolvable = True
-        #             self.data["unsolvable"] = self._unsolvable
-        #             return self.solved
-        #         self._particles[i] = particle.data
-        #         self._vol_totals += self._particles[i]["results"]["volumes"]
-        #         del particle
-        #         bar()
 
         if model is not None:
             self._works = np.zeros(self.data["number_images"])

@@ -8,137 +8,16 @@ import sys
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
-
 from matplotlib.collections import LineCollection
-import scipy as sp
 import numpy as np
 import re
 import geopyv as gp
-import alphashape
+import scipy.spatial as spsp
 
 plt.rcParams["axes.prop_cycle"] = plt.cycler(
     "color", plt.cm.tab20(np.linspace(0, 1, 20))
 )
 log = logging.getLogger(__name__)
-
-
-def warp_visualiser(template, warp, show, block, save):
-    title = "Visualise warp"
-
-    f_coord = np.zeros(2)
-    f_coords = template.coords
-    g_coords = gp._subset_extensions._g_coords(f_coord, warp, f_coords)
-
-    f_alpha = alphashape.alphashape(f_coords, 1)
-    f_x, f_y = f_alpha.exterior.xy
-    g_alpha = alphashape.alphashape(g_coords, 1)
-    g_x, g_y = g_alpha.exterior.xy
-
-    fig, ax = plt.subplots(num=title)
-
-    ax.fill(f_x, f_y, alpha=0.5, color="b")
-    ax.fill(g_x, g_y, alpha=0.5, color="r")
-
-    ax.set_axis_off()
-    ax.axis("equal")
-    plt.tight_layout()
-
-    # Save
-    if save is not None:
-        plt.savefig(save, dpi=600)
-
-    # Show or close.
-    if show is True:
-        plt.show(block=block)
-    else:
-        plt.close(fig)
-
-    return fig, ax
-
-
-def inspect_subset_warp(data, mask, show, block, save):
-    image = cv2.imread(data["images"]["f_img"], cv2.IMREAD_COLOR)
-    image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
-    x = data["position"]["x"]
-    y = data["position"]["y"]
-    template_size = data["template"]["size"]
-    title = "Inspect subset: f_coord = ({x},{y}) (px)".format(x=x, y=y)
-
-    f_coord = np.asarray([x, y])
-    if data["template"]["shape"] == "circle":
-        template = gp.templates.Circle(template_size)
-    elif data["template"]["shape"] == "square":
-        template = gp.templates.Square(template_size)
-    f_img = gp.image.Image(data["images"]["f_img"])
-    f_coords = gp._subset_extensions._init_reference(
-        f_coord, template.coords, f_img.QCQT
-    )[0]
-    g_coords = gp._subset_extensions._g_coords(f_coord, data["results"]["p"], f_coords)
-
-    # Crop image and mask.
-    x_min = (np.round(min(np.min(f_coords[:, 0]), np.min(g_coords[:, 0])), 0)).astype(
-        int
-    )
-    x_max = (np.round(max(np.max(f_coords[:, 0]), np.max(g_coords[:, 0])), 0)).astype(
-        int
-    )
-    y_min = (np.round(min(np.min(f_coords[:, 1]), np.min(g_coords[:, 1])), 0)).astype(
-        int
-    )
-    y_max = (np.round(max(np.max(f_coords[:, 1]), np.max(g_coords[:, 1])), 0)).astype(
-        int
-    )
-
-    # image = image_gs.astype(np.float32)[y_min : y_max + 1, x_min : x_max + 1]
-    if not isinstance(mask, type(None)):
-        if type(mask) == np.ndarray:
-            if np.shape(mask) == np.shape(image_gs):
-                mask = mask.astype(np.float32)[y_min : y_max + 1, x_min : x_max + 1]
-                invert_mask = np.abs(mask - 1) * 255
-                image = np.maximum(image, invert_mask)
-
-    f_hull = sp.spatial.ConvexHull(f_coords)
-    g_hull = sp.spatial.ConvexHull(g_coords)
-
-    fig, ax = plt.subplots(num=title)
-    ax.imshow(
-        image,
-        cmap="gist_gray",
-        interpolation="nearest",
-        aspect="equal",
-    )
-    ax.fill(
-        f_coords[f_hull.vertices, 0], f_coords[f_hull.vertices, 1], alpha=0.5, color="b"
-    )
-    ax.fill(
-        g_coords[g_hull.vertices, 0], g_coords[g_hull.vertices, 1], alpha=0.5, color="r"
-    )
-
-    ax.text(
-        3.0,
-        -1.0,
-        "warp vector: " + str(data["results"]["p"]),
-        horizontalalignment="center",
-    )
-
-    ax.set_xlim(x_min - 5, x_max + 5)
-    ax.set_ylim(y_max + 5, y_min - 5)
-
-    ax.set_axis_off()
-    plt.tight_layout()
-
-    # Save
-    if save is not None:
-        plt.savefig(save, dpi=600)
-
-    # Show or close.
-    if show is True:
-        plt.show(block=block)
-    else:
-        plt.close(fig)
-
-    return fig, ax
 
 
 def inspect_subset(data, mask, show, block, save):
@@ -457,7 +336,8 @@ def convergence_mesh(data, quantity, show, block, save):
 def contour_mesh(
     data,
     quantity,
-    inter_order,
+    view,
+    coords,
     imshow,
     colorbar,
     ticks,
@@ -474,11 +354,11 @@ def contour_mesh(
     """Function to plot contours of mesh data."""
 
     # Load data.
+    obj = data
+    data = data.data
+
     nodes = data["nodes"]
     elements = data["elements"]
-
-    if quantity in ["u", "v", "R", "size", "C_ZNCC", "iterations", "norm"]:
-        inter_order = 0
 
     # Plot setup.
     try:
@@ -520,7 +400,7 @@ def contour_mesh(
         for i in range(np.shape(x_p)[0]):
             ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth=0.5)
 
-    if inter_order == 1:
+    if view == "subset":
         subsets = data["results"]["subsets"]
         # Data extraction.
         value = []
@@ -544,7 +424,48 @@ def contour_mesh(
             else:
                 value.append(s["results"][quantity])
         value = np.asarray(value)
+    elif view == "particle":
+        names = np.asarray(["u", "v", "u_x", "v_x", "u_y", "v_y"])
+        warp_index = np.argwhere(names == quantity)[0][0]
+        if data["mesh_order"] == 1 and warp_index >= 2:
+            value = np.zeros(len(elements))
+            field = gp.field.Field(
+                series=obj,
+                coordinates=np.mean(nodes[elements], axis=1),
+            )
+            field.solve()
+            for i in range(len(field.data["particles"])):
+                value[i] = field.data["particles"][i]["results"]["warps"][1, warp_index]
+        else:
+            if coords is not None:
+                value = np.zeros(len(coords))
+                field = gp.field.Field(
+                    series=obj,
+                    coordinates=coords,
+                )
+                field.solve()
+                for i in range(len(coords)):
+                    value[i] = field.data["particles"][i]["results"]["warps"][
+                        1, warp_index
+                    ]
+                nodes = coords
+                delaunay = spsp.Delaunay(coords)
+                mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+                    delaunay.simplices, nodes[:, 0], nodes[:, 1], 1
+                )
+            else:
+                value = np.zeros(len(nodes))
+                field = gp.field.Field(
+                    series=obj,
+                    coordinates=nodes,
+                )
+                field.solve()
+                for i in range(len(nodes)):
+                    value[i] = field.data["particles"][i]["results"]["warps"][
+                        1, warp_index
+                    ]
 
+    if len(value) == len(nodes):
         # Set levels and extend.
         extend = "neither"
         if not isinstance(levels, type(None)):
@@ -555,7 +476,6 @@ def contour_mesh(
             elif np.min(value) < np.min(levels):
                 extend = "min"
         extend = "both"
-
         # Plot contours.
         triangulation = tri.Triangulation(nodes[:, 0], nodes[:, 1], mesh_triangulation)
         contours = ax.tricontourf(
@@ -565,16 +485,7 @@ def contour_mesh(
             levels=levels,
             extend=extend,
         )
-    elif inter_order == 0:
-        if quantity == "u_x":
-            warp_index = 2
-        elif quantity == "v_x":
-            warp_index = 3
-        elif quantity == "u_y":
-            warp_index = 4
-        elif quantity == "v_y":
-            warp_index = 5
-        value = data["results"]["warps"][:, warp_index]
+    else:
         if levels is not None:
             vmin = levels[0]
             vmax = levels[-1]

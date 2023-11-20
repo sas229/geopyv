@@ -475,7 +475,7 @@ class Particle(ParticleBase):
         N, dN, d2N = self._shape_function(zeta, eta, theta)
         return N @ x
 
-    def solve(self, *, model=None, state=None, parameters=None, inter_order=0):
+    def solve(self, *, model=None, state=None, parameters=None, intype=0):
         """
 
         Method to solve for the particle.
@@ -498,9 +498,9 @@ class Particle(ParticleBase):
             - LinearElastic
             - MCC
             - SMCC
-        inter_order : int, optional
+        intype : int, optional
             Base interpolation order. Options are:
-            0 (default) : strains are interpolated from nodal displacements
+            0 (default) : strains are interpolated from nodal displacementss
                 i.e. strains from a 1st order mesh are singular per element.
             1 : strains are interpolated from nodal strains i.e. strains from
             a 1st order mesh are linearly interpolatable.
@@ -508,7 +508,7 @@ class Particle(ParticleBase):
         # Checks.
 
         # Store variables.
-        self._inter_order = inter_order
+        self._intype = intype
 
         # Solving.
         if self._field is False:
@@ -737,16 +737,16 @@ class Particle(ParticleBase):
         self._warp_inc[:2] = N @ u
 
         # 1st Order Strains
-        if self._inter_order == 0:
+        if self._intype == 0:
             J_x_T = dN @ x
             J_u_T = dN @ u
             self._warp_inc[2:6] = (np.linalg.inv(J_x_T) @ J_u_T).flatten()
-        elif self._inter_order == 1:
-            u_prime = np.zeros((3, 4))
-            for i in range(3):
+        elif self._intype == 1:
+            u_prime = np.zeros((3 * self._mesh_order, 4))
+            for i in range(3 * self._mesh_order):
                 u_prime[i] = self._cm.data["results"]["subsets"][
                     self._cm.data["elements"][tri_idx][i]
-                ]["results"]["p"][2:].flatten()
+                ]["results"]["p"][2:6].flatten()
             self._warp_inc[2:6] = N @ u_prime
 
         # 2nd Order Strains
@@ -823,7 +823,8 @@ class Particle(ParticleBase):
                 bar()
         return True
 
-    def _strain_path_inc(self, m, cm, rm):
+    def _strain_path_inc(self, m, cm, rm, intype=0):
+        self._intype = intype
         self._update_cm_rm(m, cm, rm)
         tri_idx = self._element_locator()
         self._warp_increment(m, tri_idx)
@@ -867,14 +868,6 @@ class Particle(ParticleBase):
             pass
         self._cm = cm
         self._rm = rm
-        # if int(
-        #     re.findall(
-        #         r"\d+",
-        #         self._rm.data["images"]["f_img"],
-        #     )[-1]
-        # ) != int(re.findall(r"\d+", self._cm.data["images"]["f_img"])[-1]):
-        #     self._reference_index = m
-        #     self._reference_update_register.append(m)
 
     def _stress_path(self, model, state, parameters):
         """Under construction"""
@@ -915,26 +908,6 @@ class Particle(ParticleBase):
                 model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
                 model.solve()
             except Exception:
-                # fig, (ax, bx) = plt.subplots(2, 1)
-                # ax.plot(range(i + 1), self._strains[: i + 1, 0], label=r"$du/dx$")
-                # ax.plot(range(i + 1), self._strains[: i + 1, 1], label=r"$dv/dy$")
-                # ax.plot(range(i + 1), self._strains[: i + 1, 5], label=r"$\gamma$")
-                # bx.plot(
-                #     range(i + 1), self._stresses[: i + 1, 0], label=r"$\sigma_{xx}$"
-                # )
-                # bx.plot(
-                #     range(i + 1), self._stresses[: i + 1, 1], label=r"$\sigma_{yy}$"
-                # )
-                # bx.plot(
-                #     range(i + 1), self._stresses[: i + 1, 2], label=r"$\sigma_{zz}$"
-                # )
-                # bx.plot(
-                #     range(i + 1), self._stresses[: i + 1, 5], label=r"$\sigma_{xy}$"
-                # )
-                # ax.legend()
-                # bx.legend()
-                # plt.show()
-
                 print(traceback.format_exc())
                 log.error("geomat error. Stress path curtailed.")
                 raise ValueError("geomat error. Stress path curtailed.")

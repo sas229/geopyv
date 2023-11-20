@@ -33,8 +33,6 @@ class SpeckleBase(Object):
         _warp = np.zeros((np.shape(ref)[0], np.shape(self.data["comp"])[0]))
         delta = ref - self.data["origin"]
         if self.data["vars"] is not None:
-            b = self.data["vars"]["width"] / 2
-            a = b * self.data["pm"][i][4]
             if self.data["vars"]["mode"] == "sin":
                 b = self.data["vars"]["width"] / 2
                 a = b * self.data["pm"][i][4]
@@ -45,7 +43,7 @@ class SpeckleBase(Object):
                 )
                 _warp[:, 0] += (delta[:, 1] >= b) * a
                 _warp[:, 0] -= (delta[:, 1] <= -b) * a
-                _warp[:, 2] += (
+                _warp[:, 4] += (
                     (abs(delta[:, 1]) < b)
                     * a
                     * np.pi
@@ -61,6 +59,11 @@ class SpeckleBase(Object):
                 _warp[:, 0] += (delta[:, 1] >= b) * a
                 _warp[:, 0] -= (delta[:, 1] <= -b) * a
                 _warp[:, 4] += (abs(delta[:, 1]) < b) * self.data["pm"][i][4]
+            elif self.data["vars"]["mode"] == "quad":
+                _warp[:, 0] += (
+                    (delta[:, 1] >= 0) * 0.5 * self.data["pm"][i][4] * delta[:, 1] ** 2
+                )
+                _warp[:, 4] += (delta[:, 1] >= 0) * self.data["pm"][i][4] * delta[:, 1]
         else:
             _warp[:, 0] = (
                 self.data["pm"][i][0]

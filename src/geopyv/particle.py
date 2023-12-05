@@ -14,7 +14,7 @@ import math
 from geomat.abstract import Elastoplastic  # noqa: F401
 from geomat.utilities import Derivatives  # noqa: F401
 from geomat.models import LinearElastic, MCC, SMCC, C2MC, EMC  # noqa: F401
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # noqa: F401
 import traceback
 
 log = logging.getLogger(__name__)
@@ -475,7 +475,7 @@ class Particle(ParticleBase):
         N, dN, d2N = self._shape_function(zeta, eta, theta)
         return N @ x
 
-    def solve(self, *, model=None, state=None, parameters=None, intype=0):
+    def solve(self, *, model=None, state=None, parameters=None, intype=0, verbose=True):
         """
 
         Method to solve for the particle.
@@ -512,7 +512,7 @@ class Particle(ParticleBase):
 
         # Solving.
         if self._field is False:
-            self.solved += self._strain_path_full()
+            self.solved += self._strain_path_full(verbose)
         self._strain_def()
         if model:
             self.solved += self._stress_path(model, state, parameters)
@@ -581,22 +581,21 @@ class Particle(ParticleBase):
                     boundary=self._cm.data[self._nref][self._cm.data["boundary"]],
                 )
             )
-            fig, ax = plt.subplots()
-            ax.plot(
-                self._cm.data["nodes"][self._cm.data["boundary"]][[0, 1, 2, 3, 0], 0],
-                self._cm.data["nodes"][self._cm.data["boundary"]][[0, 1, 2, 3, 0], 1],
-            )
-            ax.plot(
-                self._cm.data["nodes"][self._cm.data["exclusions"][0]][:, 0],
-                self._cm.data["nodes"][self._cm.data["exclusions"][0]][:, 1],
-            )
-            ax.plot(
-                self._plotting_coordinates[:, 0],
-                self._plotting_coordinates[:, 1],
-            )
-            plt.show()
+            # fig, ax = plt.subplots()
+            # ax.plot(
+            #     self._cm.data["nodes"][self._cm.data["boundary"]][[0, 1, 2, 3, 0], 0],
+            #     self._cm.data["nodes"][self._cm.data["boundary"]][[0, 1, 2, 3, 0], 1],
+            # )
+            # ax.plot(
+            #     self._cm.data["nodes"][self._cm.data["exclusions"][0]][:, 0],
+            #     self._cm.data["nodes"][self._cm.data["exclusions"][0]][:, 1],
+            # )
+            # ax.plot(
+            #     self._plotting_coordinates[:, 0],
+            #     self._plotting_coordinates[:, 1],
+            # )
+            # plt.show()
             raise ValueError("Particle outside of boundary.")
-
         return index
 
     def _local_coordinates(self, element_nodes):
@@ -785,9 +784,13 @@ class Particle(ParticleBase):
             del self._rm
             self._rm = self._series._load_mesh(m, obj=True, verbose=False)
 
-    def _strain_path_full(self):
+    def _strain_path_full(self, verbose):
         with alive_bar(
-            self._inc_no - 1, dual_line=True, bar="blocks", title="Solving particle ..."
+            self._inc_no - 1,
+            dual_line=True,
+            bar="blocks",
+            title="Solving particle ...",
+            disable=(not verbose),
         ) as bar:
             for m in range(self._inc_no - 1):
                 self._update_mesh(m)
@@ -908,6 +911,25 @@ class Particle(ParticleBase):
                 model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
                 model.solve()
             except Exception:
+                # fig, (ax, bx) = plt.subplots(2, 1)
+                # ax.plot(range(i + 1), self._strains[: i + 1, 0], label=r"$du/dx$")
+                # ax.plot(range(i + 1), self._strains[: i + 1, 1], label=r"$dv/dy$")
+                # ax.plot(range(i + 1), self._strains[: i + 1, 5], label=r"$\gamma$")
+                # bx.plot(
+                #     range(i + 1), self._stresses[: i + 1, 0], label=r"$\sigma_{xx}$"
+                # )
+                # bx.plot(
+                #     range(i + 1), self._stresses[: i + 1, 1], label=r"$\sigma_{yy}$"
+                # )
+                # bx.plot(
+                #     range(i + 1), self._stresses[: i + 1, 2], label=r"$\sigma_{zz}$"
+                # )
+                # bx.plot(
+                #     range(i + 1), self._stresses[: i + 1, 5], label=r"$\sigma_{xy}$"
+                # )
+                # ax.legend()
+                # bx.legend()
+                # plt.show()
                 print(traceback.format_exc())
                 log.error("geomat error. Stress path curtailed.")
                 raise ValueError("geomat error. Stress path curtailed.")

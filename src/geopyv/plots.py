@@ -27,7 +27,7 @@ def inspect_subset(data, mask, show, block, save):
 
     Parameters
     ----------
-    data : dict
+    data : dictgit
         Subset data dict.
     mask : `numpy.ndarray`
         Subset mask.
@@ -401,6 +401,8 @@ def contour_mesh(
             ax.plot(x_p[i], y_p[i], color="k", alpha=0.25, linewidth=0.5)
 
     if view == "subset":
+        if quantity == "C_ZNCC":
+            value = data["results"]["C_ZNCC"]
         subsets = data["results"]["subsets"]
         # Data extraction.
         value = []

@@ -33,39 +33,38 @@ subset = gp.io.load(filename="test")
 
 # Mesh test.
 # Mesh setup.
-ref = gp.image.Image("./images/T-Bar/IMG_1062.jpg")
-tar = gp.image.Image("./images/T-Bar/IMG_1065.jpg")
+ref = gp.image.Image("./images/ref.jpg")
+tar = gp.image.Image("./images/tar.jpg")
 template = gp.templates.Circle(50)
-boundary = gp.geometry.region.Path(
-    nodes=np.asarray(
-        [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
-    ),
+boundary_obj = gp.geometry.region.Path(
+    nodes=np.asarray([[200.0, 200.0], [200.0, 800.0], [800.0, 800.0], [800.0, 200.0]]),
     hard=False,
 )
-exclusions = []
-exclusions.append(
+exclusions_objs = []
+exclusions_objs.append(
     gp.geometry.region.Circle(
-        centre=np.asarray([1925, 1470]),
-        radius=430.0,
-        size=100.0,
+        centre=np.asarray([700.0, 700.0]),
+        radius=50.0,
+        size=20.0,
         option="F",
         hard=True,
     )
 )
-seed = np.asarray([400, 400.0])
+seed = np.asarray([501, 501.0])
 alpha = 0.2
 
 # Mesh instantiation.
 mesh = gp.mesh.Mesh(
     f_img=ref,
     g_img=tar,
-    target_nodes=1000,
-    boundary_obj=boundary,
-    exclusion_objs=exclusions,
+    target_nodes=100,
+    boundary_obj=boundary_obj,
+    exclusion_objs=exclusions_objs,
     mesh_order=1,
 )
 
 # Mesh inspection.
+mesh.inspect()
 # mesh.inspect(subset_index=5000)
 # Mesh saving : note, prior to solving, a geopyv object cannot be saved.
 gp.io.save(object=mesh, filename="mesh")
@@ -130,52 +129,50 @@ mesh.convergence(subset_index=4000)
 # Sequence test.
 # Sequence setup.
 template = gp.templates.Circle(50)
-boundary = gp.geometry.region.Path(
-    nodes=np.asarray(
-        [[200.0, 200.0], [200.0, 2700.0], [3900.0, 2700.0], [3900.0, 200.0]]
-    ),
-    option="F",
+boundary_obj = gp.geometry.region.Path(
+    nodes=np.asarray([[200.0, 200.0], [200.0, 800.0], [800.0, 800.0], [800.0, 200.0]]),
     hard=False,
 )
-exclusions = []
-exclusions.append(
+exclusion_objs = []
+exclusion_objs.append(
     gp.geometry.region.Circle(
-        centre=np.asarray([1925, 1470]),
-        radius=430.0,
-        size=100.0,
+        centre=np.asarray([700.0, 700.0]),
+        radius=50.0,
+        size=20.0,
         option="F",
         hard=True,
     )
 )
-seed = np.asarray([400, 400.0])
+seed = np.asarray([501, 501.0])
 alpha = 0.2
 
 # Sequence instantiation.
 sequence = gp.sequence.Sequence(
-    image_dir="images/T-Bar/",
+    image_dir="images/sequence/",
     target_nodes=1000,
-    boundary_obj=boundary,
-    exclusion_objs=exclusions,
+    boundary_obj=boundary_obj,
+    exclusion_objs=exclusion_objs,
     save_by_reference=True,
-    mesh_dir="images/T-Bar/meshes/",
+    mesh_dir="images/meshes/",
 )
 
 # Sequence solving.
 sequence.solve(
     seed_coord=seed,
     template=template,
-    adaptive_iterations=0,
+    adaptive_iterations=3,
     method="ICGN",
     alpha=alpha,
     tolerance=0.7,
+    sync=True,
 )
 
 # Sequence saving.
-gp.io.save(object=sequence, filename="T_bar_sequence")
+gp.io.save(object=sequence, filename="sequence")
 del sequence
 
 # Sequence loading.
-sequence = gp.io.load(filename="T_bar_sequence")
+sequence = gp.io.load(filename="sequence")
 
 # Other sequence methods (plot functionality).
 sequence.inspect(mesh_index=0)

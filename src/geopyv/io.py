@@ -120,6 +120,8 @@ def save(*, object, directory=None, filename=None, verbose=True):
     if isinstance(object, gp.object.Object):
         solved = object.data["solved"]
         if solved is True or object.data["type"] == "Sequence":
+            if filename[-4:] == ".pyv":
+                filename = filename[:-4]
             ext = ".pyv"
             filepath = directory + "/" + filename + ext
             with open(filepath, "wb") as outfile:

@@ -874,7 +874,8 @@ class Sequence(SequenceBase):
         guide=True,
         override=False,
         sequential=False,
-        history=None,
+        sync=False,
+        dense=False,
         subset_size_limits=None,
         _f_index=0,
         _g_index=1,
@@ -921,9 +922,12 @@ class Sequence(SequenceBase):
             Boolean to indicate if the subset instance has been solved.
         """
         # Check if solved.
-        if self.data["solved"] is True:
-            log.error("Sequence has already been solved. Cannot be solved again.")
-            return
+        try:
+            if self.data["solved"] is True:
+                log.error("Sequence has already been solved. Cannot be solved again.")
+                return
+        except Exception:
+            log.error("Sequence cannot be solved as instantiation failed.")
 
         # Check inputs.
         if self._report(
@@ -1101,16 +1105,17 @@ class Sequence(SequenceBase):
         self._sequential = sequential
         self._override = override
         self._mesh_override = False
-        self._history = history
         self._seed_warp = np.zeros(6 * self._subset_order)
         self._subset_size_limits = subset_size_limits
+        self._sync = sync
+        self._dense = dense
 
         # Solve.
         _seed_coord_t = self._seed_coord
         _seed_displacement = np.zeros(2)
         _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
         _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
-        _prev_mesh = None
+        geo = None
         while _g_index < len(self._image_indices):
             log.info(
                 "Solving for image pair {}-{}.".format(
@@ -1128,6 +1133,7 @@ class Sequence(SequenceBase):
                 size_upper_bound=self._size_upper_bound,
                 mesh_order=self._mesh_order,
                 hp=True,
+                geo=geo,
             )  # Initialise mesh object.
             mesh.solve(
                 seed_coord=self._seed_coord,
@@ -1135,70 +1141,53 @@ class Sequence(SequenceBase):
                 template=self._template,
                 max_iterations=self._max_iterations,
                 max_norm=self._max_norm,
-                adaptive_iterations=self._adaptive_iterations,
+                adaptive_iterations=self._adaptive_iterations * (geo is None),
                 correction=self._correction,
                 method=self._method,
                 subset_order=self._subset_order,
                 tolerance=self._tolerance,
                 seed_tolerance=self._seed_tolerance,
                 alpha=self._alpha,
-                history=_prev_mesh,
                 override=self._mesh_override,
                 subset_size_limits=self._subset_size_limits,
+                dense=self._dense,
             )  # Solve mesh.
             if mesh.solved:
-                # Mesh override reset.
-                if self._mesh_override:
-                    if np.any(mesh._C_ZNCC < self._tolerance):
-                        log.warning(
-                            (
-                                "Warning, correlation thresholds overriden to "
-                                "prevent sequence curtailment:\n{x} subsets with "
-                                "correlation between: {min}-{tol}."
-                            ).format(
-                                x=(mesh._C_ZNCC < self._tolerance).sum(),
-                                min=round(np.min(mesh._C_ZNCC), 2),
-                                tol=self._tolerance,
-                            )
-                        )
-                    self._mesh_override = False
-                # Save/store mesh.
+                self._check_override(mesh)
                 self._save_store_mesh(_f_index, _g_index, mesh)
-                if self._history:
-                    del _prev_mesh
-                    _prev_mesh = mesh
-                # Target image update.
                 _g_index, _g_img = self._target_update(_g_index, _g_img)
                 if self.solved:
                     break
-
                 # Setup for next mesh.
                 # Deformation preconditioning (if guided).
                 _seed_displacement = self._deformation_preconditioning(
                     mesh, _seed_coord_t
                 )
-                # Reference updating (if sequential).
                 if self._sequential:
                     (
                         _f_index,
                         _f_img,
                         _seed_coord_t,
                         _seed_displacement,
-                        _prev_mesh,
                     ) = self._reference_update(
-                        _g_index, _f_img, _seed_coord_t, _seed_displacement, _prev_mesh
+                        _g_index, _f_img, _seed_coord_t, _seed_displacement
                     )
-
+                elif self._sync:
+                    geo = self._geo_update(mesh)
             elif _f_index + 1 < _g_index:
                 (
                     _f_index,
                     _f_img,
                     _seed_coord_t,
                     _seed_displacement,
-                    _prev_mesh,
                 ) = self._reference_update(
-                    _g_index, _f_img, _seed_coord_t, _seed_displacement, _prev_mesh
+                    _g_index,
+                    _f_img,
+                    _seed_coord_t,
+                    _seed_displacement,
                 )
+                if self._sync:
+                    geo = None
                 if self._override:
                     self._mesh_override = True
             else:
@@ -1214,7 +1203,7 @@ class Sequence(SequenceBase):
                 del mesh
                 break
             del mesh
-        del _f_img, _prev_mesh
+        del _f_img
 
         # Pack data.
         self.data.update(
@@ -1222,10 +1211,40 @@ class Sequence(SequenceBase):
                 "solved": self.solved,
                 "unsolvable": self._unsolvable,
                 "meshes": np.asarray(self.data["meshes"]),
+                "sync": self._sync,
+                "dense": self._dense,
+                "subset_size_limits": self._subset_size_limits,
+                "override": self._override,
             }
         )
 
         return self.solved
+
+    def _geo_update(self, mesh):
+        geo = {
+            "nodes": mesh._nodes,
+            "elements": mesh._elements,
+            "boundary": mesh._boundary,
+            "exclusions": mesh._exclusions,
+        }
+        return geo
+
+    def _check_override(self, mesh):
+        # Mesh override reset.
+        if self._mesh_override:
+            if np.any(mesh._C_ZNCC < self._tolerance):
+                log.warning(
+                    (
+                        "Warning, correlation thresholds overriden to "
+                        "prevent sequence curtailment:\n{x} subsets with "
+                        "correlation between: {min}-{tol}."
+                    ).format(
+                        x=(mesh._C_ZNCC < self._tolerance).sum(),
+                        min=round(np.min(mesh._C_ZNCC), 2),
+                        tol=self._tolerance,
+                    )
+                )
+            self._mesh_override = False
 
     def _save_store_mesh(self, _f_index, _g_index, mesh):
         # Save/store mesh.
@@ -1250,7 +1269,7 @@ class Sequence(SequenceBase):
     def _deformation_preconditioning(self, mesh, _seed_coord_t):
         if self._guide:
             seed = gp.particle.Particle(series=mesh, coordinate=_seed_coord_t)
-            seed.solve()
+            seed.solve(verbose=False)
             _seed_displacement = seed.data["results"]["warps"][1, :2]
             self._seed_warp[
                 : 6 * min(self._mesh_order, self._subset_order)
@@ -1270,17 +1289,13 @@ class Sequence(SequenceBase):
             self.solved = True
             return _g_index, None
 
-    def _reference_update(
-        self, _g_index, _f_img, _seed_coord_t, _seed_displacement, _prev_mesh
-    ):
+    def _reference_update(self, _g_index, _f_img, _seed_coord_t, _seed_displacement):
         _f_index = _g_index - 1
         del _f_img
         _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
         _seed_coord_t += _seed_displacement
         _seed_displacement = np.zeros(2)
-        if self._history:
-            _prev_mesh._nodes += _prev_mesh._displacements
-        return _f_index, _f_img, _seed_coord_t, _seed_displacement, _prev_mesh
+        return _f_index, _f_img, _seed_coord_t, _seed_displacement
 
     def load(self):
         try:
@@ -1349,6 +1364,10 @@ class SequenceResults(SequenceBase):
         exclusion_objs = self.data["mesh_settings"]["exclusion_objs"]
         size_lower_bound = self.data["mesh_settings"]["size_lower_bound"]
         size_upper_bound = self.data["mesh_settings"]["size_upper_bound"]
+        sync = self.data["sync"]
+        dense = self.data["dense"]
+        subset_size_limits = self.data["subset_size_limits"]
+        override = self.data["override"]
 
         sequence = gp.sequence.Sequence(
             image_dir=image_dir,
@@ -1401,7 +1420,7 @@ class SequenceResults(SequenceBase):
             seed = mesh["results"]["subsets"][mesh["results"]["seed"]]
             subset_order = seed["settings"]["order"]
             seed_displacement = seed["results"]["p"][:2].flatten()
-            seed_warp = seed["results"]["p"][:6].flatten()
+            seed_warp = seed["results"]["p"][: 6 * mesh_order].flatten()
             template_shape = seed["template"]["shape"]
             template_size = seed["template"]["size"]
             seed_coord = mesh["nodes"][mesh["results"]["seed"]]
@@ -1428,6 +1447,9 @@ class SequenceResults(SequenceBase):
                 guide=guide,
                 override=override,
                 sequential=sequential,
+                dense=dense,
+                sync=sync,
+                subset_size_limits=subset_size_limits,
                 _f_index=_f_index,
                 _g_index=_g_index,
             )

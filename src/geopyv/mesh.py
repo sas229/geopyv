@@ -11,8 +11,8 @@ import gmsh
 from copy import deepcopy
 from scipy.optimize import minimize_scalar
 from alive_progress import alive_bar
-import matplotlib.pyplot as plt
-import cv2
+import matplotlib.pyplot as plt  # noqa: F401
+import cv2  # noqa: F401
 import traceback
 
 # import matplotlib.pyplot as plt
@@ -110,6 +110,26 @@ class MeshBase(Object):
             )
             return fig, ax
         else:
+            if self.data["solved"] is not True and self._nodes is None:
+                # Initialize gmsh if not already initialized.
+                if gmsh.isInitialized() == 0:
+                    gmsh.initialize()
+                gmsh.option.setNumber("General.Verbosity", 2)
+                log.info(
+                    "Generating initial mesh for inspection with {n} nodes.".format(
+                        n=self._target_nodes
+                    )
+                )
+                self._initial_mesh()
+                self._update_mesh()
+                log.info(
+                    "Mesh generated with {n} nodes and {e} elements.".format(
+                        n=len(self._nodes), e=len(self._elements)
+                    )
+                )
+                self.data["nodes"] = self._nodes
+                self.data["elements"] = self._elements
+                gmsh.finalize()
             log.info("Inspecting mesh...")
             fig, ax = gp.plots.inspect_mesh(
                 data=self.data,
@@ -117,6 +137,10 @@ class MeshBase(Object):
                 block=block,
                 save=save,
             )
+            self._nodes = None
+            self._elements = None
+            self.data.update({"nodes": None, "elements": None})
+
             return fig, ax
 
     def convergence(
@@ -723,8 +747,10 @@ class Mesh(MeshBase):
         exclusion_objs=[],
         size_lower_bound=1.0,
         size_upper_bound=1000.0,
+        compensate=False,
         mesh_order=2,
         hp=False,
+        geo=None,
     ):
         """
 
@@ -863,6 +889,7 @@ class Mesh(MeshBase):
         self._size_upper_bound = size_upper_bound
         self._mesh_order = mesh_order
         self._hard_boundary = boundary_obj._hard
+        self._compensate = compensate
         self._hp = hp
         self.solved = False
         self._unsolvable = False
@@ -873,37 +900,40 @@ class Mesh(MeshBase):
         if self._hp is True:
             self._update_region()  # Boundary and exclusion objects.
 
-        # Creating the initial mesh.
-        # Define region of interest.
-        (
-            self._borders,
-            self._segments,
-            self._curves,
-            self._mask,
-        ) = gp.geometry.meshing._define_RoI(
-            f_img=self._f_img,
-            boundary_obj=self._boundary_obj,
-            exclusion_objs=self._exclusion_objs,
-        )
-        # Initialize gmsh if not already initialized.
-        if gmsh.isInitialized() == 0:
-            gmsh.initialize()
-        gmsh.option.setNumber("General.Verbosity", 2)
-        # 0: silent except for fatal errors, 1: +errors, 2: +warnings,
-        # 3: +direct, 4: +information, 5: +status, 99: +debug.
-        log.info(
-            "Generating mesh using gmsh with approximately {n} nodes.".format(
-                n=self._target_nodes
+        # Geometry setup.
+        if geo is not None:
+            self._nodes = geo["nodes"]
+            self._elements = geo["elements"]
+            self._boundary = geo["boundary"]
+            self._exclusions = geo["exclusions"]
+            if "mask" in geo.keys():
+                self._mask = geo["mask"]
+            else:
+                (
+                    _,
+                    _,
+                    _,
+                    self._mask,
+                ) = gp.geometry.meshing._define_RoI(
+                    f_img=self._f_img,
+                    boundary_obj=self._boundary_obj,
+                    exclusion_objs=self._exclusion_objs,
+                )
+        else:
+            (
+                self._borders,
+                self._segments,
+                self._curves,
+                self._mask,
+            ) = gp.geometry.meshing._define_RoI(
+                f_img=self._f_img,
+                boundary_obj=self._boundary_obj,
+                exclusion_objs=self._exclusion_objs,
             )
-        )
-        self._initial_mesh()
-        self._update_mesh()
-        log.info(
-            "Mesh generated with {n} nodes and {e} elements.".format(
-                n=len(self._nodes), e=len(self._elements)
-            )
-        )
-        gmsh.finalize()
+            self._nodes = None
+            self._elements = None
+            self._boundary = None
+            self._exclusions = None
 
         # Data.
         self.data = {
@@ -985,26 +1015,6 @@ class Mesh(MeshBase):
         # Checks.
         self._target_checks()  # Size bounds and target nodes.
 
-        # Initialize gmsh if not already initialized.
-        if gmsh.isInitialized() == 0:
-            gmsh.initialize()
-        gmsh.option.setNumber("General.Verbosity", 2)
-
-        # Create mesh.
-        log.info(
-            "Generating mesh using gmsh with approximately {n} nodes.".format(
-                n=self._target_nodes
-            )
-        )
-        self._initial_mesh()
-        self._update_mesh()
-        log.info(
-            "Mesh generated with {n} nodes and {e} elements.".format(
-                n=len(self._nodes), e=len(self._elements)
-            )
-        )
-        gmsh.finalize()
-
     def solve(
         self,
         *,
@@ -1020,9 +1030,9 @@ class Mesh(MeshBase):
         adaptive_iterations=0,
         correction=True,
         alpha=0.5,
-        history=None,
         subset_size_limits=None,
         override=False,
+        dense=False,
     ):
         r"""
 
@@ -1232,8 +1242,10 @@ class Mesh(MeshBase):
             except Exception:
                 self._report(check, "TypeError")
         self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
+        self._report(gp.check._check_type(dense, "dense", [bool]), "TypeError")
 
         # Store variables.
+        self._dense = dense
         self._seed_coord = seed_coord
         self._template = template
         self._max_iterations = max_iterations
@@ -1247,7 +1259,6 @@ class Mesh(MeshBase):
         self._alpha = alpha
         self._update = False
         self._seed_warp = seed_warp
-        self._history = history
         self._override = override
         self._status = 0
         if subset_size_limits is not None:
@@ -1263,19 +1274,33 @@ class Mesh(MeshBase):
         gmsh.option.setNumber("General.Verbosity", 2)
 
         # Create initial mesh.
-        self._initial_mesh()
-        self._update_mesh()
+        if self._nodes is None:
+            if self._dense and self._adaptive_iterations != 0:
+                self._uniform_remesh(
+                    template.size,
+                    self._borders,
+                    self._segments,
+                    self._curves,
+                    self._target_nodes,
+                    self._size_lower_bound,
+                    self._size_upper_bound,
+                    self._mesh_order,
+                )
+                self._adaptive_iterations = 1
+            else:
+                self._initial_mesh()
+            self._update_mesh()
 
         # Solve initial mesh.
         self._message = "Solving initial mesh"
         self._find_seed_node()
         try:
-            self._reliability_guided(init=True)
+            self._reliability_guided()
             if self._unsolvable and not (self._status == 3 and self._override):
                 self._check_status()
                 return self.solved
             # Solve adaptive iterations.
-            for iteration in range(1, adaptive_iterations + 1):
+            for iteration in range(1, self._adaptive_iterations + 1):
                 self._message = "Adaptive iteration {}".format(iteration)
                 self._adaptive_mesh()
                 self._update_mesh()
@@ -1320,6 +1345,8 @@ class Mesh(MeshBase):
                 {
                     "nodes": self._nodes,
                     "elements": self._elements,
+                    "boundary": self._boundary,
+                    "exclusions": self._exclusions,
                     "areas": self._areas,
                     "solved": self.solved,
                     "unsolvable": self._unsolvable,
@@ -1328,7 +1355,6 @@ class Mesh(MeshBase):
                     "results": self._results,
                 }
             )
-            del self._history
         except Exception:
             self._status = 7
             self._unsolvable = True
@@ -1439,16 +1465,9 @@ class Mesh(MeshBase):
             (np.asarray(ent) - 1).flatten(), (-1, 3 * self._mesh_order)
         )  # Element connectivity array.
         self._boundary = gmsh.model.occ.getCurveLoops(0)[1][0]
-        self._boundary_edges = list(
-            gmsh.model.mesh.getNodesForPhysicalGroup(1, 0)[0] - 1
-        )
         self._exclusions = []
-        self._exclusion_edges = []
         for i in range(len(self._exclusion_objs)):
             self._exclusions.append(np.sort(gmsh.model.occ.getCurveLoops(0)[1][i + 1]))
-            self._exclusion_edges.append(
-                list(gmsh.model.mesh.getNodesForPhysicalGroup(1, i + 1)[0] - 1)
-            )
 
     def _find_seed_node(self):
         """
@@ -1514,7 +1533,7 @@ class Mesh(MeshBase):
                     self._mesh_order,
                 )
 
-            minimize_scalar(f, bounds=(0.1, 5))
+            minimize_scalar(f, bounds=(0.1, 10))
             bar()
 
     @staticmethod
@@ -1523,7 +1542,7 @@ class Mesh(MeshBase):
         boundary,
         segments,
         curves,
-        target_nodes,
+        target,
         size_lower_bound,
         size_upper_bound,
         order,
@@ -1597,8 +1616,7 @@ class Mesh(MeshBase):
             gmsh.model.mesh.getNodes()
         )  # Extracts: node tags, node coordinates, parametric coordinates.
         nodes = np.column_stack((nc[0::3], nc[1::3]))  # Nodal coordinate array (x,y).
-        error = (np.shape(nodes)[0] - target_nodes) ** 2
-
+        error = (np.shape(nodes)[0] - target) ** 2
         return error
 
     @staticmethod
@@ -1718,7 +1736,7 @@ class Mesh(MeshBase):
             (m, 2), dtype=np.float64
         )  # Displacement output array.
 
-    def _reliability_guided(self, init=False):
+    def _reliability_guided(self):
         """
 
         Private method to perform reliability-guided (RG) PIV analysis.
@@ -1728,7 +1746,7 @@ class Mesh(MeshBase):
         self._output_preparation()
 
         # Subset instantiation with template masking.
-        self._subset_instantiation(init)
+        self._subset_instantiation()
 
         # Solve subsets in mesh.
         with alive_bar(
@@ -1768,17 +1786,20 @@ class Mesh(MeshBase):
         # Corrections, calculations and checks.
         if self._correction:
             self._corrections()
+        if self._unsolvable and not (self._status == 3 and self._override):
+            return
         self._element_area()
         self._element_strains()
         self._compatibility()
         if self._unsolvable and not (self._status == 3 and self._override):
             return
-        if any(self._subset_solved != -1):
-            self._unsolvable = True
-            self._status = 5
-        elif any(self._C_ZNCC < self._tolerance):
-            self._unsolvable = True
-            self._status = 3
+        if self._status == 0:
+            if any(self._subset_solved != -1):
+                self._unsolvable = True
+                self._status = 5
+            elif any(self._C_ZNCC < self._tolerance):
+                self._unsolvable = True
+                self._status = 3
 
     def _resize(self, i):
         adj_nodes_idxs = self._connectivity(i)
@@ -1786,71 +1807,32 @@ class Mesh(MeshBase):
         dist = np.clip(dist, self._lbss, self._ubss)
         return int(dist)
 
-    def _subset_instantiation(self, init):
+    def _subset_instantiation(self):
         """Private method that instantiates the mesh subsets with masking."""
 
-        if self._ssa is True and init is False:
-            sizes = []
-            for i in range(np.shape(self._nodes)[0]):
+        for i in range(np.shape(self._nodes)[0]):
+            if self._ssa is True:
                 size = self._resize(i)
-                sizes.append(size)
                 if self._template.shape == "circle":
                     template = gp.templates.Circle(radius=size)
                 elif self._template.shape == "square":
                     template = gp.templates.Square(length=size)
-                _template_npx = template.n_px
-                template.mask(self._nodes[i], self._mask)
-                check = False
-                for e in range(len(self._exclusions)):
-                    if (i in self._exclusion_edges[e]) and self._exclusion_objs[
-                        e
-                    ]._compensate:
-                        check = True
-                if (
-                    (i in self._boundary_edges) and self._boundary_obj._compensate
-                ) or check is True:
-                    if template.n_px < _template_npx:
-                        size = int(size / np.sqrt(template.n_px / _template_npx))
-                        if self._template.shape == "circle":
-                            template = gp.templates.Circle(radius=size)
-                        elif self._template.shape == "square":
-                            template = gp.templates.Square(length=size)
-                        template.mask(self._nodes[i], self._mask)
-                self._subsets[i] = gp.subset.Subset(
-                    f_coord=self._nodes[i],
-                    f_img=self._f_img,
-                    g_img=self._g_img,
-                    template=template,
-                )  # Create masked subset.
-        else:
-            for i in range(np.shape(self._nodes)[0]):
+            else:
                 template = deepcopy(self._template)
+            template.mask(self._nodes[i], self._mask)
+            if template.m_n_px < template.n_px and self._compensate:
+                size = int(template.size / np.sqrt(template.m_n_px / template.n_px))
+                if self._template.shape == "circle":
+                    template = gp.templates.Circle(radius=size)
+                elif self._template.shape == "square":
+                    template = gp.templates.Square(length=size)
                 template.mask(self._nodes[i], self._mask)
-                check = False
-                for e in range(len(self._exclusions)):
-                    if (i in self._exclusion_edges[e]) and self._exclusion_objs[
-                        e
-                    ]._compensate:
-                        check = True
-                if (
-                    (i in self._boundary_edges) and self._boundary_obj._compensate
-                ) or check is True:
-                    if template.n_px < self._template.n_px:
-                        size = int(
-                            self._template.size
-                            / np.sqrt(template.n_px / self._template.n_px)
-                        )
-                        if self._template.shape == "circle":
-                            template = gp.templates.Circle(radius=size)
-                        elif self._template.shape == "square":
-                            template = gp.templates.Square(length=size)
-                        template.mask(self._nodes[i], self._mask)
-                self._subsets[i] = gp.subset.Subset(
-                    f_coord=self._nodes[i],
-                    f_img=self._f_img,
-                    g_img=self._g_img,
-                    template=template,
-                )  # Create masked subset.
+            self._subsets[i] = gp.subset.Subset(
+                f_coord=self._nodes[i],
+                f_img=self._f_img,
+                g_img=self._g_img,
+                template=template,
+            )  # Create masked subset.
 
     def _compatibility(self):
         """
@@ -1861,72 +1843,112 @@ class Mesh(MeshBase):
         """
         for i in range(len(self._elements)):
             if self._warps[i, 2] < -1 or self._warps[i, 5] < -1:
-                n1 = self._nodes[self._elements[i]]
-                n2 = (
-                    self._nodes[self._elements[i]]
-                    + self._displacements[self._elements[i]]
-                )
-                fig, ax = plt.subplots()
-                image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
-                image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                image_gs = cv2.GaussianBlur(
-                    image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
-                )
-                plt.imshow(image_gs, cmap="gray")
-                ax.plot(n1[[0, 1, 2, 0], 0], n1[[0, 1, 2, 0], 1], color="purple")
-                ax.plot(n2[[0, 1, 2, 0], 0], n2[[0, 1, 2, 0], 1], color="orange")
-                ax.scatter(n1[0, 0], n1[0, 1], color="r")
-                ax.scatter(n2[0, 0], n2[0, 1], color="r")
-                ax.scatter(n1[1, 0], n1[1, 1], color="b")
-                ax.scatter(n2[1, 0], n2[1, 1], color="b")
-                ax.scatter(n1[2, 0], n1[2, 1], color="g")
-                ax.scatter(n2[2, 0], n2[2, 1], color="g")
-                plt.show()
-                self._unsolvable = True
-                self._status = 6
+                # print(self._C_ZNCC[self._elements[i]])
+                # if self._mesh_order == 1:
+                #     n1 = self._nodes[self._elements[i]]
+                #     n2 = (
+                #         self._nodes[self._elements[i]]
+                #         + self._displacements[self._elements[i]]
+                #     )
+                #     fig, ax = plt.subplots()
+                #     image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
+                #     image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                #     image_gs = cv2.GaussianBlur(
+                #         image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
+                #     )
+                #     plt.imshow(image_gs, cmap="gray")
+                #     ax.plot(n1[[0, 1, 2, 0], 0], n1[[0, 1, 2, 0], 1], color="purple")
+                #     ax.plot(n2[[0, 1, 2, 0], 0], n2[[0, 1, 2, 0], 1], color="orange")
+                #     ax.scatter(n1[0, 0], n1[0, 1], color="r")
+                #     ax.scatter(n2[0, 0], n2[0, 1], color="r")
+                #     ax.scatter(n1[1, 0], n1[1, 1], color="b")
+                #     ax.scatter(n2[1, 0], n2[1, 1], color="b")
+                #     ax.scatter(n1[2, 0], n1[2, 1], color="g")
+                #     ax.scatter(n2[2, 0], n2[2, 1], color="g")
+                #     plt.show()
+                # else:
+                #     n1 = self._nodes[self._elements[i]]
+                #     n2 = (
+                #         self._nodes[self._elements[i]]
+                #         + self._displacements[self._elements[i]]
+                #     )
+                #     fig, ax = plt.subplots()
+                #     image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
+                #     image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                #     image_gs = cv2.GaussianBlur(
+                #         image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
+                #     )
+                #     plt.imshow(image_gs, cmap="gray")
+                #     ax.plot(
+                #         n1[[0, 3, 1, 4, 2, 5, 0], 0],
+                #         n1[[0, 3, 1, 4, 2, 5, 0], 1],
+                #         color="purple",
+                #     )
+                #     ax.plot(
+                #         n2[[0, 3, 1, 4, 2, 5, 0], 0],
+                #         n2[[0, 3, 1, 4, 2, 5, 0], 1],
+                #         color="orange",
+                #     )
+                #     ax.scatter(n1[0, 0], n1[0, 1], color="r")
+                #     ax.scatter(n2[0, 0], n2[0, 1], color="r")
+                #     ax.scatter(n1[1, 0], n1[1, 1], color="b")
+                #     ax.scatter(n2[1, 0], n2[1, 1], color="b")
+                #     ax.scatter(n1[2, 0], n1[2, 1], color="g")
+                #     ax.scatter(n2[2, 0], n2[2, 1], color="g")
+                #     ax.scatter(n1[3, 0], n1[3, 1], color="c")
+                #     ax.scatter(n2[3, 0], n2[3, 1], color="c")
+                #     ax.scatter(n1[4, 0], n1[4, 1], color="m")
+                #     ax.scatter(n2[4, 0], n2[4, 1], color="m")
+                #     ax.scatter(n1[5, 0], n1[5, 1], color="k")
+                #     ax.scatter(n2[5, 0], n2[5, 1], color="k")
+                #     plt.show()
+                if self._status == 0:
+                    self._unsolvable = True
+                    self._status = 6
                 break
 
             if self._mesh_order == 2:
                 if gp.geometry.utilities.polysect(
                     self._nodes[self._elements[i]][[0, 3, 1, 4, 2, 5]]
                 ):
-                    n1 = self._nodes[self._elements[i]]
-                    n2 = (
-                        self._nodes[self._elements[i]]
-                        + self._displacements[self._elements[i]]
-                    )
-                    fig, ax = plt.subplots()
-                    image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
-                    image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                    image_gs = cv2.GaussianBlur(
-                        image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
-                    )
-                    plt.imshow(image_gs, cmap="gray")
-                    ax.plot(
-                        n1[[0, 3, 1, 4, 2, 5, 0], 0],
-                        n1[[0, 3, 1, 4, 2, 5, 0], 1],
-                        color="purple",
-                    )
-                    ax.plot(
-                        n2[[0, 3, 1, 4, 2, 5, 0], 0],
-                        n2[[0, 3, 1, 4, 2, 5, 0], 1],
-                        color="orange",
-                    )
-                    ax.scatter(n1[0, 0], n1[0, 1], color="r")
-                    ax.scatter(n2[0, 0], n2[0, 1], color="r")
-                    ax.scatter(n1[1, 0], n1[1, 1], color="b")
-                    ax.scatter(n2[1, 0], n2[1, 1], color="b")
-                    ax.scatter(n1[2, 0], n1[2, 1], color="g")
-                    ax.scatter(n2[2, 0], n2[2, 1], color="g")
-                    ax.scatter(n1[3, 0], n1[3, 1], color="c")
-                    ax.scatter(n2[3, 0], n2[3, 1], color="c")
-                    ax.scatter(n1[4, 0], n1[4, 1], color="m")
-                    ax.scatter(n2[4, 0], n2[4, 1], color="m")
-                    ax.scatter(n1[5, 0], n1[5, 1], color="k")
-                    ax.scatter(n2[5, 0], n2[5, 1], color="k")
-                    plt.show()
-                    self._unsolvable = True
-                    self._status = 6
+                    # n1 = self._nodes[self._elements[i]]
+                    # n2 = (
+                    #     self._nodes[self._elements[i]]
+                    #     + self._displacements[self._elements[i]]
+                    # )
+                    # fig, ax = plt.subplots()
+                    # image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
+                    # image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                    # image_gs = cv2.GaussianBlur(
+                    #     image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
+                    # )
+                    # plt.imshow(image_gs, cmap="gray")
+                    # ax.plot(
+                    #     n1[[0, 3, 1, 4, 2, 5, 0], 0],
+                    #     n1[[0, 3, 1, 4, 2, 5, 0], 1],
+                    #     color="purple",
+                    # )
+                    # ax.plot(
+                    #     n2[[0, 3, 1, 4, 2, 5, 0], 0],
+                    #     n2[[0, 3, 1, 4, 2, 5, 0], 1],
+                    #     color="orange",
+                    # )
+                    # ax.scatter(n1[0, 0], n1[0, 1], color="r")
+                    # ax.scatter(n2[0, 0], n2[0, 1], color="r")
+                    # ax.scatter(n1[1, 0], n1[1, 1], color="b")
+                    # ax.scatter(n2[1, 0], n2[1, 1], color="b")
+                    # ax.scatter(n1[2, 0], n1[2, 1], color="g")
+                    # ax.scatter(n2[2, 0], n2[2, 1], color="g")
+                    # ax.scatter(n1[3, 0], n1[3, 1], color="c")
+                    # ax.scatter(n2[3, 0], n2[3, 1], color="c")
+                    # ax.scatter(n1[4, 0], n1[4, 1], color="m")
+                    # ax.scatter(n2[4, 0], n2[4, 1], color="m")
+                    # ax.scatter(n1[5, 0], n1[5, 1], color="k")
+                    # ax.scatter(n2[5, 0], n2[5, 1], color="k")
+                    # plt.show()
+                    if self._status == 0:
+                        self._unsolvable = True
+                        self._status = 6
                     break
 
     def _corrections(self):
@@ -1968,7 +1990,7 @@ class Mesh(MeshBase):
                         warp_0=warp,
                         order=self._subset_order,
                         method=self._method,
-                        tolerance=self._seed_tolerance,
+                        tolerance=self._tolerance,
                     )
                     try:
                         if (
@@ -1979,7 +2001,14 @@ class Mesh(MeshBase):
                             benefit[idx] = subset._C_ZNCC - self._subsets[idx]._C_ZNCC
                             self._subsets[idx] = subset
                             self._store_variables(idx=idx, flag=-1)
+                        if self._C_ZNCC[idx] < self._tolerance and self._status == 0:
+                            self._displacements[idx] = warp[
+                                :2
+                            ]  # Neighbourhood mean can't be as bad a spurious...
+                            self._status = 3
+                            self._unsolvable = True
                     except Exception:
+                        print(traceback.format_exc())
                         pass
                     bar()
                     bar.text = "{} corrections accepted".format(round(j / k, 3))
@@ -2068,32 +2097,6 @@ class Mesh(MeshBase):
         # Iterate through list of neighbours.
         for idx in neighbours:
             if self._subset_solved[idx] == 0:  # If not previously solved.
-                # if self._history:
-                #     # 0. Use history pre-conditioning
-                #     particle = gp.particle.Particle(
-                #             series = self._history,
-                #             coordinate_0 = self._nodes[idx]
-                #         )
-                #     try:
-                #         particle.solve()
-                #         p_h = particle._warps[-1]
-                #         self._subsets[idx].solve(
-                #             max_norm=self._max_norm,
-                #             max_iterations=self._max_iterations,
-                #             order=self._subset_order,
-                #             warp_0=p_h,
-                #             method=self._method,
-                #             tolerance=self._tolerance,
-                #         )
-                #     except Exception:
-                #         pass
-                #     del particle
-                # if self._subsets[idx].data["solved"]:  # Check against tolerance.
-                #    self._store_variables(idx=idx, flag=1)
-                # elif self._subsets[idx].data["unsolvable"]:
-                #    self._status = 5
-                #    self._unsolvable = True
-                # else:
                 # 1. Use nearest-neighbour pre-conditioning.
                 self._subsets[idx].solve(
                     max_norm=self._max_norm,

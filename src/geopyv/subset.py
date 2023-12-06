@@ -497,6 +497,7 @@ class Subset(SubsetBase):
             "tolerance": self._tolerance,
         }
         self.data.update({"settings": self._settings})
+        self._warp_0 = warp_0
 
         # Compute initial guess if u and v in deformation parameter vector
         # initialised with zeros, otherwise precondition.

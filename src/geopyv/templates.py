@@ -123,7 +123,7 @@ class Template:
         local = np.pad(local, ((lyp, uyp), (lxp, uxp)))
         self._local_masked = local * self.subset_mask
         self.coords = np.argwhere(self._local_masked == 1) - self.size
-        self.n_px = np.shape(self.coords)[0]
+        self.m_n_px = np.shape(self.coords)[0]
         if flag:
             log.warning(
                 "Subset centred {centre} clipped by image edge.".format(centre=centre)

@@ -50,6 +50,25 @@ class SpeckleBase(Object):
                     / self.data["vars"]["width"]
                     * np.cos(np.pi * delta[:, 1] / self.data["vars"]["width"])
                 )
+            elif self.data["vars"]["mode"] == "bend":
+                b = self.data["vars"]["width"] / 2
+                a = self.data["pm"][i][4]
+                _warp[:, 0] += (
+                    (abs(delta[:, 1]) < b)
+                    * a
+                    * self.data["vars"]["width"]
+                    / np.pi
+                    * np.cos(np.pi * delta[:, 1] / self.data["vars"]["width"])
+                )
+                _warp[:, 0] += (delta[:, 1] >= b) * a * (b - delta[:, 1])
+                _warp[:, 0] += (delta[:, 1] <= -b) * a * (delta[:, 1] + b)
+                _warp[:, 4] += (
+                    (abs(delta[:, 1]) < b)
+                    * a
+                    * -np.sin(np.pi * delta[:, 1] / self.data["vars"]["width"])
+                )
+                _warp[:, 4] += (delta[:, 1] >= b) * -a
+                _warp[:, 4] += (delta[:, 1] <= -b) * a
             elif self.data["vars"]["mode"] == "lin":
                 b = self.data["vars"]["width"] / 2
                 a = b * self.data["pm"][i][4]

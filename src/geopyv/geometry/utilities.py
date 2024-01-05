@@ -115,3 +115,17 @@ def ccw(A, B, C):
 
 def intersect(A, B, C, D):
     return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
+
+
+def polycentroid(coords):
+    centroid = np.zeros(2)
+    sa = 0
+    for i in range(len(coords)):
+        j = (i + 1) % len(coords)
+        a = (coords[i, 0] * coords[j, 1]) - (coords[j, 0] * coords[i, 1])
+        sa += a
+        centroid[0] += (coords[i, 0] + coords[j, 0]) * a
+        centroid[1] += (coords[i, 0] + coords[j, 1]) * a
+    centroid /= 3 * sa
+
+    return centroid

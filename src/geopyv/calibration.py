@@ -638,7 +638,7 @@ class Calibration(CalibrationBase):
 
         return board_settings
 
-    def solve(self, *, index=None, binary=None, threshold=50):
+    def solve(self, *, ext_id=None, binary=None, threshold=50):
         """
         Private method to calibrate the camera.
         """
@@ -654,24 +654,24 @@ class Calibration(CalibrationBase):
         self._report(
             gp.check._check_type(threshold, "threshold", [int, float]), "TypeError"
         )
-        check = self._report(gp.check._check_type(index, "index", [int]), "Warning")
-        if check:
-            _ext_img = gp.io._load_img("extrinsic", load=False)
-            index = int(re.findall(r"\d+", _ext_img)[-1])
-        image_indices = np.asarray(
-            [int(re.findall(r"\d+", x)[-1]) for x in self._calibration_images]
-        )
-        try:
-            index = np.argwhere(image_indices == index)[0][0]
-        except Exception:
-            _ext_img = gp.io._load_img("extrinsic", load=False)
-            index = int(re.findall(r"\d+", _ext_img)[-1])
-            index = np.argwhere(image_indices == index)[0][0]
+        # check = self._report(gp.check._check_type(ext_id, "ext_id", [int]), "Warning")
+        # if check:
+        #     _ext_img = gp.io._load_img("extrinsic", load=False)
+        #     index = int(re.findall(r"\d+", _ext_img)[-1])
+        # image_indices = np.asarray(
+        #     [int(re.findall(r"\d+", x)[-1]) for x in self._calibration_images]
+        # )
+        # try:
+        #     index = np.argwhere(image_indices == index)[0][0]
+        # except Exception:
+        #     _ext_img = gp.io._load_img("extrinsic", load=False)
+        #     index = int(re.findall(r"\d+", _ext_img)[-1])
+        #     index = np.argwhere(image_indices == index)[0][0]
 
         # Store input.
         self._binary = binary
-        self._index = index
-        self._img_index = index + 1
+        self._ext_id = ext_id
+        # self._img_index = index + 1
 
         # Pre-process images for calibration.
         self._allCorners, self._allIds, self._imsize = self._read_chessboards(threshold)
@@ -787,7 +787,7 @@ class Calibration(CalibrationBase):
             [int(re.findall(r"\d+", x)[-1]) for x in self._calibration_images]
         )
         try:
-            self._index = np.argwhere(image_indices == self._img_index)[0][0]
+            self._index = np.argwhere(image_indices == self._ext_id)[0][0]
         except Exception:
             log.error("External matrix image of insufficient quality.")
         imsize = frame.shape

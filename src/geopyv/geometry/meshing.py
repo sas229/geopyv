@@ -23,7 +23,7 @@ def _gmsh_initializer():
 #     _initial_mesh()
 
 
-def _mask_image(f_img, boundary_obj, exclusion_objs):
+def _mask_image(f_img, boundary, exclusions):
     """
 
     Private method to create an image mask.
@@ -35,9 +35,9 @@ def _mask_image(f_img, boundary_obj, exclusion_objs):
         (np.shape(f_img.image_gs)[1], np.shape(f_img.image_gs)[0]),
         0,
     )
-    if boundary_obj._hard:
+    if boundary._hard:
         ImageDrawPIL.Draw(binary_img).polygon(
-            boundary_obj._nodes.flatten().tolist(), outline=1, fill=1
+            boundary._nodes.flatten().tolist(), outline=1, fill=1
         )
     else:
         image_edge = np.asarray(
@@ -55,14 +55,14 @@ def _mask_image(f_img, boundary_obj, exclusion_objs):
             image_edge.flatten().tolist(), outline=1, fill=1
         )
     # Add exclusion to binary mask.
-    for exclusion_obj in exclusion_objs:
+    for exclusion in exclusions:
         ImageDrawPIL.Draw(binary_img).polygon(
-            exclusion_obj._nodes.flatten().tolist(), outline=1, fill=0
+            exclusion._nodes.flatten().tolist(), outline=1, fill=0
         )
     return np.asarray(binary_img)
 
 
-def _define_RoI(*, f_img=None, boundary_obj=None, exclusion_objs=None):
+def _define_RoI(*, f_img=None, boundary=None, exclusions=None):
     """
 
     Private method to define the RoI.
@@ -71,21 +71,23 @@ def _define_RoI(*, f_img=None, boundary_obj=None, exclusion_objs=None):
 
     if f_img is not None:
         # Create binary mask.
-        mask = _mask_image(f_img, boundary_obj, exclusion_objs)
+        mask = _mask_image(f_img, boundary, exclusions)
         # Define nodes in relevant space.
-        boundary_nodes = boundary_obj._nodes
-        exclusion_nodes = [exclusion_objs[i]._nodes for i in range(len(exclusion_objs))]
+        boundary_nodes = boundary._nodes
+        exclusion_nodes = [exclusions[i]._nodes for i in range(len(exclusions))]
     else:
-        try:
-            boundary_nodes = boundary_obj.data["Nodes"][0]
-            exclusion_nodes = [
-                exclusion_objs[i].data["Nodes"][0] for i in range(len(exclusion_objs))
-            ]
-        except Exception:
-            boundary_nodes = boundary_obj.data["nodes"][0]
-            exclusion_nodes = [
-                exclusion_objs[i].data["nodes"][0] for i in range(len(exclusion_objs))
-            ]
+        boundary_nodes = boundary
+        exclusion_nodes = exclusions
+        # try:
+        #     boundary_nodes = boundary.data["Nodes"][0]
+        #     exclusion_nodes = [
+        #         exclusions[i].data["Nodes"][0] for i in range(len(exclusions))
+        #     ]
+        # except Exception:
+        #     boundary_nodes = boundary.data["nodes"][0]
+        #     exclusion_nodes = [
+        #         exclusions[i].data["nodes"][0] for i in range(len(exclusions))
+        #     ]
 
     # Create objects for mesh generation.
     segments = np.empty(

@@ -916,8 +916,8 @@ class Mesh(MeshBase):
                     self._mask,
                 ) = gp.geometry.meshing._define_RoI(
                     f_img=self._f_img,
-                    boundary_obj=self._boundary_obj,
-                    exclusion_objs=self._exclusion_objs,
+                    boundary=self._boundary_obj,
+                    exclusions=self._exclusion_objs,
                 )
         else:
             (
@@ -927,8 +927,8 @@ class Mesh(MeshBase):
                 self._mask,
             ) = gp.geometry.meshing._define_RoI(
                 f_img=self._f_img,
-                boundary_obj=self._boundary_obj,
-                exclusion_objs=self._exclusion_objs,
+                boundary=self._boundary_obj,
+                exclusions=self._exclusion_objs,
             )
             self._nodes = None
             self._elements = None
@@ -947,8 +947,6 @@ class Mesh(MeshBase):
             },
             "target_nodes": self._target_nodes,
             "mesh_order": self._mesh_order,
-            "boundary_obj": self._boundary_obj,
-            "exclusion_objs": self._exclusion_objs,
             "boundary": self._boundary,
             "exclusions": self._exclusions,
             "size_lower_bound": self._size_lower_bound,
@@ -1396,9 +1394,15 @@ class Mesh(MeshBase):
         elif self._status == 4:  # Unsolvable: rigid exclusions decorrelation.s
             log.error("Rigid exclusion tracking failure.")
         elif self._status == 5:  # Unsolvable: unsolvable subset.
-            log.error("Unsolvable subset.")
+            log.error(
+                "Subset {} located at {} is unsolvable.".format(
+                    self._unsolvable_idx, self._nodes[self._unsolvable_idx]
+                )
+            )
         elif self._status == 6:  # Unsolvable: subset compatability failure.
-            log.error("Local mesh compatibility failure.")
+            log.error(
+                "Local mesh compatibility failure centred at {}".format(self._point)
+            )
         elif self._status == 7:  # Unsolvable: unkown issue.
             log.error("Could not solve mesh. Unrecognised problem.")
             input()
@@ -1905,6 +1909,7 @@ class Mesh(MeshBase):
                 if self._status == 0:
                     self._unsolvable = True
                     self._status = 6
+                    self._point = np.mean(self._nodes[self._elements[i]], axis=0)
                 break
 
             if self._mesh_order == 2:
@@ -1949,6 +1954,7 @@ class Mesh(MeshBase):
                     if self._status == 0:
                         self._unsolvable = True
                         self._status = 6
+                        self._point = np.mean(self._nodes[self._elements[i]], axis=0)
                     break
 
     def _corrections(self):
@@ -2117,6 +2123,7 @@ class Mesh(MeshBase):
                     # self._subsets[idx].convergence()
                     self._status = 5
                     self._unsolvable = True
+                    self._unsolvable_idx = idx
                 else:
                     # 2. Use projected pre-conditioning.
                     diff = self._nodes[idx] - self._nodes[cur_idx]
@@ -2164,6 +2171,7 @@ class Mesh(MeshBase):
                         # self._subsets[idx].convergence()
                         self._status = 5
                         self._unsolvable = True
+                        self._unsolvable_idx = idx
                     else:
                         # 3. Use the NCC initial guess.
                         self._subsets[idx].solve(
@@ -2185,6 +2193,7 @@ class Mesh(MeshBase):
                             # self._subsets[idx].convergence()
                             self._status = 5
                             self._unsolvable = True
+                            self._unsolvable_idx = idx
                         else:
                             self._store_variables(idx=idx, flag=1)
 

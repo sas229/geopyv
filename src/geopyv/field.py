@@ -5,6 +5,7 @@ Field module for geopyv.
 """
 import logging
 import numpy as np
+import scipy as sp
 import geopyv as gp
 from geopyv.object import Object
 import gmsh
@@ -469,8 +470,8 @@ class Field(FieldBase):
         series=None,
         target_particles=1000,
         track=True,
-        boundary_obj=None,
-        exclusion_objs=[],
+        boundary=None,
+        exclusions=[],
         coordinates=None,
         volumes=None,
         stresses=np.zeros(6),
@@ -550,31 +551,53 @@ class Field(FieldBase):
         )
         self._report(
             gp.check._check_type(
-                boundary_obj,
-                "boundary_obj",
-                [gp.geometry.region.Circle, gp.geometry.region.Path, type(None)],
+                boundary,
+                "boundary",
+                [
+                    gp.geometry.region.Circle,
+                    gp.geometry.region.Path,
+                    np.ndarray,
+                    type(None),
+                ],
             ),
             "TypeError",
         )
-        check = gp.check._check_type(exclusion_objs, "exclusion_objs", [list])
+        if type(boundary) == np.ndarray:
+            self._report(gp.check._check_dim(boundary, "boundary", 2), "ValueError")
+            self._report(
+                gp.check._check_axis(boundary, "boundary", 1, [2]), "ValueError"
+            )
+        check = gp.check._check_type(exclusions, "exclusions", [list])
         if check:
             try:
-                exclusion_objs = list(exclusion_objs)
+                exclusions = list(exclusions)
                 self._report(
-                    gp.check._conversion(exclusion_objs, "exclusion_objs", list, False),
+                    gp.check._conversion(exclusions, "exclusions", list, False),
                     "Warning",
                 )
             except Exception:
                 self._report(check, "TypeError")
-        for exclusion_obj in exclusion_objs:
+        for exclusion in exclusions:
             self._report(
                 gp.check._check_type(
-                    exclusion_obj,
-                    "exclusion_obj",
-                    [gp.geometry.region.Circle, gp.geometry.region.Path, type(None)],
+                    exclusion,
+                    "exclusion",
+                    [
+                        gp.geometry.region.Circle,
+                        gp.geometry.region.Path,
+                        np.ndarray,
+                        type(None),
+                    ],
                 ),
                 "TypeError",
             )
+            if type(exclusion) == np.ndarray:
+                self._report(
+                    gp.check._check_dim(exclusion, "exclusion", 2), "ValueError"
+                )
+                self._report(
+                    gp.check._check_axis(exclusion, "exclusion", 1, [2]), "ValueError"
+                )
         check = gp.check._check_type(
             coordinates, "coordinates", [np.ndarray, type(None)]
         )
@@ -631,7 +654,6 @@ class Field(FieldBase):
             self._report(
                 gp.check._check_axis(stresses, "stresses", 0, [6, 2]), "ValueError"
             )
-
         self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
 
         # Store.
@@ -642,6 +664,10 @@ class Field(FieldBase):
         self.solved = False
         self._unsolvable = False
         self._calibrated = series.data["calibrated"]
+        if self._calibrated is True:
+            self._nref = "Nodes"
+        else:
+            self._nref = "nodes"
         self._reference_update_register = []
         if self._series.data["type"] == "Sequence":
             self._number_images = len(self._series.data["meshes"]) + 1
@@ -650,28 +676,50 @@ class Field(FieldBase):
 
         if coordinates is not None:
             _auto_distribute = False
-            # Develop boundary chekc that works for both spaces.
-            # image = gp.image.Image(self._image_0)
-            # for coord in coordinates:
-            #     if (
-            #         coord[0] > np.shape(image.image_gs)[1]
-            #         or coord[0] < 0
-            #         or coord[1] > np.shape(image.image_gs)[0]
-            #         or coord[1] < 0
-            #     ):
-            #         log.error(
-            #             (
-            #                 "User-specified coordinate {value} "
-            #                 "outside image boundary."
-            #             ).format(value=coord)
-            #         )
-            #         raise ValueError(
-            #             (
-            #                 "User-specified coordinate {value} "
-            #                 "outside image boundary."
-            #             ).format(value=coord)
-            #         )
-            # del image
+            boundary_hull = sp.spatial.Delaunay(
+                self._cm.data[self._nref][self._cm.data["boundary"]]
+            )
+            exclusion_hulls = []
+            for exclusion in self._cm.data[self._nref][self._cm.data["exclusions"]]:
+                exclusion_hulls.append(sp.spatial.Delaunay(exclusion))
+            for coord in coordinates:
+                if boundary_hull.find_simplex(coord) < 0:
+                    log.error(
+                        (
+                            "User-specified coordinate {} " "outside mesh boundary:\n{}"
+                        ).format(
+                            coord, self._cm.data[self._nref][self._cm.data["boundary"]]
+                        )
+                    )
+                    raise ValueError(
+                        (
+                            "User-specified coordinate {} outside mesh boundary:\n{}"
+                        ).format(
+                            coord, self._cm.data[self._nref][self._cm.data["boundary"]]
+                        )
+                    )
+                for i in range(len(exclusion_hulls)):
+                    if exclusion_hulls[i].find_simplex(coord) >= 0:
+                        centre = np.round(
+                            gp.geometry.utilities.polycentroid(
+                                self._cm.data[self._nref][
+                                    self._cm.data["exclusions"][i]
+                                ]
+                            ),
+                            2,
+                        )
+                        log.error(
+                            (
+                                "User-specified coordinate {} "
+                                "inside mesh exclusion centred at {}."
+                            ).format(coord, centre)
+                        )
+                        raise ValueError(
+                            (
+                                "User-specified coordinate {} "
+                                "inside mesh exclusion centred at {}."
+                            ).format(coord, centre)
+                        )
             if volumes is None:
                 volumes = np.ones(np.shape(coordinates)[0])
             self._target_particles = np.shape(coordinates)[0]
@@ -680,24 +728,62 @@ class Field(FieldBase):
 
         # Particle distribution.
         if _auto_distribute is True:
-            if boundary_obj is not None:
-                self._boundary_obj = boundary_obj
+            if boundary is not None:
+                if type(boundary) == np.ndarray:
+                    self._boundary = boundary
+                else:
+                    try:
+                        self._boundary = boundary.data[self._nref][0]
+                    except Exception:
+                        log.error(
+                            (
+                                "Calibration mismatch. Series and boundary object do "
+                                "not share the same calibration status."
+                            )
+                        )
             else:
-                self._boundary_obj = self._cm.data["boundary_obj"]
-            if exclusion_objs is not None:
-                self._exclusion_objs = exclusion_objs
+                self._boundary = self._cm.data[self._nref][self._cm.data["boundary"]]
+            if exclusions is True:
+                if type(exclusions[0]) == np.ndarray:
+                    self._exclusions = exclusions
+                else:
+                    try:
+                        self._exclusions = []
+                        for i in range(len(exclusions)):
+                            self._exclusions[i] = exclusions[i].data[self._nref][0]
+                    except Exception:
+                        log.error(
+                            (
+                                "Calibration mismatch. Series and exclusion object do "
+                                "not share the same calibration status."
+                            )
+                        )
             else:
-                self._exclusion_objs = self._cm.data["exclusion_objs"]
+                self._exclusions = self._cm.data[self._nref][
+                    self._cm.data["exclusions"]
+                ]
 
-            self._size_lower_bound = 1  # mesh_0["size_lower_bound"]
-            self._size_upper_bound = 400  # mesh_0["size_upper_bound"]
+            self._size_upper_bound = np.max(
+                np.sqrt(
+                    np.sum(
+                        np.square(
+                            np.diff(
+                                self._cm.data[self._nref][self._cm.data["boundary"]],
+                                axis=0,
+                            )
+                        ),
+                        axis=1,
+                    )
+                )
+            )
+            self._size_lower_bound = self._size_upper_bound / 1000
             (
                 self._borders,
                 self._segments,
                 self._curves,
             ) = gp.geometry.meshing._define_RoI(
-                boundary_obj=self._boundary_obj,
-                exclusion_objs=self._exclusion_objs,
+                boundary=self._boundary,
+                exclusions=self._exclusions,
             )
             # Initialize gmsh if not already initialized.
             if gmsh.isInitialized() == 0:
@@ -738,7 +824,6 @@ class Field(FieldBase):
             "type": "Field",
             "solved": self.solved,
             "calibrated": self._calibrated,
-            # "series_type": self._series_type,
             "number_images": self._number_images,
             "track": self._track,
             "target_particles": self._target_particles,

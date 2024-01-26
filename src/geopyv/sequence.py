@@ -661,6 +661,7 @@ class Sequence(SequenceBase):
         size_upper_bound=1000.0,
         save_by_reference=False,
         mesh_dir=".",
+        ID="",
     ):
         """Initialisation of geopyv sequence object.
 
@@ -778,6 +779,12 @@ class Sequence(SequenceBase):
         if self._report(gp.check._check_path(mesh_dir, "mesh_dir"), "Warning"):
             mesh_dir = gp.io._get_mesh_dir()
         mesh_dir = gp.check._check_character(mesh_dir, "/", -1)
+        check = gp.check._check_type(ID, "ID", [str])
+        if check:
+            try:
+                ID = str(ID)
+            except Exception:
+                self._report(check, "TypeError")
 
         # Store variables.
         self._image_dir = image_dir
@@ -825,6 +832,7 @@ class Sequence(SequenceBase):
         self.solved = False
         self._unsolvable = False
         self._calibrated = False
+        self._ID = ID
 
         # Data.
         file_settings = {
@@ -845,6 +853,7 @@ class Sequence(SequenceBase):
         }
         self.data = {
             "type": "Sequence",
+            "ID": self._ID,
             "solved": self.solved,
             "unsolvable": self._unsolvable,
             "calibrated": self._calibrated,
@@ -879,6 +888,7 @@ class Sequence(SequenceBase):
         subset_size_limits=None,
         _f_index=0,
         _g_index=1,
+        geo=None,
     ):
         """
         Method to solve for the sequence.
@@ -1109,13 +1119,14 @@ class Sequence(SequenceBase):
         self._subset_size_limits = subset_size_limits
         self._sync = sync
         self._dense = dense
+        self._override_log = []
 
         # Solve.
         _seed_coord_t = self._seed_coord
         _seed_displacement = np.zeros(2)
         _f_img = gp.image.Image(self._image_dir + self._images[_f_index])
         _g_img = gp.image.Image(self._image_dir + self._images[_g_index])
-        geo = None
+
         while _g_index < len(self._image_indices):
             log.info(
                 "Solving for image pair {}-{}.".format(
@@ -1134,6 +1145,7 @@ class Sequence(SequenceBase):
                 mesh_order=self._mesh_order,
                 hp=True,
                 geo=geo,
+                ID=str(_g_index),
             )  # Initialise mesh object.
             mesh.solve(
                 seed_coord=self._seed_coord,
@@ -1153,7 +1165,7 @@ class Sequence(SequenceBase):
                 dense=self._dense,
             )  # Solve mesh.
             if mesh.solved:
-                self._check_override(mesh)
+                self._check_override(mesh, _g_index)
                 self._save_store_mesh(_f_index, _g_index, mesh)
                 _g_index, _g_img = self._target_update(_g_index, _g_img)
                 if self.solved:
@@ -1214,7 +1226,7 @@ class Sequence(SequenceBase):
                 "sync": self._sync,
                 "dense": self._dense,
                 "subset_size_limits": self._subset_size_limits,
-                "override": self._override,
+                "override_log": self._override_log,
             }
         )
 
@@ -1229,7 +1241,7 @@ class Sequence(SequenceBase):
         }
         return geo
 
-    def _check_override(self, mesh):
+    def _check_override(self, mesh, _g_index):
         # Mesh override reset.
         if self._mesh_override:
             if np.any(mesh._C_ZNCC < self._tolerance):
@@ -1244,6 +1256,7 @@ class Sequence(SequenceBase):
                         tol=self._tolerance,
                     )
                 )
+                self._override_log.append(_g_index)
             self._mesh_override = False
 
     def _save_store_mesh(self, _f_index, _g_index, mesh):
@@ -1349,9 +1362,12 @@ class SequenceResults(SequenceBase):
         """Initialisation of geopyv SequenceResults class."""
         self.data = data
 
-    def regenerate(self, *, override=False, sequential=False, guide=True):
+    def regenerate(self, *, override=False, sequential=False, guide=True, cut=None):
         """Create a Sequence class object."""
-        meshes = self.data["meshes"]
+        if cut is not None:
+            meshes = list(self.data["meshes"][:cut])
+        else:
+            meshes = list(self.data["meshes"])
         image_dir = self.data["file_settings"]["image_dir"]
         common_name = self.data["file_settings"]["common_name"]
         images = self.data["file_settings"]["images"]
@@ -1424,6 +1440,15 @@ class SequenceResults(SequenceBase):
             template_shape = seed["template"]["shape"]
             template_size = seed["template"]["size"]
             seed_coord = mesh["nodes"][mesh["results"]["seed"]]
+            if sync is True:
+                geo = {
+                    "nodes": mesh["nodes"],
+                    "elements": mesh["elements"],
+                    "boundary": mesh["boundary"],
+                    "exclusions": mesh["exclusions"],
+                }
+            else:
+                geo = None
 
             if template_shape == "circle":
                 template = gp.templates.Circle(template_size)
@@ -1452,6 +1477,7 @@ class SequenceResults(SequenceBase):
                 subset_size_limits=subset_size_limits,
                 _f_index=_f_index,
                 _g_index=_g_index,
+                geo=geo,
             )
 
         return sequence

@@ -232,7 +232,7 @@ class Subset(SubsetBase):
 
     """
 
-    def __init__(self, *, f_coord=None, f_img=None, g_img=None, template=None):
+    def __init__(self, *, f_coord=None, f_img=None, g_img=None, template=None, ID=""):
         """
 
         Initialisation of geopyv subset object.
@@ -287,6 +287,12 @@ class Subset(SubsetBase):
         elif self._report(gp.check._check_axis(f_coord, "f_coord", 0, [2]), "Warning"):
             selector = gp.gui.selectors.coordinate.CoordinateSelector()
             f_coord = selector.select(f_img, template)
+        check = gp.check._check_type(ID, "ID", [str])
+        if check:
+            try:
+                ID = str(ID)
+            except Exception:
+                self._report(check, "TypeError")
 
         # Store.
         self._initialised = False
@@ -294,6 +300,7 @@ class Subset(SubsetBase):
         self._f_img = f_img
         self._g_img = g_img
         self._template = template
+        self._ID = ID
 
         # Check subset is entirely within the reference image.
         self._x = self._f_coord[0]
@@ -347,6 +354,7 @@ class Subset(SubsetBase):
         # Data.
         self.data = {
             "type": "Subset",
+            "ID": self._ID,
             "solved": self.solved,
             "unsolvable": self._unsolvable,
             "calibrated": self._calibrated,

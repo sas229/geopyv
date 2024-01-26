@@ -155,7 +155,7 @@ class Speckle(SpeckleBase):
         file_format=".jpg",
         image_size_x=1001,
         image_size_y=1001,
-        speckle_limits=1001,
+        speckle_limits=[1001, 1001],
         image_no=101,
         mmin=0,
         mmax=1,
@@ -261,8 +261,8 @@ class Speckle(SpeckleBase):
         if number is not None:
             corner = np.asarray(
                 [
-                    0.5 * (self._image_size_x - self._speckle_limits),
-                    0.5 * (self._image_size_y - self._speckle_limits),
+                    0.5 * (self._image_size_x - self._speckle_limits[0]),
+                    0.5 * (self._image_size_y - self._speckle_limits[1]),
                 ]
             )
             speckles = corner + np.random.rand(number, 2) * self._speckle_limits
@@ -280,8 +280,8 @@ class Speckle(SpeckleBase):
                 while mi < self._tmi and i < 50000:
                     corner = np.asarray(
                         [
-                            0.5 * self._image_size_y - self._speckle_limits,
-                            0.5 * self._image_size_x - self._speckle_limits,
+                            0.5 * self._image_size_y - self._speckle_limits[1],
+                            0.5 * self._image_size_x - self._speckle_limits[0],
                         ]
                     )
                     new_speckle = corner + np.random.rand(2) * self._speckle_limits

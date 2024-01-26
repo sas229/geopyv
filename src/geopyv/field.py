@@ -12,6 +12,7 @@ import gmsh
 from scipy.optimize import minimize_scalar
 from alive_progress import alive_bar
 import re
+import traceback
 
 log = logging.getLogger(__name__)
 
@@ -475,6 +476,7 @@ class Field(FieldBase):
         coordinates=None,
         volumes=None,
         stresses=np.zeros(6),
+        ID="",
     ):
         """
         Initialisation of geopyv field object.
@@ -655,6 +657,12 @@ class Field(FieldBase):
                 gp.check._check_axis(stresses, "stresses", 0, [6, 2]), "ValueError"
             )
         self._report(gp.check._check_type(track, "track", [bool]), "TypeError")
+        check = gp.check._check_type(ID, "ID", [str])
+        if check:
+            try:
+                ID = str(ID)
+            except Exception:
+                self._report(check, "TypeError")
 
         # Store.
         self._series = series
@@ -663,6 +671,7 @@ class Field(FieldBase):
         self._track = track
         self.solved = False
         self._unsolvable = False
+        self._ID = ID
         self._calibrated = series.data["calibrated"]
         if self._calibrated is True:
             self._nref = "Nodes"
@@ -743,15 +752,16 @@ class Field(FieldBase):
                         )
             else:
                 self._boundary = self._cm.data[self._nref][self._cm.data["boundary"]]
-            if exclusions is True:
+            if bool(exclusions) is True:
                 if type(exclusions[0]) == np.ndarray:
                     self._exclusions = exclusions
                 else:
                     try:
                         self._exclusions = []
                         for i in range(len(exclusions)):
-                            self._exclusions[i] = exclusions[i].data[self._nref][0]
+                            self._exclusions.append(exclusions[i].data[self._nref][0])
                     except Exception:
+                        print(traceback.format_exc())
                         log.error(
                             (
                                 "Calibration mismatch. Series and exclusion object do "
@@ -822,6 +832,7 @@ class Field(FieldBase):
 
         self.data = {
             "type": "Field",
+            "ID": self._ID,
             "solved": self.solved,
             "calibrated": self._calibrated,
             "number_images": self._number_images,
@@ -946,6 +957,7 @@ class Field(FieldBase):
                     stress=self._stresses[i],
                     track=self._track,
                     field=True,
+                    ID=str(i),
                 )
                 bar()
         with alive_bar(

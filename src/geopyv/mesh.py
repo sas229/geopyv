@@ -15,9 +15,6 @@ import matplotlib.pyplot as plt  # noqa: F401
 import cv2  # noqa: F401
 import traceback
 
-# import matplotlib.pyplot as plt
-# import cv2
-
 log = logging.getLogger(__name__)
 
 
@@ -751,6 +748,7 @@ class Mesh(MeshBase):
         mesh_order=2,
         hp=False,
         geo=None,
+        ID="",
     ):
         """
 
@@ -875,6 +873,12 @@ class Mesh(MeshBase):
             gp.check._check_type(hp, "hp", [bool]),
             "TypeError",
         )
+        check = gp.check._check_type(ID, "ID", [str])
+        if check:
+            try:
+                ID = str(ID)
+            except Exception:
+                self._report(check, "TypeError")
 
         # Store.
         self._initialised = False
@@ -894,6 +898,7 @@ class Mesh(MeshBase):
         self.solved = False
         self._unsolvable = False
         self._calibrated = False
+        self._ID = ID
 
         # Checks.
         self._target_checks()  # Size bounds and target nodes.
@@ -938,6 +943,7 @@ class Mesh(MeshBase):
         # Data.
         self.data = {
             "type": "Mesh",
+            "ID": self._ID,
             "solved": self.solved,
             "unsolvable": self._unsolvable,
             "calibrated": self._calibrated,
@@ -1270,7 +1276,6 @@ class Mesh(MeshBase):
         if gmsh.isInitialized() == 0:
             gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)
-
         # Create initial mesh.
         if self._nodes is None:
             if self._dense and self._adaptive_iterations != 0:
@@ -1288,7 +1293,6 @@ class Mesh(MeshBase):
             else:
                 self._initial_mesh()
             self._update_mesh()
-
         # Solve initial mesh.
         self._message = "Solving initial mesh"
         self._find_seed_node()
@@ -1751,7 +1755,6 @@ class Mesh(MeshBase):
 
         # Subset instantiation with template masking.
         self._subset_instantiation()
-
         # Solve subsets in mesh.
         with alive_bar(
             np.shape(self._nodes)[0],
@@ -1788,8 +1791,12 @@ class Mesh(MeshBase):
                 if self._unsolvable and not (self._status == 3 and self._override):
                     return
         # Corrections, calculations and checks.
-        if self._correction:
-            self._corrections()
+        self._corrections()
+        # Wild.
+        self._wild()
+        if any(self._C_ZNCC < self._tolerance):
+            self._unsolvable = True
+            self._status = 3
         if self._unsolvable and not (self._status == 3 and self._override):
             return
         self._element_area()
@@ -1801,9 +1808,6 @@ class Mesh(MeshBase):
             if any(self._subset_solved != -1):
                 self._unsolvable = True
                 self._status = 5
-            elif any(self._C_ZNCC < self._tolerance):
-                self._unsolvable = True
-                self._status = 3
 
     def _resize(self, i):
         adj_nodes_idxs = self._connectivity(i)
@@ -1836,6 +1840,7 @@ class Mesh(MeshBase):
                 f_img=self._f_img,
                 g_img=self._g_img,
                 template=template,
+                ID=str(i),
             )  # Create masked subset.
 
     def _compatibility(self):
@@ -1957,6 +1962,225 @@ class Mesh(MeshBase):
                         self._point = np.mean(self._nodes[self._elements[i]], axis=0)
                     break
 
+    def _wild(self):
+        """
+
+        Private method for the taming of wild subsets.
+
+        """
+
+        # Flow evaluation.
+        flow = np.zeros(len(self._subsets))
+        for i in range(len(self._subsets)):
+            n = self._connectivity(
+                i,
+            )  # full = True) # Neighbours.
+            v = np.mean(self._displacements[n], axis=0)
+            loc_unit_vec = v / np.sqrt(np.sum(v**2))
+            sub_unit_vec = self._displacements[i] / np.sqrt(
+                np.sum(self._displacements[i] ** 2)
+            )
+            flow[i] = np.vdot(sub_unit_vec, loc_unit_vec)
+        flow_ss = (flow - np.mean(flow)) / np.std(flow)
+        # flow_out = np.argwhere((flow_ss < -3) * (flow < 0.9)).flatten()
+
+        # Correlation evaluation.
+        czncc_ss = (self._C_ZNCC - np.mean(self._C_ZNCC)) / np.std(self._C_ZNCC)
+        # czncc_out = np.argwhere((czncc_ss < -10) * (self._C_ZNCC < 0.95)).flatten()
+
+        # Magnitude evaluation.
+        R = np.sqrt(np.einsum("ij,ij->i", self._displacements, self._displacements))
+        R_ss = (R - np.mean(R)) / np.std(R)
+        # R_out = np.argwhere(R_ss > 8).flatten()
+
+        wild_vec = np.argwhere(
+            (flow_ss < -3) * (flow < 0.9)
+            + (R_ss > 8)
+            + (czncc_ss < -10) * (self._C_ZNCC < 0.95)
+        ).flatten()
+
+        # fig,ax = plt.subplots()
+        # S = 10
+        # image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
+        # image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+        # plt.imshow(image_gs, cmap="gray")
+        # for i in wild_vec:
+        #     ax.arrow(
+        #    self._nodes[i,0],
+        #     self._nodes[i,1],
+        #     self._displacements[i,0]*S,
+        #     self._displacements[i,1]*S,
+        #     color = "r"
+        # )
+
+        a = []
+        b = []
+        # Correct.
+        if np.shape(wild_vec)[0] >= 1:
+            for idx in wild_vec:
+                # print("{}\t\tFlow\tCZNCC\tR\t Node: [{:.2f}\t{:.2f}]".format(
+                #     idx, self._nodes[idx,0],self._nodes[idx,1]))
+                # print("Before\t|True\t|{:.2f}\t{:.2f}\t{:.2f}".format(
+                #     flow[idx], self._C_ZNCC[idx], R[idx]))
+                # print("\t|SS\t|{:.2f}\t{:.2f}\t{:.2f}".format(
+                #     flow_ss[idx], czncc_ss[idx], R_ss[idx]))
+
+                # Setup.
+                subset = gp.subset.Subset(
+                    f_coord=self._nodes[idx],
+                    f_img=self._f_img,
+                    g_img=self._g_img,
+                    template=self._subsets[idx]._template,
+                    ID=str(idx),
+                )
+                n = self._connectivity(idx, full=True)
+                if np.any(self._C_ZNCC[n] > self._tolerance):
+                    warp = np.mean(
+                        self._p[n[self._C_ZNCC[n] > self._tolerance]],
+                        axis=0,
+                    )
+                else:
+                    warp = self._p[n[np.argmax(self._C_ZNCC[n])]]
+                # Solve.
+                subset.solve(
+                    max_norm=self._max_norm,
+                    max_iterations=self._max_iterations,
+                    warp_0=warp,
+                    order=self._subset_order,
+                    method=self._method,
+                    tolerance=self._tolerance,
+                )
+                # Check result.
+                try:
+                    v = np.mean(self._displacements[n], axis=0)
+                    loc_unit_vec = v / np.sqrt(np.sum(v**2))
+                    sub_unit_vec = subset._p.flatten()[:2] / np.sqrt(
+                        np.sum(subset._p.flatten()[:2] ** 2)
+                    )
+                    flow_i = (
+                        np.vdot(sub_unit_vec, loc_unit_vec) - np.mean(flow)
+                    ) / np.std(flow)
+                    # czncc_i = (subset._C_ZNCC - np.mean(self._C_ZNCC)) / np.std(
+                    #     self._C_ZNCC
+                    # )
+                    R_i = (
+                        np.sqrt((np.sum(subset._p[:2].flatten() ** 2))) - np.mean(R)
+                    ) / np.std(R)
+                    # print("Flow: {:.2f}, CZNCC: {:.2f}, R: {:.2f}".format(
+                    #     flow_i, czncc_i, R_i))
+
+                    if (
+                        subset.solved
+                        and flow_i > -3
+                        and subset._C_ZNCC > self._tolerance
+                        and R_i < 10
+                    ):
+                        # Success, save.
+                        self._subsets[idx] = subset
+                        self._store_variables(idx=idx, flag=-1)
+                        a.append(idx)
+                    else:  # if self._override is True:
+                        b.append(idx)
+                        # Force neighbour mean.
+                        subset.solve(
+                            max_norm=self._max_norm,
+                            max_iterations=2,
+                            warp_0=warp,
+                            order=self._subset_order,
+                            method=self._method,
+                            tolerance=self._tolerance,
+                        )
+                        subset._p = warp
+                        self._subsets[idx] = subset
+                        self._store_variables(idx=idx, flag=-1)
+                        if subset._C_ZNCC < self._tolerance:
+                            # Raise correlation issue.
+                            self._unsolvable = True
+                except Exception:
+                    print(traceback.format_exc())
+
+                # sub_unit_vec = self._displacements[idx] / np.sqrt(
+                #     np.sum(self._displacements[idx] ** 2)
+                # )
+                # flow_i = np.vdot(sub_unit_vec, loc_unit_vec)
+                # R_i = np.sqrt(np.sum(self._displacements[idx] ** 2))
+                # flow_i_ss = (flow_i - np.mean(flow)) / np.std(flow)
+                # czncc_i_ss = (self._C_ZNCC[idx] - np.mean(self._C_ZNCC)) / np.std(
+                #     self._C_ZNCC
+                # )
+                # R_i_ss = (R_i - np.mean(R)) / np.std(R)
+                # print("After\t|True\t|{:.2f}\t{:.2f}\t{:.2f}".format(
+                #    flow_i, self._C_ZNCC[idx], R_i))
+                # print("\t|SS\t|{:.2f}\t{:.2f}\t{:.2f}".format(
+                #    flow_i_ss, czncc_i_ss, R_i_ss))
+
+        # print("Before\tMin\tMax\tLim\tNo")
+        # print("Flow:\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}".format(
+        #     np.min(flow_ss), np.max(flow_ss),
+        # np.mean(flow)-3*np.std(flow), len(flow_out)))
+        # print("CZNCC:\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}".format(
+        #     np.min(czncc_ss), np.max(czncc_ss),
+        # np.mean(self._C_ZNCC)-10*np.std(self._C_ZNCC), len(czncc_out)))
+        # print("R:\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}".format(
+        #     np.min(R_ss), np.max(R_ss), np.mean(R)+8*np.std(R), len(R_out)))
+        # print()
+
+        flow = np.zeros(len(self._subsets))
+        for i in range(len(self._subsets)):
+            n = self._connectivity(
+                i,
+            )  # full = True) # Neighbours.
+            v = np.mean(self._displacements[n], axis=0)
+            loc_unit_vec = v / np.sqrt(np.sum(v**2))
+            sub_unit_vec = self._displacements[i] / np.sqrt(
+                np.sum(self._displacements[i] ** 2)
+            )
+            flow[i] = np.vdot(sub_unit_vec, loc_unit_vec)
+        flow_ss = (flow - np.mean(flow)) / np.std(flow)
+        czncc_ss = (self._C_ZNCC - np.mean(self._C_ZNCC)) / np.std(self._C_ZNCC)
+        R = np.sqrt(np.einsum("ij,ij->i", self._displacements, self._displacements))
+        R_ss = (R - np.mean(R)) / np.std(R)
+        # print("After\tMin\tMax\tLim\tNo")
+        # print("Flow\t|{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}".format(
+        #     np.min(flow_ss),
+        #     np.max(flow_ss),
+        #     np.mean(flow)-3*np.std(flow),
+        #     len(flow_out)
+        # ))
+        # print("CZNCC\t|{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}".format(
+        #     np.min(czncc_ss),
+        #     np.max(czncc_ss),
+        #     np.mean(self._C_ZNCC)-10*np.std(self._C_ZNCC),
+        #     len(czncc_out)
+        # ))
+        # print("R\t|{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}".format(
+        #     np.min(R_ss), np.max(R_ss), np.mean(R)+8*np.std(R), len(R_out)))
+        # print("A: {}, {}".format(a, len(a)))
+        # print("B: {}, {}".format(b, len(b)))
+
+        # for i in range(len(self._subsets)):
+        #     if i in wild_vec:
+        #         ax.arrow(
+        #         self._nodes[i,0],
+        #         self._nodes[i,1],
+        #         self._displacements[i,0]*S,
+        #         self._displacements[i,1]*S,
+        #         color = "g"
+        #     )
+        #     else:
+        #         ax.arrow(
+        #             self._nodes[i,0],
+        #             self._nodes[i,1],
+        #             self._displacements[i,0]*S,
+        #             self._displacements[i,1]*S,
+        #             color = "b"
+        #         )
+        # if any(self._C_ZNCC<self._tolerance):
+        #     plt.show()
+        # else:
+        #     del fig
+
     def _corrections(self):
         """
 
@@ -1964,71 +2188,62 @@ class Mesh(MeshBase):
         preconditioning.
 
         """
+        # Identify.
+        sc = np.argsort(self._C_ZNCC)  # Sorted Correlations.
+        cc = sc[self._C_ZNCC[sc] < self._seed_tolerance][
+            ::-1
+        ]  # Correlation corrections.
 
-        arg = np.argsort(self._C_ZNCC)
-        corarg = arg[self._C_ZNCC[arg] < self._seed_tolerance]
-        j = 0
-        k = 0
-        benefit = np.zeros(len(self._C_ZNCC))
-        if np.shape(corarg)[0] >= 1:
-            with alive_bar(
-                np.shape(corarg)[0],
-                dual_line=True,
-                bar="blocks",
-                title="Corrections",
-            ) as bar:
-                for idx in corarg:
-                    k += 1
-                    subset = gp.subset.Subset(
-                        f_coord=self._nodes[idx],
-                        f_img=self._f_img,
-                        g_img=self._g_img,
-                        template=self._subsets[idx]._template,
-                    )
-                    neighbours = self._connectivity(idx)
+        # Correct.
+        if np.shape(cc)[0] >= 1:
+            for idx in cc:
+                # Setup.
+                subset = gp.subset.Subset(
+                    f_coord=self._nodes[idx],
+                    f_img=self._f_img,
+                    g_img=self._g_img,
+                    template=self._subsets[idx]._template,
+                    ID=str(idx),
+                )
+                n = self._connectivity(idx, full=True)
+                if np.any(self._C_ZNCC[n] > self._tolerance):
                     warp = np.mean(
-                        self._p[neighbours[self._C_ZNCC[neighbours] > self._tolerance]],
+                        self._p[n[self._C_ZNCC[n] > self._tolerance]],
                         axis=0,
                     )
-                    subset.solve(
-                        max_norm=self._max_norm,
-                        max_iterations=self._max_iterations,
-                        warp_0=warp,
-                        order=self._subset_order,
-                        method=self._method,
-                        tolerance=self._tolerance,
-                    )
-                    try:
-                        if (
-                            subset._C_ZNCC > self._subsets[idx]._C_ZNCC
-                            and subset.solved
-                        ):
-                            j += 1
-                            benefit[idx] = subset._C_ZNCC - self._subsets[idx]._C_ZNCC
+                else:
+                    warp = self._p[n[np.argmax(self._C_ZNCC[n])]]
+                # Solve.
+                subset.solve(
+                    max_norm=self._max_norm,
+                    max_iterations=self._max_iterations,
+                    warp_0=warp,
+                    order=self._subset_order,
+                    method=self._method,
+                    tolerance=self._tolerance,
+                )
+                # Check result.
+                try:
+                    if subset._C_ZNCC > self._subsets[idx]._C_ZNCC and subset.solved:
+                        # Success, save.
+                        self._subsets[idx] = subset
+                        self._store_variables(idx=idx, flag=-1)
+                    elif self._C_ZNCC[idx] < self._tolerance:
+                        if self._override is True:
+                            # Force neighbour mean.
+                            subset.solve(
+                                max_norm=self._max_norm,
+                                max_iterations=2,
+                                warp_0=warp,
+                                order=self._subset_order,
+                                method=self._method,
+                                tolerance=self._tolerance,
+                            )
+                            subset._p = warp
                             self._subsets[idx] = subset
                             self._store_variables(idx=idx, flag=-1)
-                        if self._C_ZNCC[idx] < self._tolerance and self._status == 0:
-                            self._displacements[idx] = warp[
-                                :2
-                            ]  # Neighbourhood mean can't be as bad a spurious...
-                            self._status = 3
-                            self._unsolvable = True
-                    except Exception:
-                        print(traceback.format_exc())
-                        pass
-                    bar()
-                    bar.text = "{} corrections accepted".format(round(j / k, 3))
-            log.info(
-                (
-                    "{ca} corrections accepted;"
-                    "{max} maximum improvement;"
-                    "{mean} mean improvement"
-                ).format(
-                    ca=round(j / k, 3),
-                    max=round(np.max(benefit), 3),
-                    mean=round(np.mean(benefit), 3),
-                )
-            )
+                except Exception:
+                    print(traceback.format_exc())
 
     def _connectivity(self, idx, full=False):
         """

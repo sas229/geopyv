@@ -302,6 +302,7 @@ class Particle(ParticleBase):
         volume=1.0,
         track=True,
         field=False,
+        ID="",
     ):
         """Initialisation of geopyv particle object.
 
@@ -391,6 +392,12 @@ class Particle(ParticleBase):
             selector = gp.gui.selectors.coordinate.CoordinateSelector()
             f_img = gp.image.Image(filepath=self._series[0]["images"]["f_img"])
             coordinate = selector.select(f_img, gp.templates.Circle(20))
+        check = gp.check._check_type(ID, "ID", [str])
+        if check:
+            try:
+                ID = str(ID)
+            except Exception:
+                self._report(check, "TypeError")
 
         # Improve by checking boundary itself so image and object space are covered.
         # if series.data["calibrated"] is False:
@@ -414,11 +421,13 @@ class Particle(ParticleBase):
         self._stresses = np.zeros((self._inc_no, 6))
         self._works = np.zeros(self._inc_no)
         self._strains = np.zeros((self._inc_no, 6))
+        self._ID = ID
 
         self._warps[0] = warp[: np.shape(self._warps)[1]]
         self._volumes[0] = volume
         self._stresses[0] = stress
         self._coordinates[0] = coordinate
+        self._adrift = False
         if self._calibrated is True:
             self._nref = "Nodes"
             self._cref = "Centroids"
@@ -436,6 +445,7 @@ class Particle(ParticleBase):
         self._initialised = True
         self.data = {
             "type": "Particle",
+            "ID": self._ID,
             "solved": self.solved,
             "calibrated": self._calibrated,
             # "series_type": self._series_type,
@@ -565,37 +575,89 @@ class Particle(ParticleBase):
         nodes = self._cm.data[self._nref]
         centroids = self._cm.data[self._cref]
         flag = False
-        diff = centroids - self._coordinates[self._reference_index]
-        dist = np.einsum("ij,ij->i", diff, diff)
-        dist_sorted = np.argpartition(dist, min(10, math.ceil(0.05 * len(dist))))
-        for index in dist_sorted:
+        cdiff = centroids - self._coordinates[self._reference_index]
+        cdist = np.einsum("ij,ij->i", cdiff, cdiff)
+        cdist_sorted = np.argpartition(cdist, min(10, math.ceil(0.05 * len(cdist))))
+        for index in cdist_sorted:
             hull = sp.spatial.Delaunay(nodes[elements[index]][:3])
             if hull.find_simplex(self._coordinates[self._reference_index]) >= 0:
                 flag = True
+                if self._adrift is True:
+                    self._adrift = False
+                    log.warning(
+                        (
+                            "{} returned to shore at {}. "
+                            "Returning to regular interpolation."
+                        ).format(
+                            "Particle " + self._ID,
+                            np.round(self._coordinates[self._reference_index], 2),
+                        )
+                    )
                 break
         if flag is False:
-            log.error(
-                "Particle {particle} is outside of boundary:\n{boundary}.\n"
-                " Check for convex boundary update.".format(
-                    particle=self._coordinates[self._reference_index],
-                    boundary=self._cm.data[self._nref][self._cm.data["boundary"]],
+            if self._adrift is False:
+                self._adrift = True
+                log.warning(
+                    (
+                        "{} adrift at {}. "
+                        "Proceeding with nearest element extrapolation."
+                    ).format(
+                        "Particle " + self._ID,
+                        np.round(self._coordinates[self._reference_index], 2),
+                    )
                 )
-            )
-            # fig, ax = plt.subplots()
-            # ax.plot(
-            #     self._cm.data["nodes"][self._cm.data["boundary"]][[0, 1, 2, 3, 0], 0],
-            #     self._cm.data["nodes"][self._cm.data["boundary"]][[0, 1, 2, 3, 0], 1],
-            # )
-            # ax.plot(
-            #     self._cm.data["nodes"][self._cm.data["exclusions"][0]][:, 0],
-            #     self._cm.data["nodes"][self._cm.data["exclusions"][0]][:, 1],
-            # )
-            # ax.plot(
-            #     self._plotting_coordinates[:, 0],
-            #     self._plotting_coordinates[:, 1],
-            # )
-            # plt.show()
-            raise ValueError("Particle outside of boundary.")
+            try:
+                ndiff = nodes - self._coordinates[self._reference_index]
+                ndist = np.einsum("ij,ij->i", ndiff, ndiff)
+                ndist_sorted = np.argpartition(ndist, 2)
+                index = np.argwhere(
+                    np.any(elements == ndist_sorted[0], axis=1)
+                    * np.any(elements == ndist_sorted[1], axis=1)
+                )[0][0]
+            except Exception:
+                fig, ax = plt.subplots()
+                ax.plot(
+                    nodes[self._cm.data["exclusions"][0], 0],
+                    nodes[self._cm.data["exclusions"][0], 1],
+                    color="purple",
+                )
+                ax.plot(
+                    nodes[self._cm.data["exclusions"][0][[0, -1]], 0],
+                    nodes[self._cm.data["exclusions"][0][[0, -1]], 1],
+                    color="purple",
+                )
+                ax.scatter(
+                    nodes[elements[cdist_sorted[:10]], 0],
+                    nodes[elements[cdist_sorted[:10]], 1],
+                    color="b",
+                )
+                ax.scatter(
+                    self._coordinates[self._reference_index, 0],
+                    self._coordinates[self._reference_index, 1],
+                    color="r",
+                )
+                for i in cdist_sorted[:10]:
+                    ax.plot(
+                        nodes[elements[i, [0, 1, 2, 0]], 0],
+                        nodes[elements[i, [0, 1, 2, 0]], 1],
+                        color="orange",
+                    )
+                # ax.plot(
+                #     nodes[elements[index,[0,1,2,0]], 0],
+                #     nodes[elements[index,[0,1,2,0]], 1],
+                #     color = "g"
+                # )
+                ax.plot(
+                    self._coordinates[: self._reference_index + 1, 0],
+                    self._coordinates[: self._reference_index + 1, 1],
+                    color="g",
+                )
+                print(np.round(nodes[ndist_sorted[:10]], 2))
+                print(ndist[ndist_sorted[:10]])
+                ax.set_aspect("equal", "box")
+                plt.show()
+                input()
+
         return index
 
     def _local_coordinates(self, element_nodes):
@@ -908,28 +970,37 @@ class Particle(ParticleBase):
         for i in range(self._inc_no - 1):
             try:
                 model.set_sigma_prime_tilde(self._stresses[i].T)
-                model.set_Delta_epsilon_tilde(-1 * strain_incs[i])
+                model.set_Delta_epsilon_tilde(strain_incs[i])
                 model.solve()
             except Exception:
-                # fig, (ax, bx) = plt.subplots(2, 1)
-                # ax.plot(range(i + 1), self._strains[: i + 1, 0], label=r"$du/dx$")
-                # ax.plot(range(i + 1), self._strains[: i + 1, 1], label=r"$dv/dy$")
-                # ax.plot(range(i + 1), self._strains[: i + 1, 5], label=r"$\gamma$")
-                # bx.plot(
-                #     range(i + 1), self._stresses[: i + 1, 0], label=r"$\sigma_{xx}$"
-                # )
-                # bx.plot(
-                #     range(i + 1), self._stresses[: i + 1, 1], label=r"$\sigma_{yy}$"
-                # )
-                # bx.plot(
-                #     range(i + 1), self._stresses[: i + 1, 2], label=r"$\sigma_{zz}$"
-                # )
-                # bx.plot(
-                #     range(i + 1), self._stresses[: i + 1, 5], label=r"$\sigma_{xy}$"
-                # )
-                # ax.legend()
-                # bx.legend()
-                # plt.show()
+                print(
+                    self._ID,
+                    i,
+                )
+                print(strain_incs[i - 5 : i + 5])
+                print(
+                    np.round(self._coordinates[0], 2), np.round(self._coordinates[i], 2)
+                )
+                fig, (ax, bx) = plt.subplots(2, 1)
+                ax.plot(range(i + 1), self._strains[: i + 1, 0], label=r"$du/dx$")
+                ax.plot(range(i + 1), self._strains[: i + 1, 1], label=r"$dv/dy$")
+                ax.plot(range(i + 1), self._strains[: i + 1, 5], label=r"$\gamma$")
+                bx.plot(
+                    range(i + 1), self._stresses[: i + 1, 0], label=r"$\sigma_{xx}$"
+                )
+                bx.plot(
+                    range(i + 1), self._stresses[: i + 1, 1], label=r"$\sigma_{yy}$"
+                )
+                bx.plot(
+                    range(i + 1), self._stresses[: i + 1, 2], label=r"$\sigma_{zz}$"
+                )
+                bx.plot(
+                    range(i + 1), self._stresses[: i + 1, 5], label=r"$\sigma_{xy}$"
+                )
+                ax.legend()
+                bx.legend()
+                plt.show()
+
                 print(traceback.format_exc())
                 log.error("geomat error. Stress path curtailed.")
                 raise ValueError("geomat error. Stress path curtailed.")

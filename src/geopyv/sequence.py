@@ -85,8 +85,10 @@ class SequenceBase(Object):
             )
 
         # Check mesh_index input.
+        if mesh_index is None:
+            mesh_index = 0
         self._report(
-            gp.check._check_type(mesh_index, "mesh_index", [int, type(None)]),
+            gp.check._check_type(mesh_index, "mesh_index", [int]),
             "TypeError",
         )
         if mesh_index:
@@ -210,8 +212,10 @@ class SequenceBase(Object):
             )
 
         # Check mesh_index input.
+        if mesh_index is None:
+            mesh_index = 0
         self._report(
-            gp.check._check_type(mesh_index, "mesh_index", [int, type(None)]),
+            gp.check._check_type(mesh_index, "mesh_index", [int]),
             "TypeError",
         )
         if mesh_index:
@@ -391,8 +395,10 @@ class SequenceBase(Object):
             )
 
         # Check input.
+        if mesh_index is None:
+            mesh_index = 0
         self._report(
-            gp.check._check_type(mesh_index, "mesh_index", [int, type(None)]),
+            gp.check._check_type(mesh_index, "mesh_index", [int]),
             "TypeError",
         )
         if mesh_index:
@@ -558,8 +564,10 @@ class SequenceBase(Object):
             )
 
         # Check input.
+        if mesh_index is None:
+            mesh_index = 0
         self._report(
-            gp.check._check_type(mesh_index, "mesh_index", [int, type(None)]),
+            gp.check._check_type(mesh_index, "mesh_index", [int]),
             "TypeError",
         )
         if mesh_index:

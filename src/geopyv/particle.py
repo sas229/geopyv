@@ -973,34 +973,59 @@ class Particle(ParticleBase):
                 model.set_Delta_epsilon_tilde(strain_incs[i])
                 model.solve()
             except Exception:
-                print(
-                    self._ID,
-                    i,
-                )
-                print(strain_incs[i - 5 : i + 5])
-                print(
-                    np.round(self._coordinates[0], 2), np.round(self._coordinates[i], 2)
-                )
-                fig, (ax, bx) = plt.subplots(2, 1)
-                ax.plot(range(i + 1), self._strains[: i + 1, 0], label=r"$du/dx$")
-                ax.plot(range(i + 1), self._strains[: i + 1, 1], label=r"$dv/dy$")
-                ax.plot(range(i + 1), self._strains[: i + 1, 5], label=r"$\gamma$")
-                bx.plot(
-                    range(i + 1), self._stresses[: i + 1, 0], label=r"$\sigma_{xx}$"
-                )
-                bx.plot(
-                    range(i + 1), self._stresses[: i + 1, 1], label=r"$\sigma_{yy}$"
-                )
-                bx.plot(
-                    range(i + 1), self._stresses[: i + 1, 2], label=r"$\sigma_{zz}$"
-                )
-                bx.plot(
-                    range(i + 1), self._stresses[: i + 1, 5], label=r"$\sigma_{xy}$"
-                )
-                ax.legend()
-                bx.legend()
-                plt.show()
-
+                # print(
+                #     self._ID,
+                #     i,
+                # )
+                # print(strain_incs[i - 5 : i + 5])
+                # print(
+                #     np.round(self._coordinates[0], 2),
+                #     np.round(self._coordinates[i], 2)
+                # )
+                # fig, ((ax, bx),(cx,dx)) = plt.subplots(2, 2)
+                # ax.plot(
+                #     range(i + 1),
+                #     self._strains[: i + 1, 0],
+                #     label=r"$\epsilon_{xx}$"
+                # )
+                # ax.plot(
+                #     range(i + 1),
+                #     self._strains[: i + 1, 1],
+                #     label=r"$\epsilon_{yy}$"
+                # )
+                # ax.plot(
+                #     range(i + 1),
+                #     self._strains[: i + 1, 5],
+                #     label=r"$\epsilon_{xy}$"
+                # )
+                # bx.plot(
+                #     range(i + 1),
+                #     self._stresses[: i + 1, 0],
+                #     label=r"$\sigma_{xx}$"
+                # )
+                # bx.plot(
+                #     range(i + 1),
+                #     self._stresses[: i + 1, 1],
+                #     label=r"$\sigma_{yy}$"
+                # )
+                # bx.plot(
+                #     range(i + 1),
+                #     self._stresses[: i + 1, 2],
+                #     label=r"$\sigma_{zz}$"
+                # )
+                # bx.plot(
+                #     range(i + 1),
+                #     self._stresses[: i + 1, 5],
+                #     label=r"$\sigma_{xy}$"
+                # )
+                # cx.plot(self._ps[:i], self._qs[:i], color = "r")
+                # x = np.linspace(0,1.5*self._ps[0], 1000)
+                # y = np.sqrt(parameters[0]**2*x*(state[0]*state[1]-x))
+                # cx.plot(x,y, color = "k")
+                # cx.plot(x, x*parameters[0], color = "k")
+                # ax.legend()
+                # bx.legend()
+                # plt.show()
                 print(traceback.format_exc())
                 log.error("geomat error. Stress path curtailed.")
                 raise ValueError("geomat error. Stress path curtailed.")
@@ -1022,18 +1047,6 @@ class Particle(ParticleBase):
 
     def _strain_def(self):
         self._strains[:, 5] = -(self._warps[:, 3] + self._warps[:, 4]) / 2
-        # self._strains[:, 0] = (
-        #     self._warps[:,2]*np.cos(0.5*self._strains[:,5])**2
-        #     + self._warps[:,5]*np.sin(0.5*self._strains[:,5])**2
-        #     + self._strains[:,5]*np.sin(0.5*self._strains[:,5])
-        #     * np.cos(0.5*self._strains[:,5])
-        # )
-        # self._strains[:,1] = (
-        #     self._warps[:,2]*np.cos(-0.5*self._strains[:,5])**2
-        #     + self._warps[:,5]*np.sin(-0.5*self._strains[:,5])**2
-        #     + self._strains[:,5]*np.sin(-0.5*self._strains[:,5])
-        #     * np.cos(-0.5*self._strains[:,5])
-        # )
         self._strains[:, 0] = self._warps[:, 2]
         self._strains[:, 1] = self._warps[:, 5]
 

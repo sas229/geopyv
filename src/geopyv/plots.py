@@ -6,17 +6,24 @@ Plots module for geopyv.
 import logging
 import sys
 import cv2
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 from matplotlib.collections import LineCollection
 import numpy as np
 import re
 import geopyv as gp
+import pandas as pd
+import seaborn as sns
 import scipy.spatial as spsp
 
 plt.rcParams["axes.prop_cycle"] = plt.cycler(
     "color", plt.cm.tab20(np.linspace(0, 1, 20))
 )
+plt.rcParams["mathtext.fontset"] = "stix"
+matplotlib.rcParams["font.family"] = "STIXGeneral"
+# plt.rcParams['axes.grid'] = True
+
 log = logging.getLogger(__name__)
 
 
@@ -447,7 +454,7 @@ def contour_mesh(
                 )
                 field.solve()
                 for i in range(len(coords)):
-                    value[i] = field.data["particles"][i]["results"]["warps"][
+                    value[i] = field.data["particles"][i].data["results"]["warps"][
                         1, warp_index
                     ]
                 nodes = coords
@@ -463,7 +470,7 @@ def contour_mesh(
                 )
                 field.solve()
                 for i in range(len(nodes)):
-                    value[i] = field.data["particles"][i]["results"]["warps"][
+                    value[i] = field.data["particles"][i].data["results"]["warps"][
                         1, warp_index
                     ]
 
@@ -809,7 +816,7 @@ def trace_particle(
         values = np.empty(
             (
                 len(data["particles"]),
-                len(data["particles"][0]["results"][quantity]) - 1,
+                len(data["particles"][0].data["results"][quantity]) - 1,
             )
         )
         if data["number_images"] > 1:
@@ -825,13 +832,17 @@ def trace_particle(
             segments = np.empty((len(data["particles"]), 2, 2))
         for i in range(len(data["particles"])):
             values[i] = np.diff(
-                data["particles"][i]["results"][quantity][:, component], axis=0
+                data["particles"][i].data["results"][quantity][:, component], axis=0
             )
             if data["calibrated"] is True:
-                points = data["particles"][i]["plotting_coordinates"].reshape(-1, 1, 2)
+                points = (
+                    data["particles"][i].data["plotting_coordinates"].reshape(-1, 1, 2)
+                )
             else:
-                points = data["particles"][i]["results"]["coordinates"].reshape(
-                    -1, 1, 2
+                points = (
+                    data["particles"][i]
+                    .data["results"]["coordinates"]
+                    .reshape(-1, 1, 2)
                 )
             segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
         values = values.flatten()
@@ -1096,6 +1107,148 @@ def contour_field(
             label = r"$\Delta$ Norm (-)"
         else:
             label = quantity
+        fig.colorbar(contours, label=label, ticks=ticks)
+
+    # Axis control.
+    if axis is False:
+        ax.set_axis_off()
+
+    # Limit control.
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    # Save
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def accumulation_field(
+    data,
+    quantity,
+    window,
+    imshow,
+    colorbar,
+    ticks,
+    alpha,
+    levels,
+    axis,
+    xlim,
+    ylim,
+    show,
+    block,
+    save,
+):
+    print(window)
+    if window is None:
+        window = (0, data["number_images"])
+    print(window)
+    value = np.zeros((np.shape(data["particles"])[0]))
+    plotting_coordinates = np.zeros((np.shape(data["particles"])[0], 2))
+    for i in range(np.shape(data["particles"])[0]):
+        if quantity == "u":
+            value[i] = np.sum(
+                # abs(
+                data["particles"][i].data["results"]["warps"][window[0] : window[1], 0]
+                # )
+            )
+        elif quantity == "v":
+            value[i] = np.sum(
+                # abs(
+                data["particles"][i].data["results"]["warps"][window[0] : window[1], 1]
+                # )
+            )
+        elif quantity == "u_x":
+            value[i] = np.sum(
+                # abs(
+                data["particles"][i].data["results"]["warps"][window[0] : window[1], 2]
+                # )
+            )
+        elif quantity == "e_xy":
+            value[i] = np.sum(
+                # abs
+                (
+                    data["particles"][i].data["results"]["warps"][
+                        window[0] : window[1], 3
+                    ]
+                    + data["particles"][i].data["results"]["warps"][
+                        window[0] : window[1], 4
+                    ]
+                )
+                / 2
+            )
+        elif quantity == "v_y":
+            value[i] = np.sum(
+                # abs(
+                data["particles"][i].data["results"]["warps"][window[0] : window[1], 5]
+                # )
+            )
+        elif quantity == "R":
+            value[i] == np.sum(
+                np.sqrt(
+                    data["particles"][i].data["results"]["warps"][
+                        window[0] : window[1], 0
+                    ]
+                    ** 2
+                    + data["particles"][i].data["results"]["warps"][
+                        window[0] : window[1], 1
+                    ]
+                    ** 2
+                )
+            )
+        plotting_coordinates[i] = data["particles"][i].data["plotting_coordinates"][0]
+
+    # Plot setup.
+    title = "Accumulation"
+    fig, ax = plt.subplots(num=title)
+
+    # Show image in background.
+    if imshow is True:
+        image = cv2.imread(data["image_0"], cv2.IMREAD_COLOR)
+        image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+        plt.imshow(image_gs, cmap="gray")
+    else:
+        ax.set_aspect("equal", "box")
+
+    extend = "neither"
+    if not isinstance(levels, type(None)):
+        if np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
+            extend = "both"
+        elif np.max(value) > np.max(levels):
+            extend = "max"
+        elif np.min(value) < np.min(levels):
+            extend = "min"
+    extend = "both"
+
+    contours = ax.tricontourf(
+        plotting_coordinates[:, 0],
+        plotting_coordinates[:, 1],
+        value,
+        alpha=alpha,
+        levels=levels,
+        extend=extend,
+    )
+
+    if colorbar is True:
+        qs = np.asarray(["u", "v", "u_x", "e_xy", "v_y", "R"])
+        labels = [
+            r"Accumulated horizontal displacement, $U$ ($mm$)",
+            r"Accumulated vertical displacement, $V$ ($mm$)",
+            r"Accumulated horizontal normal strain, $dU/dX$ ($-$)",
+            r"Accumulated shear strain, $\epsilon_{xy}$ ($-$)",
+            r"Accumulated vertical normal strain, $dV/dY$ ($-$)",
+            r"Accumulated absolute displacement, $R$ ($mm$)",
+        ]
+        label = labels[np.argwhere(quantity == qs)[0][0]]
         fig.colorbar(contours, label=label, ticks=ticks)
 
     # Axis control.
@@ -1698,5 +1851,158 @@ def error_calibration(
         plt.show(block=block)
     else:
         plt.close(fig)
+
+    return fig, ax
+
+
+def kde_chain(data, R_t, true, axis, xlim, ylim, save, block, show):
+    if xlim is None:
+        xlim = (data["prior"][1, 0], data["prior"][1, 1])
+    if ylim is None:
+        ylim = (data["prior"][0, 0], data["prior"][0, 1])
+    chain = np.transpose(
+        np.asarray(
+            [
+                data["k_c"][R_t:],
+                data["s_c"][R_t:],
+            ]
+        )
+    )
+    df = pd.DataFrame(chain, columns=["k_c", "s_c"])
+    g = sns.JointGrid(x="k_c", y="s_c", xlim=xlim, ylim=ylim, data=df, space=0)
+    g.plot_joint(sns.kdeplot, cmap="Blues", n_levels=15, fill=False, thresh=False)
+    g.plot_marginals(sns.kdeplot, fill=True, legend=False)
+    g.set_axis_labels(r"Rate parameter, $k$ (-)", r"Sensitivity, $s_{ep-ini}$ (-)")
+    if true is not None:
+        sns.scatterplot(
+            x=true[:, 0],
+            y=true[:, 1],
+            marker="+",
+            color="r",
+            s=100,
+            linewidth=1.5,
+            ax=g.ax_joint,
+        )
+        # g.scatter(true[0], true[1], marker = "+", facecolors="none", edgecolors="r",)
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+
+    return g
+
+
+def convergence_bayes(data, true, axis, klim, slim, save, block, show):
+    if klim is None:
+        klim = (
+            data["chains"][0].data["prior"][1, 0],
+            data["chains"][0].data["prior"][1, 1],
+        )
+    if slim is None:
+        slim = (
+            data["chains"][0].data["prior"][0, 0],
+            data["chains"][0].data["prior"][0, 1],
+        )
+    fig, ((ax, bx), (cx, dx)) = plt.subplots(2, 2)
+    for i in range(data["chain_no"]):
+        ax.plot(range(1, data["sample_no"]), data["results"]["chain_means"][i, 1:, 0])
+        cx.plot(range(1, data["sample_no"]), data["results"]["chain_means"][i, 1:, 1])
+    bx.plot(range(1, data["sample_no"]), data["results"]["R"][:, 0], color="k")
+    dx.plot(range(1, data["sample_no"]), data["results"]["R"][:, 1], color="k")
+    ax.plot(
+        [data["results"]["R_t"], data["results"]["R_t"]],
+        [klim[0], klim[1]],
+        color="b",
+        ls="--",
+        label="Convergence Threshold",
+    )
+    cx.plot(
+        [data["results"]["R_t"], data["results"]["R_t"]],
+        [slim[0], slim[1]],
+        color="b",
+        ls="--",
+    )
+    bx.plot(
+        [data["results"]["R_t"], data["results"]["R_t"]],
+        [np.min(data["results"]["R"][:, 0]), np.max(data["results"]["R"][:, 0])],
+        color="b",
+        ls="--",
+    )
+    dx.plot(
+        [data["results"]["R_t"], data["results"]["R_t"]],
+        [np.min(data["results"]["R"][:, 1]), np.max(data["results"]["R"][:, 1])],
+        color="b",
+        ls="--",
+    )
+    if true is not None:
+        ax.plot(
+            (1, data["sample_no"]),
+            [true[0], true[0]],
+            color="r",
+            ls="--",
+            label="True Value",
+        )
+        cx.plot((1, data["sample_no"]), [true[1], true[1]], color="r", ls="--")
+    ax.set_ylabel(r"Mean Sensitivity Degradation Rate, $\mu_k$ ($-$)")
+    cx.set_ylabel(r"Mean Sensitivity Degradation Magnitude, $\mu_{s,ep}$ ($-$)")
+    bx.set_ylabel(r"Sensitivity Degradation Rate Convergence, $\hat{R}_k$ ($-$)")
+    dx.set_ylabel(
+        r"Sensitivity Degradation Magnitude Convergence, $\hat{R}_{s,ep}$ ($-$)"
+    )
+    cx.set_xlabel(r"Sample number, $S$ ($-$)")
+    dx.set_xlabel(r"Sample number, $S$ ($-$)")
+    ax.set_xscale("log")
+    bx.set_xscale("log")
+    cx.set_xscale("log")
+    dx.set_xscale("log")
+    bx.set_yscale("log")
+    dx.set_yscale("log")
+    ax.set_ylim(klim)
+    cx.set_ylim(slim)
+    ax.set_xlim(1, data["sample_no"])
+    bx.set_xlim(1, data["sample_no"])
+    cx.set_xlim(1, data["sample_no"])
+    dx.set_xlim(1, data["sample_no"])
+    fig.legend()
+    if axis is False:
+        ax.set_axis_off()
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+
+    return fig, ax
+
+
+def autocorrelation_bayes(data, axis, xlim, ylim, save, block, show):
+    autocorlim = len(data["results"]["autocorrelation"])
+    fig, (ax, bx) = plt.subplots(2, 1)
+    for i in range(3):
+        ax.plot(range(autocorlim), data["results"]["autocorrelation"][:, i, 0])
+        bx.plot(range(autocorlim), data["results"]["autocorrelation"][:, i, 1])
+
+    ax.set_ylabel(r"Sensitivity Degradation Rate Autocorrelation, $\A_k$ ($-$)")
+    bx.set_ylabel(
+        r"Sensitivity Degradation Magnitude Autocorrelation, $\A_{s,ep}$ ($-$)"
+    )
+    ax.set_xlabel(r"Lag, $k$ ($-$)")
+    bx.set_xlabel(r"Lag, $k$ ($-$)")
+    ax.set_xlim(0, autocorlim)
+    bx.set_xlim(0, autocorlim)
+    ax.set_ylim(min(0, 1.1 * np.min(data["results"]["autocorrelation"][:, :, 0])))
+    bx.set_ylim(min(0, 1.1 * np.min(data["results"]["autocorrelation"][:, :, 1])))
+
+    if axis is False:
+        ax.set_axis_off()
+    if save is not None:
+        plt.savefig(save, dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
 
     return fig, ax

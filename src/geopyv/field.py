@@ -148,7 +148,7 @@ class FieldBase(Object):
                 component,
                 "component",
                 1,
-                self.data["particles"][0]["results"][quantity],
+                self.data["particles"][0].data["results"][quantity],
             ),
             "IndexError",
         )
@@ -348,6 +348,130 @@ class FieldBase(Object):
         )
         return fig, ax
 
+    def accumulation(
+        self,
+        *,
+        quantity="R",
+        window=None,
+        imshow=True,
+        colorbar=True,
+        ticks=None,
+        alpha=0.75,
+        levels=None,
+        axis=True,
+        xlim=None,
+        ylim=None,
+        show=True,
+        block=True,
+        save=None,
+    ):
+        """
+        Method to plot an incremental quantity along the particle position path.
+
+        Parameters
+        ----------
+        quantity : str, optional
+            Specifier for which metric to plot along the particle path.
+        component : int, optional
+            Specifier for which component of the metric to plot along the particle path.
+        imshow : bool, optional
+            Control whether the reference image is plotted.
+            Defaults to True.
+        colorbar : bool, optional
+            Control whether the colour bar is plotted.
+            Defaults to True.
+        ticks : list, optional
+            Overwrite default colourbar ticks.
+            Defaults to None.
+        alpha : float, optional
+            Control contour opacity. Must be between 0.0-1.0.
+            Defaults to 0.75.
+        axis : bool, optional
+            Control whether the axes are plotted.
+            Defaults to True.
+        xlim : array-like, optional
+            Set the plot x-limits (lower_limit,upper_limit).
+            Defaults to None.
+        ylim : array-like, optional
+            Set the plot y-limits (lower_limit,upper_limit).
+            Defaults to None.
+        show : bool, optional
+            Control whether the plot is displayed.
+            Defaults to True.
+        block : bool, optional
+            Control whether the plot blocks execution until closed.
+            Defaults to False.
+        save : str, optional
+            Name to use to save plot. Uses default extension of `.png`.
+        """
+
+        # Check if solved.
+        if self.data["solved"] is not True:
+            log.error(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+            raise ValueError(
+                "Particle not yet solved therefore no convergence data to plot. "
+                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
+            )
+        # Check input.
+        self._report(gp.check._check_type(quantity, "quantity", [str]), "TypeError")
+        if quantity:
+            self._report(
+                gp.check._check_value(
+                    quantity,
+                    "quantity",
+                    ["u", "v", "u_x", "e_xy", "v_y", "R"],
+                ),
+                "ValueError",
+            )
+        self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
+        self._report(gp.check._check_type(colorbar, "colorbar", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(ticks, "ticks", types), "TypeError")
+        check = gp.check._check_type(alpha, "alpha", [float])
+        if check:
+            try:
+                alpha = float(alpha)
+                self._report(gp.check._conversion(alpha, "alpha", float), "Warning")
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
+        types = [int, tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(levels, "levels", types), "TypeError")
+        self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
+        types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
+        if xlim is not None:
+            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
+            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
+        if ylim is not None:
+            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
+            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
+        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
+        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
+        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
+
+        fig, ax = gp.plots.accumulation_field(
+            data=self.data,
+            window=window,
+            quantity=quantity,
+            imshow=imshow,
+            colorbar=True,
+            ticks=ticks,
+            alpha=alpha,
+            levels=levels,
+            axis=axis,
+            xlim=xlim,
+            ylim=ylim,
+            show=show,
+            block=block,
+            save=save,
+        )
+        return fig, ax
+
     def history(
         self,
         particle_index,
@@ -404,12 +528,7 @@ class FieldBase(Object):
                 gp.check._check_value(
                     quantity,
                     "quantity",
-                    [
-                        "coordinates",
-                        "warps",
-                        "volumes",
-                        "stresses",
-                    ],
+                    ["coordinates", "warps", "volumes", "stresses", "works"],
                 ),
                 "ValueError",
             )
@@ -439,7 +558,7 @@ class FieldBase(Object):
         self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
         log.info("Particle {} history...".format(particle_index))
         fig, ax = gp.plots.history_particle(
-            data=self.data["particles"][particle_index],
+            data=self.data["particles"][particle_index].data,
             quantity=quantity,
             components=components,
             xlim=xlim,
@@ -978,7 +1097,6 @@ class Field(FieldBase):
                             model=model,
                             state=state,
                             parameters=parameters,
-                            intype=intype,
                         )
                 if bool(self.solved) is False:
                     self._unsolvable = True
@@ -987,13 +1105,12 @@ class Field(FieldBase):
                 bar()
 
         for i in range(particle_no):
-            self._particles[i] = self._particles[i].data
-            self._vol_totals += self._particles[i]["results"]["volumes"]
+            self._vol_totals += self._particles[i].data["results"]["volumes"]
 
         if model is not None:
             self._works = np.zeros(self.data["number_images"])
             for i in range(particle_no):
-                self._works += self._particles[i]["results"]["works"]
+                self._works += self._particles[i].data["results"]["works"]
             self.data.update({"works": self._works})
 
         self.data.update(
@@ -1001,6 +1118,33 @@ class Field(FieldBase):
                 "particles": self._particles,
                 "volumes": self._vol_totals,
                 "reference_update_register": self._reference_update_register,
+            }
+        )
+        self.solved = True
+        self.data["solved"] = self.solved
+        return self.solved
+
+    def stress(self, model=None, state=None, parameters=None):
+        self.solved = False
+        self.data["solved"] = self.solved
+        particle_no = np.shape(self._coordinates)[0]
+        for j in range(particle_no):
+            self.solved += self._particles[j].solve(
+                model=model,
+                state=state,
+                parameters=parameters,
+            )
+        if bool(self.solved) is False:
+            self._unsolvable = True
+            self.data["unsolvable"] = self._unsolvable
+            return self.solved
+        self._works = np.zeros(self.data["number_images"])
+        for i in range(particle_no):
+            self._works += self._particles[i].data["results"]["works"]
+        self.data.update(
+            {
+                "works": self._works,
+                "particles": self._particles.data,
             }
         )
         self.solved = True

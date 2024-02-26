@@ -1,3 +1,5 @@
+import geopyv.bayes
+import geopyv.chain
 import geopyv.check
 import geopyv.calibration
 import geopyv.log

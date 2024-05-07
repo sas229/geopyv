@@ -15,7 +15,6 @@ from geomat.abstract import Elastoplastic  # noqa: F401
 from geomat.utilities import Derivatives  # noqa: F401
 from geomat.models import LinearElastic, MCC, SMCC, C2MC, EMC  # noqa: F401
 import matplotlib.pyplot as plt  # noqa: F401
-import traceback
 
 log = logging.getLogger(__name__)
 
@@ -223,13 +222,7 @@ class ParticleBase(Object):
                 gp.check._check_value(
                     quantity,
                     "quantity",
-                    [
-                        "coordinates",
-                        "warps",
-                        "volumes",
-                        "stresses",
-                        "works",
-                    ],
+                    ["coordinates", "warps", "volumes", "stresses", "works", "strains"],
                 ),
                 "ValueError",
             )
@@ -422,8 +415,9 @@ class Particle(ParticleBase):
         self._works = np.zeros(self._inc_no)
         self._strains = np.zeros((self._inc_no, 6))
         self._ID = ID
-
-        self._warps[0] = warp[: np.shape(self._warps)[1]]
+        self._warps[0, : min(np.shape(warp)[0], np.shape(self._warps)[1])] = warp[
+            : min(np.shape(warp)[0], np.shape(self._warps)[1])
+        ]
         self._volumes[0] = volume
         self._stresses[0] = stress
         self._coordinates[0] = coordinate
@@ -485,7 +479,9 @@ class Particle(ParticleBase):
         N, dN, d2N = self._shape_function(zeta, eta, theta)
         return N @ x
 
-    def solve(self, *, model=None, state=None, parameters=None, intype=0, verbose=True):
+    def solve(
+        self, *, model=None, state=None, parameters=None, factor=1.0, verbose=True
+    ):
         """
 
         Method to solve for the particle.
@@ -508,17 +504,11 @@ class Particle(ParticleBase):
             - LinearElastic
             - MCC
             - SMCC
-        intype : int, optional
-            Base interpolation order. Options are:
-            0 (default) : strains are interpolated from nodal displacementss
-                i.e. strains from a 1st order mesh are singular per element.
-            1 : strains are interpolated from nodal strains i.e. strains from
-            a 1st order mesh are linearly interpolatable.
         """
         # Checks.
 
         # Store variables.
-        self._intype = intype
+        self._factor = factor
 
         # Solving.
         if self._field is False:
@@ -530,6 +520,7 @@ class Particle(ParticleBase):
                 "coordinates": self._coordinates,
                 "warps": self._warps,
                 "volumes": self._volumes,
+                "vol_strains": self._vol_strains,
                 "stresses": self._stresses,
                 "strains": self._strains,
                 "mean_effective_stresses": self._ps,
@@ -542,6 +533,7 @@ class Particle(ParticleBase):
                 "coordinates": self._coordinates,
                 "warps": self._warps,
                 "strains": self._strains,
+                "vol_strains": self._vol_strains,
                 "volumes": self._volumes,
             }
         if self._calibrated is True:
@@ -798,17 +790,9 @@ class Particle(ParticleBase):
         self._warp_inc[:2] = N @ u
 
         # 1st Order Strains
-        if self._intype == 0:
-            J_x_T = dN @ x
-            J_u_T = dN @ u
-            self._warp_inc[2:6] = (np.linalg.inv(J_x_T) @ J_u_T).flatten()
-        elif self._intype == 1:
-            u_prime = np.zeros((3 * self._mesh_order, 4))
-            for i in range(3 * self._mesh_order):
-                u_prime[i] = self._cm.data["results"]["subsets"][
-                    self._cm.data["elements"][tri_idx][i]
-                ]["results"]["p"][2:6].flatten()
-            self._warp_inc[2:6] = N @ u_prime
+        J_x_T = dN @ x
+        J_u_T = dN @ u
+        self._warp_inc[2:6] = (np.linalg.inv(J_x_T) @ J_u_T).flatten()
 
         # 2nd Order Strains
         if self._mesh_order == 2:
@@ -888,8 +872,7 @@ class Particle(ParticleBase):
                 bar()
         return True
 
-    def _strain_path_inc(self, m, cm, rm, intype=0):
-        self._intype = intype
+    def _strain_path_inc(self, m, cm, rm):
         self._update_cm_rm(m, cm, rm)
         tri_idx = self._element_locator()
         self._warp_increment(m, tri_idx)
@@ -961,94 +944,60 @@ class Particle(ParticleBase):
                 state=state,
                 # log_severity="verbose"
             )
-        strain_incs = np.diff(self._strains, axis=0)
         model.set_sigma_prime_tilde(self._stresses[0].T)
-        model.set_Delta_epsilon_tilde(-strain_incs[0])
+        model.set_Delta_epsilon_tilde(self._strain_incs[0])
         self._ps[0] = model.p_prime
         self._qs[0] = model.q
-        # self._states[0] = model.state
+        self._states[0] = model.get_state_variables()
         for i in range(self._inc_no - 1):
             try:
                 model.set_sigma_prime_tilde(self._stresses[i].T)
-                model.set_Delta_epsilon_tilde(strain_incs[i])
+                model.set_Delta_epsilon_tilde(self._strain_incs[i])
                 model.solve()
             except Exception:
-                # print(
-                #     self._ID,
-                #     i,
-                # )
-                # print(strain_incs[i - 5 : i + 5])
-                # print(
-                #     np.round(self._coordinates[0], 2),
-                #     np.round(self._coordinates[i], 2)
-                # )
-                # fig, ((ax, bx),(cx,dx)) = plt.subplots(2, 2)
-                # ax.plot(
-                #     range(i + 1),
-                #     self._strains[: i + 1, 0],
-                #     label=r"$\epsilon_{xx}$"
-                # )
-                # ax.plot(
-                #     range(i + 1),
-                #     self._strains[: i + 1, 1],
-                #     label=r"$\epsilon_{yy}$"
-                # )
-                # ax.plot(
-                #     range(i + 1),
-                #     self._strains[: i + 1, 5],
-                #     label=r"$\epsilon_{xy}$"
-                # )
-                # bx.plot(
-                #     range(i + 1),
-                #     self._stresses[: i + 1, 0],
-                #     label=r"$\sigma_{xx}$"
-                # )
-                # bx.plot(
-                #     range(i + 1),
-                #     self._stresses[: i + 1, 1],
-                #     label=r"$\sigma_{yy}$"
-                # )
-                # bx.plot(
-                #     range(i + 1),
-                #     self._stresses[: i + 1, 2],
-                #     label=r"$\sigma_{zz}$"
-                # )
-                # bx.plot(
-                #     range(i + 1),
-                #     self._stresses[: i + 1, 5],
-                #     label=r"$\sigma_{xy}$"
-                # )
-                # cx.plot(self._ps[:i], self._qs[:i], color = "r")
-                # x = np.linspace(0,1.5*self._ps[0], 1000)
-                # y = np.sqrt(parameters[0]**2*x*(state[0]*state[1]-x))
-                # cx.plot(x,y, color = "k")
-                # cx.plot(x, x*parameters[0], color = "k")
-                # ax.legend()
-                # bx.legend()
-                # plt.show()
-                print(traceback.format_exc())
-                log.error("geomat error. Stress path curtailed.")
-                raise ValueError("geomat error. Stress path curtailed.")
-            # print(
-            #     "Increment {}: p = {:.2f} ; q = {:.2f} ; q/p = {:.2f}".format(
-            #         0, model.p_prime, model.q, model.q / model.p_prime
-            #     )
-            # )
+                log.warning("Too large a strain increment. Attempting linearisation...")
+                stress = self._stresses[i].T
+                for j in range(10):
+                    model.set_sigma_prime_tilde(stress)
+                    model.set_Delta_epsilon_tilde(self._strain_incs[i] / 10)
+                    model.sigma_prime_tilde
+                # print(traceback.format_exc())
+                # log.error("geomat error. Stress path curtailed.")
+                # raise ValueError("geomat error. Stress path curtailed.")
             self._ps[i + 1] = model.p_prime
             self._qs[i + 1] = model.q
-            # self._states[i + 1] = model.state
+            self._states[i + 1] = model.get_state_variables()
             self._stresses[i + 1] = model.sigma_prime_tilde
 
         self._works[1:] = (
-            np.sum(self._stresses[1:] * strain_incs, axis=-1) * self._volumes[1:]
+            np.sum(self._stresses[1:] * self._strain_incs, axis=-1) * self._volumes[1:]
         )
 
         return True
 
     def _strain_def(self):
+        """
+
+        Private method for the definition of strain components from warp vectors.
+        Note, here the sign change from compression negative to compression positive
+        is performed.
+
+        """
+
         self._strains[:, 5] = -(self._warps[:, 3] + self._warps[:, 4]) / 2
-        self._strains[:, 0] = self._warps[:, 2]
-        self._strains[:, 1] = self._warps[:, 5]
+        self._strains[:, 0] = -self._warps[:, 2]
+        self._strains[:, 1] = -self._warps[:, 5]
+        self._strain_incs = np.diff(self._strains, axis=0)
+        self._strain_incs[:, [0, 1]] -= (
+            self._factor * np.mean(self._strain_incs[:, [0, 1]], axis=1)[:, np.newaxis]
+        )
+        self._strains[1:, [0, 1]] = np.cumsum(self._strain_incs[:, [0, 1]], axis=0)
+        self._vol_strains = np.zeros(np.shape(self._strain_incs)[0] + 1)
+        self._vol_strains[1:] = np.cumsum(
+            (1 + self._strain_incs[:, 0]) * (1 + self._strain_incs[:, 1])
+            - np.diff(self._warps[:, 3]) * np.diff(self._warps[:, 4])
+            - 1
+        )
 
 
 class ParticleResults(ParticleBase):

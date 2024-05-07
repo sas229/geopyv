@@ -434,45 +434,40 @@ def contour_mesh(
                 value.append(s["results"][quantity])
         value = np.asarray(value)
     elif view == "particle":
-        names = np.asarray(["u", "v", "u_x", "v_x", "u_y", "v_y"])
-        warp_index = np.argwhere(names == quantity)[0][0]
-        if data["mesh_order"] == 1 and warp_index >= 2:
-            value = np.zeros(len(elements))
-            field = gp.field.Field(
-                series=obj,
-                coordinates=np.mean(nodes[elements], axis=1),
-            )
-            field.solve()
+        field = gp.field.Field(series=obj, coordinates=nodes)
+        field.solve()
+        value = np.zeros(np.shape(nodes)[0])
+        if quantity == "u":
             for i in range(len(field.data["particles"])):
-                value[i] = field.data["particles"][i]["results"]["warps"][1, warp_index]
-        else:
-            if coords is not None:
-                value = np.zeros(len(coords))
-                field = gp.field.Field(
-                    series=obj,
-                    coordinates=coords,
+                value[i] = field.data["particles"][i].data["results"]["warps"][1, 0]
+        elif quantity == "v":
+            for i in range(len(field.data["particles"])):
+                value[i] = field.data["particles"][i].data["results"]["warps"][1, 1]
+        elif quantity == "R":
+            for i in range(len(field.data["particles"])):
+                value[i] = np.sqrt(
+                    np.sum(
+                        field.data["particles"][i].data["results"]["warps"][1, :2] ** 2,
+                    )
                 )
-                field.solve()
-                for i in range(len(coords)):
-                    value[i] = field.data["particles"][i].data["results"]["warps"][
-                        1, warp_index
-                    ]
-                nodes = coords
-                delaunay = spsp.Delaunay(coords)
-                mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
-                    delaunay.simplices, nodes[:, 0], nodes[:, 1], 1
+        elif quantity == "ep_xx":
+            for i in range(len(field.data["particles"])):
+                value[i] = -field.data["particles"][i].data["results"]["warps"][1, 2]
+        elif quantity == "ep_yy":
+            for i in range(len(field.data["particles"])):
+                value[i] = -field.data["particles"][i].data["results"]["warps"][1, 5]
+        elif quantity == "ep_xy":
+            for i in range(len(field.data["particles"])):
+                value[i] = (
+                    -(
+                        field.data["particles"][i].data["results"]["warps"][1, 3]
+                        + field.data["particles"][i].data["results"]["warps"][1, 4]
+                    )
+                    / 2
                 )
-            else:
-                value = np.zeros(len(nodes))
-                field = gp.field.Field(
-                    series=obj,
-                    coordinates=nodes,
-                )
-                field.solve()
-                for i in range(len(nodes)):
-                    value[i] = field.data["particles"][i].data["results"]["warps"][
-                        1, warp_index
-                    ]
+        elif quantity == "ep_vol":
+            for i in range(len(field.data["particles"])):
+                value[i] = field.data["particles"][i].data["results"]["vol_strains"][-1]
 
     if len(value) == len(nodes):
         # Set levels and extend.
@@ -484,7 +479,6 @@ def contour_mesh(
                 extend = "max"
             elif np.min(value) < np.min(levels):
                 extend = "min"
-        extend = "both"
         # Plot contours.
         triangulation = tri.Triangulation(nodes[:, 0], nodes[:, 1], mesh_triangulation)
         contours = ax.tricontourf(
@@ -504,7 +498,7 @@ def contour_mesh(
         contours = ax.tripcolor(
             nodes[:, 0],
             nodes[:, 1],
-            elements,
+            elements[:, :3],
             vmin=vmin,
             vmax=vmax,
             facecolors=value,
@@ -531,10 +525,19 @@ def contour_mesh(
             label = r"Shear Deformation Gradient, $du/dy$ ($-$)"
         elif quantity == "v_y":
             label = r"Vertical Deformation Gradient, $dv/dy$ ($-$)"
+        elif quantity == "ep_xx":
+            label = r"Horizontal Normal Strain, $\epsilon_{xx}$ ($-$)"
+        elif quantity == "ep_yy":
+            label = r"Vertical Normal Strain, $\epsilon_{yy}$ ($-$)"
+        elif quantity == "ep_xy":
+            label = r"Shear Strain, $\epsilon_{xy}$ ($-$)"
+        elif quantity == "ep_vol":
+            label = r"Volumetric Strain, $\epsilon_{vol}$ ($-$)"
         else:
             label = quantity
         fig.colorbar(contours, label=label, ticks=ticks)
 
+    ax.grid(False)
     # Axis control.
     if axis is False:
         ax.set_axis_off()
@@ -910,9 +913,39 @@ def history_particle(data, quantity, components, xlim, ylim, show, block, save):
             r"$\sigma_{zx}$ ($kPa$)",
             r"$\sigma_{xy}$ ($kPa$)",
         ]
+    elif quantity == "strains":
+        labels = [
+            r"$\epsilon_{xx}$ ($-$)",
+            r"$\epsilon_{yy}$ ($-$)",
+            r"$\epsilon_{xy}$ ($-$)",
+            r"$\epsilon_{vol}$ ($-$)",
+        ]
 
     fig, ax = plt.subplots(num=title)
-    if quantity != "works":
+    if quantity == "strains":
+        ax.plot(
+            range(np.shape(data["results"]["strains"])[0]),
+            data["results"]["strains"][:, 0],
+            label=labels[0],
+        )
+        ax.plot(
+            range(np.shape(data["results"]["strains"])[0]),
+            data["results"]["strains"][:, 1],
+            label=labels[1],
+        )
+        ax.plot(
+            range(np.shape(data["results"]["strains"])[0]),
+            data["results"]["strains"][:, 5],
+            label=labels[2],
+        )
+        ax.plot(
+            range(np.shape(data["results"]["vol_strains"])[0]),
+            data["results"]["vol_strains"],
+            label=labels[3],
+        )
+        ax.set_ylabel(r"Strain, $\epsilon$ ")
+        plt.legend()
+    elif quantity != "works":
         if components is None:
             components = range(np.shape(data["results"][quantity])[1])
         for component in components:
@@ -1147,10 +1180,8 @@ def accumulation_field(
     block,
     save,
 ):
-    print(window)
     if window is None:
         window = (0, data["number_images"])
-    print(window)
     value = np.zeros((np.shape(data["particles"])[0]))
     plotting_coordinates = np.zeros((np.shape(data["particles"])[0], 2))
     for i in range(np.shape(data["particles"])[0]):
@@ -1290,20 +1321,20 @@ def standard_error_validation(
     ylabel,
 ):
     labels = [
-        r"$u$ ($px$)",
-        r"$v$ ($px$)",
-        r"$du/dx$ ($-$)",
-        r"$dv/dx$ ($-$)",
-        r"$du/dy$ ($-$)",
-        r"$dv/dy$ ($-$)",
-        r"$d^2u/dx^2$ ($-$)",
-        r"$d^2v/dx^2$ ($-$)",
-        r"$d^2u/dxdy$ ($-$)",
-        r"$d^2v/dxdy$ ($-$)",
-        r"$d^2u/dy^2$ ($-$)",
-        r"$d^2v/dy^2$ ($-$)",
-        r"$\theta$ ($^o$)",
-        r"$\epsilon_{\gamma}$ ($-$)",
+        r"Horizontal displacement, $u$ ($px$)",
+        r"Vertical displacement, $v$ ($px$)",
+        r"Horizontal normal strain, $\epsilon_{xx}$ ($-$)",
+        r"Shear strain component, $dv/dx$ ($-$)",
+        r"Shear strain component, $du/dy$ ($-$)",
+        r"Vertical normal strain, $\epsilon_{yy}$ ($-$)",
+        r"Strain gradient component, $d^2u/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2u/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2v/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2u/dy^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dy^2$ ($-$)",
+        r"Rotation, $\theta$ ($^o$)",
+        r"Pure shear strain, $\epsilon_{xy}$ ($-$)",
     ]
     colours = ["r", "b", "g", "orange", "purple", "k"]
     markers = [
@@ -1388,7 +1419,7 @@ def standard_error_validation(
 
     # Axis labels.
     if xlabel is None:
-        ax.set_xlabel(r"Applied warp, {}".format(labels[component]))
+        ax.set_xlabel(r"{}".format(labels[component]))
     else:
         ax.set_xlabel(xlabel)
     if ylabel is None:
@@ -1426,20 +1457,20 @@ def mean_error_validation(
     save,
 ):
     labels = [
-        r"$u$ ($px$)",
-        r"$v$ ($px$)",
-        r"$du/dx$ ($-$)",
-        r"$dv/dx$ ($-$)",
-        r"$du/dy$ ($-$)",
-        r"$dv/dy$ ($-$)",
-        r"$d^2u/dx^2$ ($-$)",
-        r"$d^2v/dx^2$ ($-$)",
-        r"$d^2u/dxdy$ ($-$)",
-        r"$d^2v/dxdy$ ($-$)",
-        r"$d^2u/dy^2$ ($-$)",
-        r"$d^2v/dy^2$ ($-$)",
-        r"$\theta$ ($^o$)",
-        r"$\epsilon_{\gamma}$ ($-$)",
+        r"Horizontal displacement, $u$ ($px$)",
+        r"Vertical displacement, $v$ ($px$)",
+        r"Horizontal normal strain, $\epsilon_{xx}$ ($-$)",
+        r"Shear strain component, $dv/dx$ ($-$)",
+        r"Shear strain component, $du/dy$ ($-$)",
+        r"Vertical normal strain, $\epsilon_{yy}$ ($-$)",
+        r"Strain gradient component, $d^2u/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2u/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2v/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2u/dy^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dy^2$ ($-$)",
+        r"Rotation, $\theta$ ($^o$)",
+        r"Pure shear strain, $\epsilon_{xy}$ ($-$)",
     ]
     colours = ["r", "b", "g", "orange", "purple", "k"]
     markers = [
@@ -1507,8 +1538,8 @@ def mean_error_validation(
         ax.set_ylim(ylim)
 
     # Axis labels.
-    ax.set_xlabel(r"Applied warp, {}".format(labels[component]))
-    ax.set_ylabel(r"Mean error, $\mu_{px}$ ($px$)")
+    ax.set_xlabel(r"{}".format(labels[component]))
+    ax.set_ylabel(r"Mean absolute error, $\mu_{px}$ ($px$)")
 
     # Save.
     if save is not None:
@@ -1526,120 +1557,127 @@ def mean_error_validation(
 def spatial_error_validation(
     data,
     field_index,
-    component,
+    time_index,
+    quantity,
     imshow,
     colorbar,
+    ticks,
+    alpha,
+    levels,
     xlim,
     ylim,
     show,
     block,
     save,
 ):
-    labels = [
-        r"$u$ ($px$)",
-        r"$v$ ($px$)",
-        r"$du/dx$ ($-$)",
-        r"$dv/dx$ ($-$)",
-        r"$du/dy$ ($-$)",
-        r"$dv/dy$ ($-$)",
-        r"$d^2u/dx^2$ ($-$)",
-        r"$d^2v/dx^2$ ($-$)",
-        r"$d^2u/dxdy$ ($-$)",
-        r"$d^2v/dxdy$ ($-$)",
-        r"$d^2u/dy^2$ ($-$)",
-        r"$d^2v/dy^2$ ($-$)",
-        r"$\theta$ ($^o$)",
-        r"$\epsilon_{\gamma}$ ($-$)",
-    ]
-
-    title = r"Error: component = {component}".format(component=labels[component])
-    fig, ax = plt.subplots(num=title)
-    values = np.empty(
-        (
-            len(data["fields"][field_index].data["particles"]),
-            len(
-                data["fields"][field_index].data["particles"][0]["results"][
-                    "coordinates"
-                ]
-            )
-            - 1,
-        )
-    )
-    if data["fields"][field_index].data["number_images"] > 1:
-        segments = np.empty(
-            (
-                len(data["fields"][field_index].data["particles"]),
-                data["fields"][field_index].data["number_images"] - 1,
-                2,
-                2,
-            )
-        )
-    else:
-        segments = np.empty((len(data["fields"][field_index].data["particles"]), 2, 2))
-    for i in range(len(data["fields"][field_index].data["particles"])):
-        values[i] = np.sqrt(
+    if quantity == "u":
+        label = r"Horizontal displacement error, $\epsilon_u$ ($px$)"
+        value = np.sqrt(
             np.sum(
                 (
-                    data["applied"][field_index][:, i, :2]
-                    - data["observed"][field_index][:, i, :2]
+                    data["applied"][field_index][time_index, :, 0]
+                    - data["observed"][field_index][time_index, :, 0]
                 )
                 ** 2,
-                axis=-1,
+                axis=1,
             )
         )
-        points = (
-            data["fields"][field_index]
-            .data["particles"][i]["results"]["coordinates"]
-            .reshape(-1, 1, 2)
+    elif quantity == "v":
+        label = r"Vertical displacement error, $\epsilon_v$ ($px$)"
+        value = np.sqrt(
+            np.sum(
+                (
+                    data["applied"][field_index][time_index, :, 1]
+                    - data["observed"][field_index][time_index, :, 1]
+                )
+                ** 2,
+                axis=1,
+            )
         )
-        segments[i] = np.concatenate([points[:-1], points[1:]], axis=1)
-    values = values.flatten()
-    norm = plt.Normalize(values.min(), values.max())
-    lc = LineCollection(segments.reshape(-1, 2, 2), cmap="viridis", norm=norm)
-    lc.set_array(values.flatten())
-    lines = ax.add_collection(lc)
+    elif quantity == "R":
+        label = r"Absolute displacement error, $\epsilon_R$ ($px$)"
+        value = np.sqrt(
+            np.sum(
+                (
+                    data["applied"][field_index][time_index, :, :2]
+                    - data["observed"][field_index][time_index, :, :2]
+                )
+                ** 2,
+                axis=1,
+            )
+        )
+
+    par_coords = np.zeros(
+        (np.shape(data["fields"][field_index].data["particles"])[0], 2)
+    )
+    for i in range(np.shape(data["fields"][field_index].data["particles"])[0]):
+        par_coords[i] = (
+            data["fields"][field_index]
+            .data["particles"][i]
+            .data["results"]["coordinates"][time_index]
+        )
+    delaunay = spsp.Delaunay(par_coords)
+    mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+        delaunay.simplices, par_coords[:, 0], par_coords[:, 1], 1
+    )
+
+    title = r"Error: component = {component}".format(component=label)
+    fig, ax = plt.subplots(num=title)
+    extend = "neither"
+    if not isinstance(levels, type(None)):
+        if np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
+            extend = "both"
+        elif np.max(value) > np.max(levels):
+            extend = "max"
+        elif np.min(value) < np.min(levels):
+            extend = "min"
+    triangulation = tri.Triangulation(
+        par_coords[:, 0], par_coords[:, 1], mesh_triangulation
+    )
+    contours = ax.tricontourf(
+        triangulation,
+        value,
+        alpha=alpha,
+        levels=levels,
+        extend=extend,
+    )
+    if colorbar is True:
+        fig.colorbar(contours, label=label, ticks=ticks)
 
     # Show image in background.
     if imshow is True:
         image = cv2.imread(
-            data["fields"][field_index].data["image_0"], cv2.IMREAD_COLOR
+            data["speckle"].data["image_dir"]
+            + data["speckle"].data["name"]
+            + "_"
+            + str(time_index)
+            + data["speckle"].data["file_format"],
+            cv2.IMREAD_COLOR,
         )
         image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
         plt.imshow(image_gs, cmap="gray")
     else:
         ax.set_aspect("equal", "box")
-
-    if colorbar is True:
-        fig.colorbar(lines, label=labels[component])
-
-        # Limit control.
+    ax.grid(False)
     if xlim is not None:
         ax.set_xlim(xlim)
     if ylim is not None:
         ax.set_ylim(ylim)
-
     # Save.
     if save is not None:
         plt.savefig(save, dpi=600)
-
     # Show or close.
     if show is True:
         plt.show(block=block)
     else:
         plt.close(fig)
-
     return fig, ax
 
 
 def inspect_calibration(data, image_index):
     fig, ax = plt.subplots()
     frame = cv2.imread(data["file_settings"]["calibration_images"][image_index])
-    print(data["calibration"]["corners"][image_index])
-    print(data["calibration"]["ids"][image_index])
-
-    # cv2.aruco.drawDetectedMarkers(frame, data["calibration"]["corners"][image_index],
-    # data["calibration"]["ids"][image_index])
     ax.imshow(frame)
     ax.scatter(
         data["calibration"]["corners"][image_index][:, :, 0],

@@ -422,6 +422,10 @@ class SequenceBase(Object):
             "v_y",
             "R",
             "size",
+            "ep_xx",
+            "ep_yy",
+            "ep_xy",
+            "ep_vol",
         ]
         if quantity:
             self._report(
@@ -881,7 +885,6 @@ class Sequence(SequenceBase):
         max_norm=1e-5,
         max_iterations=50,
         adaptive_iterations=0,
-        correction=True,
         method="ICGN",
         mesh_order=2,
         subset_order=1,
@@ -1112,7 +1115,6 @@ class Sequence(SequenceBase):
         self._max_iterations = max_iterations
         self._max_norm = max_norm
         self._adaptive_iterations = adaptive_iterations
-        self._correction = correction
         self._method = method
         self._subset_order = subset_order
         self._mesh_order = mesh_order
@@ -1162,7 +1164,6 @@ class Sequence(SequenceBase):
                 max_iterations=self._max_iterations,
                 max_norm=self._max_norm,
                 adaptive_iterations=self._adaptive_iterations * (geo is None),
-                correction=self._correction,
                 method=self._method,
                 subset_order=self._subset_order,
                 tolerance=self._tolerance,
@@ -1439,7 +1440,6 @@ class SequenceResults(SequenceBase):
             method = mesh["settings"]["method"]
             tolerance = mesh["settings"]["tolerance"]
             seed_tolerance = mesh["settings"]["seed_tolerance"]
-            correction = mesh["settings"]["correction"]
             alpha = mesh["settings"]["alpha"]
             seed = mesh["results"]["subsets"][mesh["results"]["seed"]]
             subset_order = seed["settings"]["order"]
@@ -1470,7 +1470,6 @@ class SequenceResults(SequenceBase):
                 max_norm=max_norm,
                 max_iterations=max_iterations,
                 adaptive_iterations=adaptive_iterations,
-                correction=correction,
                 method=method,
                 mesh_order=mesh_order,
                 subset_order=subset_order,

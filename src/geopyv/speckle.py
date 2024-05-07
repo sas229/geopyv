@@ -83,6 +83,230 @@ class SpeckleBase(Object):
                     (delta[:, 1] >= 0) * 0.5 * self.data["pm"][i][4] * delta[:, 1] ** 2
                 )
                 _warp[:, 4] += (delta[:, 1] >= 0) * self.data["pm"][i][4] * delta[:, 1]
+            elif self.data["vars"]["mode"] == "T":
+                if i == 0:
+                    pass
+                else:
+                    # Points.
+                    C = self.data["vars"]["centre"] + np.asarray(
+                        [0.0, self.data["vars"]["rate"] * i]
+                    )
+                    X = np.asarray(
+                        [
+                            self.data["vars"]["lambda"]
+                            * self.data["vars"]["radius"]
+                            / np.cos(np.pi / 2 - self.data["vars"]["b2"]),
+                            C[1],
+                        ]
+                    )
+                    m = -1 / np.tan(np.pi / 2 - self.data["vars"]["b2"])
+                    coefs = np.asarray(
+                        [
+                            1 + m**2,
+                            2 * (m * (X[0] - C[0]) - X[1]) - 2 * m**2 * C[1],
+                            (m * (X[0] - C[0]) - X[1]) ** 2
+                            + m**2 * (C[1] ** 2 - self.data["vars"]["radius"] ** 2),
+                        ]
+                    )
+                    roots = np.roots(coefs)
+                    B = np.asarray(
+                        [
+                            C[0]
+                            + np.sqrt(
+                                self.data["vars"]["radius"] ** 2
+                                - (roots[np.argwhere(roots > C[1])][0][0] - C[1]) ** 2
+                            ),
+                            roots[np.argwhere(roots > C[1])][0][0],
+                        ]
+                    )
+                    Z = np.asarray(
+                        [
+                            C[0]
+                            + self.data["vars"]["lambda"]
+                            * self.data["vars"]["radius"]
+                            * np.sin(self.data["vars"]["b1"]),
+                            C[1]
+                            + self.data["vars"]["lambda"]
+                            * self.data["vars"]["radius"]
+                            * np.cos(self.data["vars"]["b1"]),
+                        ]
+                    )
+                    m = -1 / np.tan(np.pi / 2 - self.data["vars"]["b1"])
+                    coefs = np.asarray(
+                        [
+                            1 + m**2,
+                            2 * (m * (Z[0] - C[0]) - Z[1]) - 2 * m**2 * C[1],
+                            (m * (Z[0] - C[0]) - Z[1]) ** 2
+                            + m**2 * (C[1] ** 2 - self.data["vars"]["radius"] ** 2),
+                        ]
+                    )
+                    roots = np.roots(coefs)
+                    D = np.asarray(
+                        [
+                            C[0]
+                            + np.sqrt(
+                                self.data["vars"]["radius"] ** 2
+                                - (roots[np.argwhere(roots > Z[1])][0][0] - C[1]) ** 2
+                            ),
+                            roots[np.argwhere(roots > Z[1])][0][0],
+                        ]
+                    )
+                    G = np.asarray([C[0], D[1] - m * (D[0] - C[0])])
+
+                    # Critical Radii.
+                    Rb = np.sqrt(np.sum((X - B) ** 2))
+                    Rd = np.sqrt(np.sum((X - D) ** 2))
+                    Rg = np.sqrt(np.sum((X - G) ** 2))
+
+                    # print("C: {}".format(np.round(C,2)))
+                    # print("X: {}".format(np.round(X,2)))
+                    # print("m: {}".format(np.round(m,2)))
+                    # print("coefs: {}".format(np.round(coefs,2)))
+                    # print("roots: {}".format(np.round(roots,2)))
+                    # print("B: {}".format(np.round(B,2)))
+                    # print("Z: {}".format(np.round(Z,2)))
+                    # print("D: {}".format(np.round(D,2)))
+                    # print("G: {}".format(np.round(G,2)))
+                    # input()
+
+                    # General speckle.
+                    Rp = np.sqrt(np.sum((X - ref) ** 2, axis=1))
+                    alpha = np.arctan(abs((ref[:, 1] - X[1]) / (ref[:, 0] - X[0])))
+
+                    # Conditions
+                    c4 = np.full(np.shape(ref)[0], False)
+                    for i in range(len(ref)):
+                        if abs(ref[i, 0]) > D[0]:
+                            pass
+                        else:
+                            cond1 = gp.geometry.utilities.intersect(
+                                Z, ref[i], D, np.asarray([C[0], D[1]])
+                            )
+                            cond2 = gp.geometry.utilities.intersect(
+                                np.asarray([Z[0], C[1] - (Z[1] - C[1])]),
+                                ref[i],
+                                np.asarray([D[0], C[1] - (D[1] - C[1])]),
+                                np.asarray([C[0], C[1] - (D[1] - C[1])]),
+                            )
+                            if cond1 or cond2:
+                                c4[i] = True
+
+                    c1 = Rp < Rb
+                    c2 = (Rp > Rb) * (Rp < Rd)
+                    c3 = (Rp > Rd) * (Rp < Rg) * np.logical_not(c4)
+                    c4 *= Rp < Rg
+
+                    # Rigid inner.
+                    # theta = np.arctan(1/(X[0]-C[0]))
+                    # _warp[:,0] = c1 * (np.cos(theta) * (ref[:,0]-X[0])
+                    # - np.sin(theta) * (ref[:,1]-X[1])) - (ref[:,0]-X[0])
+                    # _warp[:,1] = c1 * (np.cos(theta) * (ref[:,1]-X[1])
+                    # - np.sin(theta) * (ref[:,0]-X[0])) - (ref[:,1]-X[1])
+
+                    _warp[:, 0] -= (
+                        c1
+                        * self.data["vars"]["rate"]
+                        * Rp
+                        / (X[0] - C[0])
+                        * np.sin(alpha)
+                        * np.sign(X[1] - ref[:, 1])
+                    )
+                    _warp[:, 1] -= (
+                        c1
+                        * self.data["vars"]["rate"]
+                        * Rp
+                        / (X[0] - C[0])
+                        * np.cos(alpha)
+                        * np.sign(ref[:, 0] - X[0])
+                    )
+                    # # Shear zone.
+                    _warp[:, 0] -= (
+                        c2
+                        * self.data["vars"]["rate"]
+                        * Rb
+                        / (X[0] - C[0])
+                        * np.sin(alpha)
+                        * np.sign(X[1] - ref[:, 1])
+                    )
+                    _warp[:, 1] -= (
+                        c2
+                        * self.data["vars"]["rate"]
+                        * Rb
+                        / (X[0] - C[0])
+                        * np.cos(alpha)
+                        * np.sign(ref[:, 0] - X[0])
+                    )
+                    # # Shear depletion.
+                    _warp[:, 0] -= (
+                        c3
+                        * self.data["vars"]["rate"]
+                        * Rp
+                        / (X[0] - C[0])
+                        * np.sin(alpha)
+                        * (Rg - Rp)
+                        / (Rg - Rd)
+                        * np.sign(X[1] - ref[:, 1])
+                    )
+                    _warp[:, 1] -= (
+                        c3
+                        * self.data["vars"]["rate"]
+                        * Rp
+                        / (X[0] - C[0])
+                        * np.cos(alpha)
+                        * (Rg - Rp)
+                        / (Rg - Rd)
+                        * np.sign(ref[:, 0] - X[0])
+                    )
+                    # # Head.
+                    _warp[:, 1] += c4 * self.data["vars"]["rate"]
+
+                    # fig,ax = plt.subplots()
+                    # ax.scatter(ref[:,0]*c1, ref[:,1]*c1, color = "r")
+                    # ax.scatter(ref[:,0]*c2, ref[:,1]*c2, color = "g")
+                    # ax.scatter(ref[:,0]*c3, ref[:,1]*c3, color = "b")
+                    # # ax.scatter(ref[:,0]*c4, ref[:,1]*c4, color = "y")
+                    # others = np.logical_not(c1)
+                    # *np.logical_not(c2)*np.logical_not(c3)#*np.logical_not(c4)
+                    # ax.scatter(ref[:,0]*others, ref[:,1]*others, color = "orange")
+                    # points = np.asarray([C,X,B,Z,D,G])
+                    # ax.scatter(points[:,0],points[:,1],color = "k")
+                    # ax.plot((X[0],B[0]), (X[1],B[1]), color = "k")
+                    # ax.plot((Z[0],D[0],G[0]), (Z[1],D[1],G[1]), color = "k")
+                    # plt.show()
+            elif self.data["vars"]["mode"] == "C":
+                delta = ref - self.data["vars"]["centre"]
+                dist = np.sqrt(np.sum(delta**2, axis=1))
+                c1 = dist < self.data["vars"]["r1"]
+                c2 = np.logical_not(c1) * (dist < self.data["vars"]["r2"])
+                m = (self.data["vars"]["r2"] - dist) / (
+                    self.data["vars"]["r2"] - self.data["vars"]["r1"]
+                )
+                _warp[:, 0] = c1 * (
+                    self.data["pm"][i][2] * delta[:, 0]
+                    + self.data["pm"][i][4] * delta[:, 1]
+                )
+                _warp[:, 1] = c1 * (
+                    self.data["pm"][i][3] * delta[:, 0]
+                    + self.data["pm"][i][5] * delta[:, 1]
+                )
+                _warp[:, 2] += c1 * (np.cos(2 * np.pi * self.data["mult"][i]) - 1)
+                _warp[:, 3] += c1 * (np.sin(2 * np.pi * self.data["mult"][i]))
+                _warp[:, 4] += c1 * (-np.sin(2 * np.pi * self.data["mult"][i]))
+                _warp[:, 5] += c1 * (np.cos(2 * np.pi * self.data["mult"][i]) - 1)
+                _warp[:, 0] += c2 * (
+                    np.cos(2 * np.pi * self.data["mult"][i] * m) * delta[:, 0]
+                    - np.sin(2 * np.pi * self.data["mult"][i] * m) * delta[:, 1]
+                    - delta[:, 0]
+                )
+                _warp[:, 1] += c2 * (
+                    np.sin(2 * np.pi * self.data["mult"][i] * m) * delta[:, 0]
+                    + np.cos(2 * np.pi * self.data["mult"][i] * m) * delta[:, 1]
+                    - delta[:, 1]
+                )
+                _warp[:, 2] += c2 * (np.cos(2 * np.pi * self.data["mult"][i] * m) - 1)
+                _warp[:, 3] += c2 * (np.sin(2 * np.pi * self.data["mult"][i] * m))
+                _warp[:, 4] += c2 * (-np.sin(2 * np.pi * self.data["mult"][i] * m))
+                _warp[:, 5] += c2 * (np.cos(2 * np.pi * self.data["mult"][i] * m) - 1)
         else:
             _warp[:, 0] = (
                 self.data["pm"][i][0]
@@ -122,9 +346,6 @@ class SpeckleBase(Object):
             )
             _warp[:, 6:] = self.data["pm"][i][6:]
 
-            if rot:
-                _warp[:, :2] -= delta
-
         return _warp
 
     def _report(self, msg, error_type):
@@ -155,16 +376,17 @@ class Speckle(SpeckleBase):
         file_format=".jpg",
         image_size_x=1001,
         image_size_y=1001,
-        speckle_limits=[1001, 1001],
+        speckle_limits=np.asarray([1001, 1001]),
         image_no=101,
         mmin=0,
         mmax=1,
         mtyp=0,
+        rot=False,
         comp=np.zeros(12),
         origin=np.asarray([501.0, 501.0]),
         noise=np.asarray([[0.0, 0.0], [0, 0]]),
         tmi=100,
-        speckle_size=10,
+        speckle_size=10.0,
     ):
         self._report(gp.check._check_type(name, "name", [str]), "Error")
         self._report(gp.check._check_type(image_dir, "image_dir", [str]), "Error")
@@ -207,6 +429,7 @@ class Speckle(SpeckleBase):
         self._mmin = mmin
         self._mmax = mmax
         self._mtyp = mtyp
+        self._rot = rot
         self._comp = comp
         self._origin = origin
         self._noise = noise
@@ -234,14 +457,21 @@ class Speckle(SpeckleBase):
             "speckle_size": self._speckle_size,
         }
 
-    def solve(self, *, wrap=False, number=None, generate=True, vars=None):
+    def solve(self, *, wrap=False, number=None, ref_speckle=None, vars=None):
         self._wrap = wrap
         self._vars = vars
         [self.X, self.Y] = np.meshgrid(
             range(self._image_size_x), range(self._image_size_y)
         )
-        if generate:
+        if ref_speckle is None:
             self._ref_speckle = self._speckle_distribution(number)
+        else:
+            self._ref_speckle = ref_speckle
+        if self._vars is not None:
+            if self._vars["mode"] == "T":
+                self._speckle = self._ref_speckle
+            elif self._vars["mode"] == "C":
+                self._rot = True
         self._mult()
         self.data.update(
             {
@@ -249,6 +479,7 @@ class Speckle(SpeckleBase):
                 "ref_speckle": self._ref_speckle,
                 "pm": self._pm,
                 "vars": self._vars,
+                "mult": self._mult,
             }
         )
         self._image_generation()
@@ -298,6 +529,14 @@ class Speckle(SpeckleBase):
                     i += 1
                     bar(min(mi / self._tmi, 1))
                     print(i)
+        if self._vars is not None:
+            if self._vars["mode"] == "T":
+                speckles = speckles[
+                    np.argwhere(
+                        np.sqrt(np.sum((speckles - self._vars["centre"]) ** 2, axis=1))
+                        > self._vars["radius"]
+                    ).flatten()
+                ]
 
         return np.asarray(speckles)
 
@@ -316,16 +555,31 @@ class Speckle(SpeckleBase):
                 self._image_no - 1,
                 endpoint=True,
             )
-        for i in range(self._image_no):
-            self._pm[i] = self._comp * self._mult[i]
-            self.noisem[i] = self._noise[0] * self._noise[1]  # * self._mult[i]
+        if self._rot is False:
+            for i in range(self._image_no):
+                self._pm[i] = self._comp * self._mult[i]
+                self.noisem[i] = self._noise[0] * self._noise[1]  # * self._mult[i]
+        else:
+            for i in range(self._image_no):
+                self._pm[i, 2] = np.cos(2 * np.pi * self._mult[i]) - 1
+                self._pm[i, 3] = np.sin(2 * np.pi * self._mult[i])
+                self._pm[i, 4] = -np.sin(2 * np.pi * self._mult[i])
+                self._pm[i, 5] = np.cos(2 * np.pi * self._mult[i]) - 1
+                self.noisem[i] = self._noise[0] * self._noise[1]
 
     def _image_generation(self):
         with alive_bar(
             self._image_no, dual_line=True, bar="blocks", title="Generating images..."
         ) as bar:
             for i in range(self._image_no):
-                warp = self._warp(i, self._ref_speckle)
+                if self._vars is not None:
+                    if self._vars["mode"] == "T":
+                        warp = self._warp(i, self._speckle, rot=self._rot)
+                        self._speckle += warp[:, :2]
+                    else:
+                        warp = self._warp(i, self._ref_speckle, rot=self._rot)
+                else:
+                    warp = self._warp(i, self._ref_speckle, rot=self._rot)
                 warp[:, :2] += self._ref_speckle
                 # _tar_speckle = (
                 #     self._warp(i, self._ref_speckle)[:, :2] + self._ref_speckle

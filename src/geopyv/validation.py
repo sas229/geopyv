@@ -181,9 +181,13 @@ class ValidationBase(Object):
         self,
         *,
         field_index=0,
+        time_index=0,
+        quantity="R",
         imshow=True,
         colorbar=True,
-        component=None,
+        ticks=None,
+        alpha=0.5,
+        levels=None,
         xlim=None,
         ylim=None,
         show=True,
@@ -202,12 +206,32 @@ class ValidationBase(Object):
             )
 
         # Check input.
-        self._report(gp.check._check_type(component, "component", [int]), "TypeError")
         self._report(
-            gp.check._check_range(component, "component", 0, ub=13),
-            "IndexError",
+            gp.check._check_type(quantity, "quantity", [str, type(None)]), "TypeError"
         )
+        types = [
+            "u",
+            "v",
+            "R",
+        ]
+        if quantity:
+            self._report(
+                gp.check._check_value(quantity, "quantity", types), "ValueError"
+            )
+        self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
+        self._report(gp.check._check_type(colorbar, "colorbar", [bool]), "TypeError")
         types = [tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(ticks, "ticks", types), "TypeError")
+        check = gp.check._check_type(alpha, "alpha", [float])
+        if check:
+            try:
+                alpha = float(alpha)
+                self._report(gp.check._conversion(alpha, "alpha", float), "Warning")
+            except Exception:
+                self._report(check, "TypeError")
+        self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
+        types = [int, tuple, list, np.ndarray, type(None)]
+        self._report(gp.check._check_type(levels, "levels", types), "TypeError")
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
         if xlim is not None:
             self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
@@ -223,9 +247,13 @@ class ValidationBase(Object):
         fig, ax = gp.plots.spatial_error_validation(
             data=self.data,
             field_index=field_index,
+            time_index=time_index,
+            quantity=quantity,
             imshow=imshow,
             colorbar=colorbar,
-            component=component,
+            ticks=ticks,
+            alpha=alpha,
+            levels=levels,
             xlim=xlim,
             ylim=ylim,
             show=show,
@@ -284,7 +312,8 @@ class Validation(ValidationBase):
             "fields": self._fields,
         }
 
-    def solve(self, *, rot=False, cumulative=True):
+    def solve(self, *, rot=False, cumulative=True, skim=None):
+        self._skim = skim
         self._applied = []  # field, image,point, warp
         self._observed = []
 
@@ -317,29 +346,82 @@ class Validation(ValidationBase):
                     )
                 )
                 for j in range(np.shape(field.data["particles"])[0]):
-                    particle_coordinates[j] = field.data["particles"][j]["results"][
-                        "coordinates"
-                    ]
+                    particle_coordinates[j] = field.data["particles"][j].data[
+                        "results"
+                    ]["coordinates"]
                 for i in range(1, self._speckle.data["image_no"]):
                     applied[i - 1] = self._speckle._warp(
                         i, field.data["field"]["coordinates"], rot=rot
                     ) - self._speckle._warp(i - 1, field.data)
             for i in range(np.shape(field.data["particles"])[0]):
-                if np.shape(field.data["particles"][i]["results"]["warps"])[1] == 6:
+                if (
+                    np.shape(field.data["particles"][i].data["results"]["warps"])[1]
+                    == 6
+                ):
                     observed[
-                        : len(field.data["particles"][i]["results"]["warps"]) - 1, i, :6
-                    ] = field.data["particles"][i]["results"]["warps"][1:]
-                elif np.shape(field.data["particles"][i]["results"]["warps"])[1] == 12:
+                        : len(field.data["particles"][i].data["results"]["warps"]) - 1,
+                        i,
+                        :6,
+                    ] = field.data["particles"][i].data["results"]["warps"][1:]
+                elif (
+                    np.shape(field.data["particles"][i].data["results"]["warps"])[1]
+                    == 12
+                ):
                     observed[
-                        : len(field.data["particles"][i]["results"]["warps"]) - 1, i
-                    ] = field.data["particles"][i]["results"]["warps"][1:]
+                        : len(field.data["particles"][i].data["results"]["warps"]) - 1,
+                        i,
+                    ] = field.data["particles"][i].data["results"]["warps"][1:]
 
             self._applied.append(applied)
             self._observed.append(observed)
+        self._anomalies()
 
         self.solved = True
         self.data["solved"] = self.solved
         self.data.update({"applied": self._applied, "observed": self._observed})
+
+    def _anomalies(self):
+        """
+
+        Remove particles that distort picture of performance.
+
+        """
+
+        if self._skim is not None:
+            for j in range(len(self._applied)):  # Field.
+                applied = np.zeros(
+                    (
+                        self._speckle.data["image_no"] - 1,
+                        np.shape(self._fields[j].data["field"]["coordinates"])[0]
+                        - self._skim,
+                        12,
+                    )
+                )
+                observed = np.zeros(
+                    (
+                        self._speckle.data["image_no"] - 1,
+                        np.shape(self._fields[j].data["field"]["coordinates"])[0]
+                        - self._skim,
+                        12,
+                    )
+                )
+                for i in range(len(self._applied[j])):  # Time step.
+                    errors = np.sqrt(
+                        np.sum(
+                            (self._applied[j][i, :, :2] - self._observed[j][i, :, :2])
+                            ** 2,
+                            axis=1,
+                        )
+                    )
+                    errors_args = np.argsort(errors)[::-1]
+                    applied[i] = np.delete(
+                        self._applied[j][i], errors_args[: self._skim], axis=0
+                    )
+                    observed[i] = np.delete(
+                        self._observed[j][i], errors_args[: self._skim], axis=0
+                    )
+                self._applied[j] = applied
+                self._observed[j] = observed
 
 
 class ValidationResults(ValidationBase):

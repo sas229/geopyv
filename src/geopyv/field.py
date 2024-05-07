@@ -5,7 +5,6 @@ Field module for geopyv.
 """
 import logging
 import numpy as np
-import scipy as sp
 import geopyv as gp
 from geopyv.object import Object
 import gmsh
@@ -185,7 +184,7 @@ class FieldBase(Object):
         else:
             log.info("Tracing particle {}...".format(particle_index))
             obj_type = "Particle"
-            data = self.data["particles"][particle_index]
+            data = self.data["particles"][particle_index].data
         fig, ax = gp.plots.trace_particle(
             data=data,
             quantity=quantity,
@@ -595,6 +594,7 @@ class Field(FieldBase):
         coordinates=None,
         volumes=None,
         stresses=np.zeros(6),
+        strains=np.zeros(6),
         ID="",
     ):
         """
@@ -788,6 +788,7 @@ class Field(FieldBase):
         self._update_cm(0)
         self._image_0 = self._cm.data["images"]["f_img"]
         self._track = track
+        self._strains = strains
         self.solved = False
         self._unsolvable = False
         self._ID = ID
@@ -804,50 +805,53 @@ class Field(FieldBase):
 
         if coordinates is not None:
             _auto_distribute = False
-            boundary_hull = sp.spatial.Delaunay(
-                self._cm.data[self._nref][self._cm.data["boundary"]]
-            )
-            exclusion_hulls = []
-            for exclusion in self._cm.data[self._nref][self._cm.data["exclusions"]]:
-                exclusion_hulls.append(sp.spatial.Delaunay(exclusion))
-            for coord in coordinates:
-                if boundary_hull.find_simplex(coord) < 0:
-                    log.error(
-                        (
-                            "User-specified coordinate {} " "outside mesh boundary:\n{}"
-                        ).format(
-                            coord, self._cm.data[self._nref][self._cm.data["boundary"]]
-                        )
-                    )
-                    raise ValueError(
-                        (
-                            "User-specified coordinate {} outside mesh boundary:\n{}"
-                        ).format(
-                            coord, self._cm.data[self._nref][self._cm.data["boundary"]]
-                        )
-                    )
-                for i in range(len(exclusion_hulls)):
-                    if exclusion_hulls[i].find_simplex(coord) >= 0:
-                        centre = np.round(
-                            gp.geometry.utilities.polycentroid(
-                                self._cm.data[self._nref][
-                                    self._cm.data["exclusions"][i]
-                                ]
-                            ),
-                            2,
-                        )
-                        log.error(
-                            (
-                                "User-specified coordinate {} "
-                                "inside mesh exclusion centred at {}."
-                            ).format(coord, centre)
-                        )
-                        raise ValueError(
-                            (
-                                "User-specified coordinate {} "
-                                "inside mesh exclusion centred at {}."
-                            ).format(coord, centre)
-                        )
+            # boundary_hull = sp.spatial.Delaunay(
+            #     self._cm.data[self._nref][self._cm.data["boundary"]]
+            # )
+            # exclusion_hulls = []
+            # for exclusion in self._cm.data[self._nref][self._cm.data["exclusions"]]:
+            #     exclusion_hulls.append(sp.spatial.Delaunay(exclusion))
+            # for coord in coordinates:
+            #     if boundary_hull.find_simplex(coord) < 0:
+            #         log.error(
+            #             (
+            #                 "User-specified coordinate {} "
+            #                 "outside mesh boundary:\n{}"
+            #             ).format(
+            #                 coord,
+            #                 self._cm.data[self._nref][self._cm.data["boundary"]]
+            #             )
+            #         )
+            #         raise ValueError(
+            #             (
+            #                 "User-specified coordinate {} outside mesh boundary:\n{}"
+            #             ).format(
+            #                 coord,
+            #                 self._cm.data[self._nref][self._cm.data["boundary"]]
+            #             )
+            #         )
+            #     for i in range(len(exclusion_hulls)):
+            #         if exclusion_hulls[i].find_simplex(coord) >= 0:
+            #             centre = np.round(
+            #                 gp.geometry.utilities.polycentroid(
+            #                     self._cm.data[self._nref][
+            #                         self._cm.data["exclusions"][i]
+            #                     ]
+            #                 ),
+            #                 2,
+            #             )
+            #             log.error(
+            #                 (
+            #                     "User-specified coordinate {} "
+            #                     "inside mesh exclusion centred at {}."
+            #                 ).format(coord, centre)
+            #             )
+            #             raise ValueError(
+            #                 (
+            #                     "User-specified coordinate {} "
+            #                     "inside mesh exclusion centred at {}."
+            #                 ).format(coord, centre)
+            #             )
             if volumes is None:
                 volumes = np.ones(np.shape(coordinates)[0])
             self._target_particles = np.shape(coordinates)[0]
@@ -937,6 +941,7 @@ class Field(FieldBase):
                 "coordinates": self._coordinates,
                 "volumes": self._volumes,
                 "stresses": self._stresses,
+                "strains": self._strains,
             }
         else:
             self._coordinates = coordinates
@@ -1049,7 +1054,7 @@ class Field(FieldBase):
             del self._rm
             self._rm = self._series._load_mesh(m, obj=True, verbose=False)
 
-    def solve(self, *, model=None, state=None, parameters=None, intype=0):
+    def solve(self, *, model=None, state=None, parameters=None, factor=0):
         """
         Method to solve for the field.
 
@@ -1074,6 +1079,7 @@ class Field(FieldBase):
                     coordinate=self._coordinates[i],
                     volume=self._volumes[i],
                     stress=self._stresses[i],
+                    warp=self._strains,
                     track=self._track,
                     field=True,
                     ID=str(i),
@@ -1090,13 +1096,16 @@ class Field(FieldBase):
                 self._check_update(i)
                 for j in range(particle_no):
                     self.solved += self._particles[j]._strain_path_inc(
-                        i, self._cm, self._rm, intype
+                        i,
+                        self._cm,
+                        self._rm,
                     )
                     if i == self.data["number_images"] - 2:
                         self.solved += self._particles[j].solve(
                             model=model,
                             state=state,
                             parameters=parameters,
+                            factor=factor,
                         )
                 if bool(self.solved) is False:
                     self._unsolvable = True

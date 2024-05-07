@@ -493,11 +493,10 @@ class Calibration(CalibrationBase):
         *,
         calibration_dir=".",
         common_name="",
-        calibration_file_format=".jpg",
-        dictionary=None,
+        file_format=".jpg",
+        dictionary=aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000),
         board_parameters=None,
         show=False,
-        save=False,
     ):
         """
         Initialisation of geopyv calibration object.
@@ -509,7 +508,7 @@ class Calibration(CalibrationBase):
         common_name : str, optional
             If multiple image sets are within the folder, specifying the common name
             is necessary to identify which set of images to use.
-        calibration_file_format : str, optional
+        file_format : str, optional
                 Image file type. Options are ".jpg", ".png" or ".bmp". Defaults to .jpg.
 
         """
@@ -527,16 +526,14 @@ class Calibration(CalibrationBase):
             calibration_dir = gp.io._get_image_dir()
         calibration_dir = gp.check._check_character(calibration_dir, "/", -1)
         self._report(
-            gp.check._check_type(
-                calibration_file_format, "calibration_file_format", [str]
-            ),
+            gp.check._check_type(file_format, "file_format", [str]),
             "TypeError",
         )
-        file_format = gp.check._check_character(calibration_file_format, ".", 0)
+        file_format = gp.check._check_character(file_format, ".", 0)
         self._report(
             gp.check._check_value(
-                calibration_file_format,
-                "calibration_file_format",
+                file_format,
+                "file_format",
                 [".jpg", ".png", ".bmp", ".tiff"],
             ),
             "ValueError",
@@ -551,7 +548,7 @@ class Calibration(CalibrationBase):
         self._unsolvable = False
 
         # Board Setup.
-        board_settings = self._board_setup(board_parameters, show, save)
+        board_settings = self._board_setup(board_parameters, show)
 
         # Load calibration images.
         try:
@@ -606,7 +603,7 @@ class Calibration(CalibrationBase):
 
         self._initialised = True
 
-    def _board_setup(self, board_parameters, show, save):
+    def _board_setup(self, board_parameters, show):
         """Private method for setting up the board."""
 
         # Board setup.
@@ -628,8 +625,6 @@ class Calibration(CalibrationBase):
 
         if show:
             imboard = self._board.generateImage((290, 180))
-            if save:
-                cv2.imwrite(save + ".tiff", imboard)
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
             plt.imshow(imboard, interpolation="nearest")
@@ -638,21 +633,29 @@ class Calibration(CalibrationBase):
 
         return board_settings
 
-    def solve(self, *, ext_id=None, binary=None, threshold=50):
+    def solve(self, *, ext_id=None, binary_threshold=None, acceptance_threshold=50):
         """
         Private method to calibrate the camera.
         """
 
         # Input checks.
-        check = gp.check._check_type(binary, "binary", [float, int, type(None)])
+        check = gp.check._check_type(
+            binary_threshold, "binary_threshold", [float, int, type(None)]
+        )
         if check:
             try:
-                binary = float(binary)
-                self._report(gp.check._conversion(binary, "binary", float), "Warning")
+                binary_threshold = float(binary_threshold)
+                self._report(
+                    gp.check._conversion(binary_threshold, "binary_threshold", float),
+                    "Warning",
+                )
             except Exception:
                 self._report(check, "TypeError")
         self._report(
-            gp.check._check_type(threshold, "threshold", [int, float]), "TypeError"
+            gp.check._check_type(
+                acceptance_threshold, "acceptance_threshold", [int, float]
+            ),
+            "TypeError",
         )
         # check = self._report(gp.check._check_type(ext_id, "ext_id", [int]), "Warning")
         # if check:
@@ -669,12 +672,14 @@ class Calibration(CalibrationBase):
         #     index = np.argwhere(image_indices == index)[0][0]
 
         # Store input.
-        self._binary = binary
+        self._binary_threshold = binary_threshold
         self._ext_id = ext_id
         # self._img_index = index + 1
 
         # Pre-process images for calibration.
-        self._allCorners, self._allIds, self._imsize = self._read_chessboards(threshold)
+        self._allCorners, self._allIds, self._imsize = self._read_chessboards(
+            acceptance_threshold
+        )
         if len(self._allCorners) == 0:
             log.error("Unsolvable: no corners identified.")
             return
@@ -718,7 +723,7 @@ class Calibration(CalibrationBase):
             }
         )
 
-    def _read_chessboards(self, threshold):
+    def _read_chessboards(self, acceptance_threshold):
         allCorners = []
         allIds = []
         acceptedImages = []
@@ -743,9 +748,9 @@ class Calibration(CalibrationBase):
                 frame = cv2.GaussianBlur(frame, (5, 5), 0)
 
                 # Image binarisation (optional).
-                if self._binary is not None:
+                if self._binary_threshold is not None:
                     ret, bin_frame = cv2.threshold(
-                        frame, self._binary, 255, cv2.THRESH_BINARY
+                        frame, self._binary_threshold, 255, cv2.THRESH_BINARY
                     )
 
                     # Marker Detection.
@@ -777,7 +782,7 @@ class Calibration(CalibrationBase):
                         arcnrs, arids, frame, self._board
                     )
                     if chcnrs is not None and chids is not None and len(chcnrs) > 3:
-                        if len(chcnrs) > threshold:
+                        if len(chcnrs) > acceptance_threshold:
                             allCorners.append(chcnrs)
                             allIds.append(chids)
                             acceptedImages.append(self._calibration_images[i])

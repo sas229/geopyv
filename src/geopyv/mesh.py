@@ -376,6 +376,10 @@ class MeshBase(Object):
             "u_y",
             "v_y",
             "R",
+            "ep_xx",
+            "ep_yy",
+            "ep_xy",
+            "ep_vol",
         ]
         if quantity:
             self._report(
@@ -1032,7 +1036,6 @@ class Mesh(MeshBase):
         seed_tolerance=0.9,
         method="ICGN",
         adaptive_iterations=0,
-        correction=True,
         alpha=0.5,
         subset_size_limits=None,
         override=False,
@@ -1074,10 +1077,6 @@ class Mesh(MeshBase):
         adaptive_iterations : int, optional
             Number of mesh adaptivity iterations to perform.
             Defaults to a value of 0.
-        correction : bool, optional
-            Boolean indicator as to whether to correct poor
-            correlation subsets.
-            Defaults to a value of True.
         alpha : float, optional
             Mesh adaptivity control parameter.
             Defaults to a value of 0.5.
@@ -1185,20 +1184,6 @@ class Mesh(MeshBase):
             gp.check._check_range(adaptive_iterations, "adaptive_iterations", 0),
             "ValueError",
         )
-        check = gp.check._check_type(correction, "correction", [bool])
-        if check:
-            try:
-                correction = bool(correction)
-                self._report(
-                    gp.check._conversion(correction, "correction", int),
-                    "Warning",
-                )
-            except Exception:
-                self._report(check, "TypeError")
-        self._report(
-            gp.check._check_range(correction, "correction", 0),
-            "ValueError",
-        )
         check = gp.check._check_type(tolerance, "tolerance", [float])
         if check:
             try:
@@ -1255,7 +1240,6 @@ class Mesh(MeshBase):
         self._max_iterations = max_iterations
         self._max_norm = max_norm
         self._adaptive_iterations = adaptive_iterations
-        self._correction = correction
         self._method = method
         self._subset_order = subset_order
         self._tolerance = tolerance
@@ -1338,7 +1322,6 @@ class Mesh(MeshBase):
                 "method": self._method,
                 "tolerance": self._tolerance,
                 "seed_tolerance": self._seed_tolerance,
-                "correction": self._correction,
                 "alpha": self._alpha,
                 "override": self._override,
             }
@@ -1410,6 +1393,8 @@ class Mesh(MeshBase):
         elif self._status == 7:  # Unsolvable: unkown issue.
             log.error("Could not solve mesh. Unrecognised problem.")
             input()
+        elif self._status == 8:  # Unsolvable: correlation anomalies.
+            log.error("Correlation anomalies detected.")
         self._update = True
 
     def _store_region(self):
@@ -1625,6 +1610,7 @@ class Mesh(MeshBase):
         )  # Extracts: node tags, node coordinates, parametric coordinates.
         nodes = np.column_stack((nc[0::3], nc[1::3]))  # Nodal coordinate array (x,y).
         error = (np.shape(nodes)[0] - target) ** 2
+
         return error
 
     @staticmethod
@@ -1967,10 +1953,18 @@ class Mesh(MeshBase):
         wild displacement with enforced correction if necessary.
 
         """
+        self._correlation_improvements()
 
         flow, flow_ss, flow_id = self._flow()
         R, R_id = self._R()
-        full_id = np.unique(np.concatenate((flow_id, R_id)))
+        full_id = np.unique(
+            np.concatenate(
+                (
+                    flow_id,
+                    R_id,
+                )
+            )
+        )
         full_id = full_id[np.argsort(R[full_id])]
         exempt = []
         for j in full_id:
@@ -1981,11 +1975,8 @@ class Mesh(MeshBase):
             except Exception:
                 pass
         full_id = np.setdiff1d(full_id, exempt, assume_unique=True)
-        if np.shape(full_id)[0] > 0:
-            precorrection = np.zeros((np.shape(full_id)[0], 12))
         # Correction procedure.
         for i in range(np.shape(full_id)[0]):
-            precorrection[i] = self._subsets[i]._p.flatten()
             # Subset instantiation.
             subset = gp.subset.Subset(
                 f_coord=self._nodes[full_id[i]],
@@ -2006,6 +1997,7 @@ class Mesh(MeshBase):
                     axis=0,
                 )
             else:
+                n = self._connectivity(full_id[i], full=True)
                 warp = self._p[n[np.argmax(self._C_ZNCC[n])]]
             # Subset solving.
             subset.solve(
@@ -2029,8 +2021,65 @@ class Mesh(MeshBase):
             except Exception:
                 print(traceback.format_exc())
 
-        if np.shape(full_id)[0] > 0:
-            self.data.update({"Corrections": {"IDs": full_id, "Warps": precorrection}})
+    def _correlation_improvements(self):
+        """
+        Private method to improve anomolous correlation subsets.
+        """
+        czncc_id = self._corr()
+        czncc_arg = np.argsort(self._C_ZNCC[czncc_id])
+        unimproved = []
+        for i in range(len(czncc_id)):
+            n = np.setdiff1d(
+                self._connectivity(czncc_id[czncc_arg[i]], full=True),
+                np.concatenate((czncc_id[czncc_arg[i + 1 :]], unimproved)),
+                assume_unique=True,
+            )
+            if np.any(self._C_ZNCC[n] > self._tolerance):
+                warp = np.mean(
+                    self._p[n[self._C_ZNCC[n] > self._tolerance]],
+                    axis=0,
+                )
+            else:
+                n = self._connectivity(czncc_id[czncc_arg[i]], full=True)
+                warp = self._p[n[np.argmax(self._C_ZNCC[n])]]
+            subset = gp.subset.Subset(
+                f_coord=self._nodes[czncc_id[czncc_arg[i]]],
+                f_img=self._f_img,
+                g_img=self._g_img,
+                template=self._subsets[czncc_id[czncc_arg[i]]]._template,
+                ID=str(czncc_id[czncc_arg[i]]),
+            )
+            subset.solve(
+                max_norm=self._max_norm,
+                max_iterations=self._max_iterations,
+                warp_0=warp,
+                order=self._subset_order,
+                method=self._method,
+                tolerance=self._tolerance,
+            )
+            # Storing.
+            try:
+                if (
+                    subset._C_ZNCC > self._subsets[czncc_id[czncc_arg[i]]]._C_ZNCC
+                    and subset.solved
+                ):
+                    self._subsets[czncc_id[czncc_arg[i]]] = subset
+                    self._store_variables(idx=czncc_id[czncc_arg[i]], flag=-1)
+                else:
+                    unimproved.append(czncc_id[czncc_arg[i]])
+            except Exception:
+                unimproved.append(czncc_id[czncc_arg[i]])
+                print(traceback.format_exc())
+
+    def _corr(self):
+        """
+        Private method to prepare subset correlation as a metric for
+        wild vector correction
+        """
+
+        C_loc_UQ, C_loc_LQ = np.percentile(self._C_ZNCC, [75, 25])
+        C_loc_IQR = C_loc_UQ - C_loc_LQ
+        return np.argwhere(self._C_ZNCC < C_loc_LQ - 2.5 * C_loc_IQR).flatten()
 
     def _flow(self, full_id=[]):
         """
@@ -2198,8 +2247,8 @@ class Mesh(MeshBase):
                     diff = self._nodes[idx] - self._nodes[cur_idx]
                     p = self._subsets[cur_idx].data["results"]["p"]
                     if np.shape(p)[0] == 6:
-                        p_0[0] = p[0] + p[2] * diff[0] + p[3] * diff[1]
-                        p_0[1] = p[1] + p[4] * diff[0] + p[5] * diff[1]
+                        p_0[0] = p[0] + p[2] * diff[0] + p[4] * diff[1]
+                        p_0[1] = p[1] + p[3] * diff[0] + p[5] * diff[1]
                     elif np.shape(p)[0] == 12:
                         p_0[0] = (
                             p[0]

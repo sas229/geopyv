@@ -15,7 +15,7 @@ from geomat.abstract import Elastoplastic  # noqa: F401
 from geomat.utilities import Derivatives  # noqa: F401
 from geomat.models import LinearElastic, MCC, SMCC, C2MC, EMC  # noqa: F401
 import matplotlib.pyplot as plt  # noqa: F401
-
+import traceback
 log = logging.getLogger(__name__)
 
 
@@ -292,7 +292,8 @@ class Particle(ParticleBase):
         coordinate=np.zeros(2),
         warp=np.zeros(12),
         stress=np.zeros(6),
-        volume=1.0,
+        volume=float(1*10**9),
+        depth = 1,
         track=True,
         field=False,
         ID="",
@@ -414,6 +415,7 @@ class Particle(ParticleBase):
         self._stresses = np.zeros((self._inc_no, 6))
         self._works = np.zeros(self._inc_no)
         self._strains = np.zeros((self._inc_no, 6))
+        self._depth = depth
         self._ID = ID
         self._warps[0, : min(np.shape(warp)[0], np.shape(self._warps)[1])] = warp[
             : min(np.shape(warp)[0], np.shape(self._warps)[1])
@@ -422,19 +424,21 @@ class Particle(ParticleBase):
         self._stresses[0] = stress
         self._coordinates[0] = coordinate
         self._adrift = False
+        if self._series.data["type"] == "Sequence":
+            self._plotting_coordinates = np.zeros((self._inc_no, 2))
+        else:
+            self._plotting_coordinates = np.zeros((2, 2))
+        
         if self._calibrated is True:
             self._nref = "Nodes"
             self._cref = "Centroids"
             self._dref = "Displacements"
-            if self._series.data["type"] == "Sequence":
-                self._plotting_coordinates = np.zeros((self._inc_no, 2))
-            else:
-                self._plotting_coordinates = np.zeros((2, 2))
             self._plotting_coordinates[0] = self._coord_map()
         else:
             self._nref = "nodes"
             self._cref = "centroids"
             self._dref = "displacements"
+            self._plotting_coordinates[0] = coordinate
 
         self._initialised = True
         self.data = {
@@ -480,7 +484,17 @@ class Particle(ParticleBase):
         return N @ x
 
     def solve(
-        self, *, model=None, state=None, parameters=None, factor=1.0, verbose=True
+        self, 
+        *, 
+        model=None, 
+        state=None, 
+        parameters=None, 
+        factor=1.0, 
+        mu = 0.0, 
+        ref_par = None, 
+        lim = None, 
+        true_incs = True,
+        verbose=True
     ):
         """
 
@@ -509,13 +523,21 @@ class Particle(ParticleBase):
 
         # Store variables.
         self._factor = factor
+        self._mu = mu
+        self._ref_par = ref_par
+        self._true_incs = true_incs
+        if lim is None:
+            self._lim = self._inc_no
+        else:
+            self._lim = lim
+        solved = 1
 
         # Solving.
         if self._field is False:
             self.solved += self._strain_path_full(verbose)
         self._strain_def()
         if model:
-            self.solved += self._stress_path(model, state, parameters)
+            self.solved *= self._stress_path(model, state, parameters, verbose)
             self._results = {
                 "coordinates": self._coordinates,
                 "warps": self._warps,
@@ -523,32 +545,37 @@ class Particle(ParticleBase):
                 "vol_strains": self._vol_strains,
                 "stresses": self._stresses,
                 "strains": self._strains,
+                "strain_incs": self._strain_incs,
                 "mean_effective_stresses": self._ps,
                 "deviatoric_stresses": self._qs,
                 "states": self._states,
                 "works": self._works,
+                "friction_works": self._friction_works,
             }
         else:
             self._results = {
                 "coordinates": self._coordinates,
                 "warps": self._warps,
                 "strains": self._strains,
+                "strain_incs": self._strain_incs,
                 "vol_strains": self._vol_strains,
                 "volumes": self._volumes,
             }
-        if self._calibrated is True:
-            self.data["plotting_coordinates"] = self._plotting_coordinates
-        self.solved = bool(self.solved)
+        self.data["plotting_coordinates"] = self._plotting_coordinates
+        self.solved = bool(solved)
         self.data.update(
             {
                 "parameters": parameters,
                 "state": state,
                 "results": self._results,
                 "reference_update_register": self._reference_update_register,
+                "factor": factor,
+                "mu": mu,
+                "ref_par": ref_par,
+                "true_incs": true_incs,
                 "solved": self.solved,
             }
         )
-
         return self.solved
 
     def _element_locator(self):
@@ -599,56 +626,12 @@ class Particle(ParticleBase):
                     )
                 )
             try:
-                ndiff = nodes - self._coordinates[self._reference_index]
-                ndist = np.einsum("ij,ij->i", ndiff, ndiff)
-                ndist_sorted = np.argpartition(ndist, 2)
-                index = np.argwhere(
-                    np.any(elements == ndist_sorted[0], axis=1)
-                    * np.any(elements == ndist_sorted[1], axis=1)
-                )[0][0]
+                ediff = centroids - self._coordinates[self._reference_index]
+                edist = np.einsum("ij,ij->i", ediff, ediff)
+                edist_sorted = np.argpartition(edist, 2)
+                index = edist_sorted[0]
             except Exception:
-                fig, ax = plt.subplots()
-                ax.plot(
-                    nodes[self._cm.data["exclusions"][0], 0],
-                    nodes[self._cm.data["exclusions"][0], 1],
-                    color="purple",
-                )
-                ax.plot(
-                    nodes[self._cm.data["exclusions"][0][[0, -1]], 0],
-                    nodes[self._cm.data["exclusions"][0][[0, -1]], 1],
-                    color="purple",
-                )
-                ax.scatter(
-                    nodes[elements[cdist_sorted[:10]], 0],
-                    nodes[elements[cdist_sorted[:10]], 1],
-                    color="b",
-                )
-                ax.scatter(
-                    self._coordinates[self._reference_index, 0],
-                    self._coordinates[self._reference_index, 1],
-                    color="r",
-                )
-                for i in cdist_sorted[:10]:
-                    ax.plot(
-                        nodes[elements[i, [0, 1, 2, 0]], 0],
-                        nodes[elements[i, [0, 1, 2, 0]], 1],
-                        color="orange",
-                    )
-                # ax.plot(
-                #     nodes[elements[index,[0,1,2,0]], 0],
-                #     nodes[elements[index,[0,1,2,0]], 1],
-                #     color = "g"
-                # )
-                ax.plot(
-                    self._coordinates[: self._reference_index + 1, 0],
-                    self._coordinates[: self._reference_index + 1, 1],
-                    color="g",
-                )
-                print(np.round(nodes[ndist_sorted[:10]], 2))
-                print(ndist[ndist_sorted[:10]])
-                ax.set_aspect("equal", "box")
-                plt.show()
-                input()
+                print(traceback.format_exc())
 
         return index
 
@@ -781,10 +764,9 @@ class Particle(ParticleBase):
         N, dN, d2N = self._shape_function(zeta, eta, theta)
 
         # Plotting coordinates.
-        if self._calibrated is True:
-            self._plotting_coordinates[m + 1] = (
-                N @ self._cm.data["nodes"][self._cm.data["elements"][tri_idx]]
-            )
+        self._plotting_coordinates[m + 1] = (
+            N @ self._cm.data["nodes"][self._cm.data["elements"][tri_idx]]
+        )
 
         # Displacements
         self._warp_inc[:2] = N @ u
@@ -843,6 +825,7 @@ class Particle(ParticleBase):
                 self._check_update(m)
                 tri_idx = self._element_locator()
                 self._warp_increment(m, tri_idx)
+                self._warp_inc[2:] = np.clip(self._warp_inc[2:], -0.99,0.99)
                 self._incs[m + 1] = self._warp_inc
                 self._coordinates[m + 1] = self._coordinates[
                     self._reference_index
@@ -876,6 +859,7 @@ class Particle(ParticleBase):
         self._update_cm_rm(m, cm, rm)
         tri_idx = self._element_locator()
         self._warp_increment(m, tri_idx)
+        self._warp_inc[2:] = np.clip(self._warp_inc[2:], -0.99,0.99)
         self._incs[m + 1] = self._warp_inc
         self._coordinates[m + 1] = self._coordinates[
             self._reference_index
@@ -917,62 +901,115 @@ class Particle(ParticleBase):
         self._cm = cm
         self._rm = rm
 
-    def _stress_path(self, model, state, parameters):
+    def _stress_path(self, model, state, parameters, verbose):
         """Under construction"""
-        self._ps = np.zeros(self._inc_no)
-        self._qs = np.zeros(self._inc_no)
-        self._states = np.zeros((self._inc_no, len(state)))
+        self._ps = np.zeros(self._lim)
+        self._qs = np.zeros(self._lim)
+        self._states = np.zeros((self._lim, len(state)))
+        stress_strain = np.zeros(self._lim)
+        self._stresses = self._stresses[:self._lim]
+        self._factor_mult = np.ones(6)
+        # self._factor_mult[:2] *= 1 - self._factor
         if model == "LinearElastic":
-            # Put input checks here!
+            model_name = "LinearElastic"
             model = LinearElastic(
                 parameters=parameters,
                 state=state,
-                # log_severity = "verbose"
             )
-        if model == "MCC":
-            # Put input checks here!
+        elif model == "MCC":
+            model_name = "MCC"
             model = MCC(
                 parameters=parameters,
                 state=state,
-                # log_severity="verbose"
             )
-
         elif model == "SMCC":
-            # Put input checks here!
             model = SMCC(
                 parameters=parameters,
                 state=state,
-                # log_severity="verbose"
             )
         model.set_sigma_prime_tilde(self._stresses[0].T)
         model.set_Delta_epsilon_tilde(self._strain_incs[0])
         self._ps[0] = model.p_prime
         self._qs[0] = model.q
         self._states[0] = model.get_state_variables()
-        for i in range(self._inc_no - 1):
-            try:
-                model.set_sigma_prime_tilde(self._stresses[i].T)
-                model.set_Delta_epsilon_tilde(self._strain_incs[i])
-                model.solve()
-            except Exception:
-                log.warning("Too large a strain increment. Attempting linearisation...")
-                stress = self._stresses[i].T
-                for j in range(10):
-                    model.set_sigma_prime_tilde(stress)
-                    model.set_Delta_epsilon_tilde(self._strain_incs[i] / 10)
-                    model.sigma_prime_tilde
-                # print(traceback.format_exc())
-                # log.error("geomat error. Stress path curtailed.")
-                # raise ValueError("geomat error. Stress path curtailed.")
+
+        ################################
+        full_p = []
+        full_q = []
+        full_p.append(model.p_prime)
+        full_q.append(model.q)
+        ################################
+        
+        success = True
+        for i in range(self._lim - 1):
+            # print(self._ID, i)
+            self.number = i
+            stress = self._stresses[i].T
+            denominator = max(1,int(np.max(abs(self._strain_incs[i]))/0.001)+1)
+            for j in range(denominator):
+                model.set_sigma_prime_tilde(stress)
+                model.set_Delta_epsilon_tilde(self._strain_incs[i]/denominator)
+                try:
+                    model.solve()
+                    #########################################
+                    full_p.append(model.p_prime)
+                    full_q.append(model.q)
+                    #########################################
+                except Exception:
+                    if verbose:
+                        print(traceback.format_exc())
+                        log.warning("Strain increment {} is too large:\n{}\nAttempting linearisation...".format(str(i), np.round(self._strain_incs[i]/denominator,6)))
+                    for k in range(100):
+                        model.set_sigma_prime_tilde(stress)
+                        model.set_Delta_epsilon_tilde(self._strain_incs[i]/(denominator*100))
+                        try: 
+                            model.solve()
+                            #######################################
+                            full_p.append(model.p_prime)
+                            full_q.append(model.q)
+                            #######################################
+                            stress = model.sigma_prime_tilde
+                        except Exception:
+                            if verbose:
+                                print(traceback.format_exc())
+                                log.error("Strain increment {} fatally large:\n{}\nParticle stresses unsolvable.".format(str(i), np.round(self._strain_incs[i]/(denominator*100),6)))
+                            success = False
+                            break
+                stress = model.sigma_prime_tilde
+                stress_strain[i+1] += np.sum(self._factor_mult * stress * self._strain_incs[i]/denominator, axis = -1)
+            if success is False:
+                break
             self._ps[i + 1] = model.p_prime
             self._qs[i + 1] = model.q
             self._states[i + 1] = model.get_state_variables()
             self._stresses[i + 1] = model.sigma_prime_tilde
+        self._works = stress_strain * self._volumes[:self._lim] * 10**-9
 
-        self._works[1:] = (
-            np.sum(self._stresses[1:] * self._strain_incs, axis=-1) * self._volumes[1:]
-        )
+        _R_inc = np.zeros(self._lim)
+        if self._ref_par is not None:
+            _R_inc[1:] = np.sqrt(
+                np.sum(
+                    np.diff(
+                        self._warps[:,:2]-self._ref_par.data["results"]["warps"][:,:2], 
+                        axis = 0
+                    )**2, 
+                    axis = 1
+                )
+            )[:self._lim-1]
+        else:
+            _R_inc[1:] = np.sqrt(
+                np.sum(
+                    np.diff(
+                        self._warps[:,:2], axis = 0
+                    )**2, 
+                    axis = 1
+                )
+            )[:self._lim-1]
 
+        self._friction_works = 2*self._stresses[:,2]*self._mu*self._volumes[:self._lim]/self._depth * _R_inc[:self._lim] * 10 ** -9
+        #####################################
+        self.data.update({"full_p": np.asarray(full_p), "full_q": np.asarray(full_q)})
+        #####################################
         return True
 
     def _strain_def(self):
@@ -983,22 +1020,27 @@ class Particle(ParticleBase):
         is performed.
 
         """
-
         self._strains[:, 5] = -(self._warps[:, 3] + self._warps[:, 4]) / 2
         self._strains[:, 0] = -self._warps[:, 2]
         self._strains[:, 1] = -self._warps[:, 5]
+
         self._strain_incs = np.diff(self._strains, axis=0)
+        if self._true_incs is False:
+            self._strain_incs[[0,1]] = -(np.exp(-self._strain_incs[[0,1]])-1)
         self._strain_incs[:, [0, 1]] -= (
             self._factor * np.mean(self._strain_incs[:, [0, 1]], axis=1)[:, np.newaxis]
         )
         self._strains[1:, [0, 1]] = np.cumsum(self._strain_incs[:, [0, 1]], axis=0)
-        self._vol_strains = np.zeros(np.shape(self._strain_incs)[0] + 1)
-        self._vol_strains[1:] = np.cumsum(
-            (1 + self._strain_incs[:, 0]) * (1 + self._strain_incs[:, 1])
-            - np.diff(self._warps[:, 3]) * np.diff(self._warps[:, 4])
-            - 1
-        )
-
+        self._volumes[1:] = self._volumes[0] + (1-self._factor)*np.cumsum(np.diff(self._volumes))
+        # self._vol_strains = np.diff(self._volumes)/self._volumes[:-1]
+        # self._vol_strains = np.insert(self._vol_strains, 0, 0)
+        self._vol_strains = (self._volumes - self._volumes[0])/self._volumes[0]
+        # self._vol_strains = np.zeros(np.shape(self._strain_incs)[0]+1)
+        # self._vol_strains[1:] = np.cumsum(
+        #     (1 + self._strain_incs[:,0]) * (1 + self._strain_incs[:,1])
+        #     -np.diff(self._warps[:,3]) * np.diff(self._warps[:,4])
+        #     -1
+        # )
 
 class ParticleResults(ParticleBase):
     """

@@ -29,7 +29,7 @@ class SpeckleBase(Object):
 
         """
 
-    def _warp(self, i, ref, rot=False):
+    def _warp(self, i, ref):
         _warp = np.zeros((np.shape(ref)[0], np.shape(self.data["comp"])[0]))
         delta = ref - self.data["origin"]
         if self.data["vars"] is not None:
@@ -276,37 +276,47 @@ class SpeckleBase(Object):
             elif self.data["vars"]["mode"] == "C":
                 delta = ref - self.data["vars"]["centre"]
                 dist = np.sqrt(np.sum(delta**2, axis=1))
+                dtheta = 2 * np.pi * self.data["mult"][i]
                 c1 = dist < self.data["vars"]["r1"]
                 c2 = np.logical_not(c1) * (dist < self.data["vars"]["r2"])
                 m = (self.data["vars"]["r2"] - dist) / (
                     self.data["vars"]["r2"] - self.data["vars"]["r1"]
                 )
-                _warp[:, 0] = c1 * (
+                _warp[:, 0] += c1 * (
                     self.data["pm"][i][2] * delta[:, 0]
                     + self.data["pm"][i][4] * delta[:, 1]
                 )
-                _warp[:, 1] = c1 * (
+                _warp[:, 1] += c1 * (
                     self.data["pm"][i][3] * delta[:, 0]
                     + self.data["pm"][i][5] * delta[:, 1]
                 )
-                _warp[:, 2] += c1 * (np.cos(2 * np.pi * self.data["mult"][i]) - 1)
-                _warp[:, 3] += c1 * (np.sin(2 * np.pi * self.data["mult"][i]))
-                _warp[:, 4] += c1 * (-np.sin(2 * np.pi * self.data["mult"][i]))
-                _warp[:, 5] += c1 * (np.cos(2 * np.pi * self.data["mult"][i]) - 1)
-                _warp[:, 0] += c2 * (
-                    np.cos(2 * np.pi * self.data["mult"][i] * m) * delta[:, 0]
-                    - np.sin(2 * np.pi * self.data["mult"][i] * m) * delta[:, 1]
-                    - delta[:, 0]
-                )
-                _warp[:, 1] += c2 * (
-                    np.sin(2 * np.pi * self.data["mult"][i] * m) * delta[:, 0]
-                    + np.cos(2 * np.pi * self.data["mult"][i] * m) * delta[:, 1]
-                    - delta[:, 1]
-                )
-                _warp[:, 2] += c2 * (np.cos(2 * np.pi * self.data["mult"][i] * m) - 1)
-                _warp[:, 3] += c2 * (np.sin(2 * np.pi * self.data["mult"][i] * m))
-                _warp[:, 4] += c2 * (-np.sin(2 * np.pi * self.data["mult"][i] * m))
-                _warp[:, 5] += c2 * (np.cos(2 * np.pi * self.data["mult"][i] * m) - 1)
+                if i != 0:
+                    for j in range(i):
+                        dtheta = 2 * np.pi * (self.data["mult"][j+1] - self.data["mult"][j])/1000
+                        for k in range(1000):
+                            _warp[:, 2] += c1 * (np.cos(dtheta) - 1)
+                            _warp[:, 3] += c1 * (np.sin(dtheta))
+                            _warp[:, 4] += c1 * (-np.sin(dtheta))
+                            _warp[:, 5] += c1 * (np.cos(dtheta) - 1)
+                            _warp[:, 0] += c2 * (
+                                np.cos(dtheta * m) * delta[:, 0]
+                                - np.sin(dtheta * m) * delta[:, 1]
+                                - delta[:, 0]
+                            )
+                            _warp[:, 1] += c2 * (
+                                np.sin(dtheta * m) * delta[:, 0]
+                                + np.cos(dtheta * m) * delta[:, 1]
+                                - delta[:, 1]
+                            )
+                            den = np.sqrt(delta[:,0]**2+delta[:,1]**2)*(self.data["vars"]["r2"]-self.data["vars"]["r1"])
+                            _warp[:, 2] += c2 * (np.cos(m*dtheta) + dtheta*delta[:,0]/den *(delta[:,0]*np.sin(m*dtheta) + delta[:,1]*np.cos(m*dtheta))-1)
+                            _warp[:, 3] += c2 * (np.sin(m*dtheta) + dtheta*delta[:,0]/den * (delta[:,1]*np.sin(m*dtheta) - delta[:,0]*np.cos(m*dtheta)))
+                            _warp[:, 4] += c2 * (-np.sin(m*dtheta) + dtheta*delta[:,1]/den * (delta[:,0]*np.sin(m*dtheta) + delta[:,1]*np.cos(m*dtheta)))
+                            _warp[:, 5] += c2 * (np.cos(m*dtheta) + dtheta*delta[:,1]/den * (delta[:,1]*np.sin(m*dtheta) - delta[:,0]*np.cos(m*dtheta))-1)
+
+                            # Update 
+                            cur_ref = ref + _warp[:,:2]
+                            delta = ref + _warp[:,:2] - self.data["vars"]["centre"]
         else:
             _warp[:, 0] = (
                 self.data["pm"][i][0]
@@ -480,6 +490,8 @@ class Speckle(SpeckleBase):
                 "pm": self._pm,
                 "vars": self._vars,
                 "mult": self._mult,
+                "rot": self._rot,
+                "noisem": self.noisem
             }
         )
         self._image_generation()
@@ -555,17 +567,16 @@ class Speckle(SpeckleBase):
                 self._image_no - 1,
                 endpoint=True,
             )
+        self.noisem[1:] = self._noise[0] * self._noise[1]
         if self._rot is False:
             for i in range(self._image_no):
                 self._pm[i] = self._comp * self._mult[i]
-                self.noisem[i] = self._noise[0] * self._noise[1]  # * self._mult[i]
         else:
             for i in range(self._image_no):
                 self._pm[i, 2] = np.cos(2 * np.pi * self._mult[i]) - 1
                 self._pm[i, 3] = np.sin(2 * np.pi * self._mult[i])
                 self._pm[i, 4] = -np.sin(2 * np.pi * self._mult[i])
-                self._pm[i, 5] = np.cos(2 * np.pi * self._mult[i]) - 1
-                self.noisem[i] = self._noise[0] * self._noise[1]
+                self._pm[i, 5] = np.cos(2 * np.pi * self._mult[i]) - 1               
 
     def _image_generation(self):
         with alive_bar(
@@ -574,20 +585,13 @@ class Speckle(SpeckleBase):
             for i in range(self._image_no):
                 if self._vars is not None:
                     if self._vars["mode"] == "T":
-                        warp = self._warp(i, self._speckle, rot=self._rot)
+                        warp = self._warp(i, self._speckle)
                         self._speckle += warp[:, :2]
                     else:
-                        warp = self._warp(i, self._ref_speckle, rot=self._rot)
+                        warp = self._warp(i, self._ref_speckle)
                 else:
-                    warp = self._warp(i, self._ref_speckle, rot=self._rot)
+                    warp = self._warp(i, self._ref_speckle)
                 warp[:, :2] += self._ref_speckle
-                # _tar_speckle = (
-                #     self._warp(i, self._ref_speckle)[:, :2] + self._ref_speckle
-                # )
-                # if self._wrap:
-                #     _tar_speckle[:, 0] %= self._image_size_x
-                #     _tar_speckle[:, 1] %= self._image_size_y
-                # _grid = self._grid(i, _tar_speckle)
                 _grid = self._grid(i, warp)
                 self._create(i, _grid)
                 bar()
@@ -596,7 +600,6 @@ class Speckle(SpeckleBase):
         grid = np.zeros((self._image_size_y, self._image_size_x))
         if self.noisem[i, 0] != 0.0:
             warp[:, :2] = np.random.normal(loc=warp[:, :2], scale=self.noisem[i, 0])
-        # covs = np.reshape(warp[:,2:6], (-1,2,2))*self._speckle_size**2
         for j in range(len(warp)):
             a = max(int(warp[j, 1]) - 100, 0)
             b = min(int(warp[j, 1]) + 101, self._image_size_y)

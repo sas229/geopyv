@@ -1,7 +1,6 @@
 import numpy as np
 import gmsh
-
-# from scipy.optimize import minimize_scalar
+import matplotlib.pyplot as plt
 import PIL.Image as ImagePIL
 import PIL.ImageDraw as ImageDrawPIL
 
@@ -11,17 +10,6 @@ def _gmsh_initializer():
     if gmsh.isInitialized() == 0:
         gmsh.initialize()
     gmsh.option.setNumber("General.Verbosity", 2)
-
-
-# def _set_target_nodes(target):
-#     _gmsh_initializer()
-#     log.info(
-#         "Generating mesh using gmsh with approximately {n} nodes.".format(
-#             n=self._target_nodes
-#         )
-#     )
-#     _initial_mesh()
-
 
 def _mask_image(f_img, boundary, exclusions):
     """
@@ -78,16 +66,6 @@ def _define_RoI(*, f_img=None, boundary=None, exclusions=None):
     else:
         boundary_nodes = boundary
         exclusion_nodes = exclusions
-        # try:
-        #     boundary_nodes = boundary.data["Nodes"][0]
-        #     exclusion_nodes = [
-        #         exclusions[i].data["Nodes"][0] for i in range(len(exclusions))
-        #     ]
-        # except Exception:
-        #     boundary_nodes = boundary.data["nodes"][0]
-        #     exclusion_nodes = [
-        #         exclusions[i].data["nodes"][0] for i in range(len(exclusions))
-        #     ]
 
     # Create objects for mesh generation.
     segments = np.empty(

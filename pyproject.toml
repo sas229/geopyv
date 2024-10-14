@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geopyv"
-version = "0.0.33"
+version = "0.0.34"
 authors = [
   { name="Sam Stanier", email="sas229@cam.ac.uk" },
   { name="Jonathan Smith", email="jdks2@cam.ac.uk" },
@@ -25,16 +25,6 @@ classifiers = [
 ]
 
 dependencies = [
-    "numpy==1.23.3",
-    "opencv-python==4.7.0.68",
-    "opencv-contrib-python==4.7.0.68",
-    "matplotlib==3.6.3",
-    "alive-progress==3.0.1",
-    "scipy==1.10.0",
-    "gmsh==4.11.1",
-    "numpyencoder==0.3.0",
-    "pyside6==6.4.2",
-    "pre-commit==3.0.2"
 ]
 
 [project.urls]

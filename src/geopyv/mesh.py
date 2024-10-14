@@ -11,10 +11,13 @@ import gmsh
 from copy import deepcopy
 from scipy.optimize import minimize_scalar
 from alive_progress import alive_bar
+import matplotlib.tri as tri
+import matplotlib
 import matplotlib.pyplot as plt  # noqa: F401
 import cv2  # noqa: F401
 import traceback
-
+plt.rcParams['axes.grid'] = False
+matplotlib.rcParams['font.size'] = 18
 log = logging.getLogger(__name__)
 
 
@@ -90,12 +93,15 @@ class MeshBase(Object):
             if self.data["solved"]:
                 subset_data = self.data["results"]["subsets"][subset_index]
             else:
-                subset_data = gp.subset.Subset(
-                    f_coord=self._nodes[subset_index],
-                    f_img=self._f_img,
-                    g_img=self._g_img,
-                    template=self._template,
-                ).data
+                try:
+                    subset_data = self._subsets[subset_index].data
+                except Exception:
+                    subset_data = gp.subset.Subset(
+                        f_coord=self._nodes[subset_index],
+                        f_img=self._f_img,
+                        g_img=self._g_img,
+                        template=self._template,
+                    ).data
             mask = self.data["mask"]
             log.info("Inspecting subset {subset}...".format(subset=subset_index))
             fig, ax = gp.plots.inspect_subset(
@@ -748,7 +754,6 @@ class Mesh(MeshBase):
         exclusion_objs=[],
         size_lower_bound=1.0,
         size_upper_bound=1000.0,
-        compensate=False,
         mesh_order=2,
         hp=False,
         geo=None,
@@ -897,13 +902,11 @@ class Mesh(MeshBase):
         self._size_upper_bound = size_upper_bound
         self._mesh_order = mesh_order
         self._hard_boundary = boundary_obj._hard
-        self._compensate = compensate
         self._hp = hp
         self.solved = False
         self._unsolvable = False
         self._calibrated = False
         self._ID = ID
-
         # Checks.
         self._target_checks()  # Size bounds and target nodes.
         if self._hp is True:
@@ -965,7 +968,6 @@ class Mesh(MeshBase):
             "elements": self._elements,
             "mask": self._mask,
         }
-
         self.initialised = True
 
     def _target_checks(self):
@@ -1255,7 +1257,6 @@ class Mesh(MeshBase):
             self._ubss = subset_size_limits[1]
         else:
             self._ssa = False
-
         # Initialize gmsh if not already initialized.
         if gmsh.isInitialized() == 0:
             gmsh.initialize()
@@ -1392,7 +1393,6 @@ class Mesh(MeshBase):
             )
         elif self._status == 7:  # Unsolvable: unkown issue.
             log.error("Could not solve mesh. Unrecognised problem.")
-            input()
         elif self._status == 8:  # Unsolvable: correlation anomalies.
             log.error("Correlation anomalies detected.")
         self._update = True
@@ -1736,9 +1736,7 @@ class Mesh(MeshBase):
         Private method to perform reliability-guided (RG) PIV analysis.
 
         """
-
         self._output_preparation()
-
         # Subset instantiation with template masking.
         self._subset_instantiation()
         # Solve subsets in mesh.
@@ -1812,7 +1810,7 @@ class Mesh(MeshBase):
             else:
                 template = deepcopy(self._template)
             template.mask(self._nodes[i], self._mask)
-            if template.m_n_px < template.n_px and self._compensate:
+            if template.m_n_px < template.n_px and self._compensation_check(i):
                 size = int(template.size / np.sqrt(template.m_n_px / template.n_px))
                 if self._template.shape == "circle":
                     template = gp.templates.Circle(radius=size)
@@ -1827,6 +1825,18 @@ class Mesh(MeshBase):
                 ID=str(i),
             )  # Create masked subset.
 
+    def _compensation_check(self, i):
+        """Private method that checks whether a subset should be size compensated
+        according to the boundary and exclusion object flags."""
+
+        if i in self._boundary:
+            return self._boundary_obj._compensate
+        else:
+            for j in range(len(self._exclusion_objs)):
+                if i in self._exclusions[j]:
+                    return self._exclusion_objs[j]._compensate
+        return False
+
     def _compatibility(self):
         """
 
@@ -1836,65 +1846,6 @@ class Mesh(MeshBase):
         """
         for i in range(len(self._elements)):
             if self._warps[i, 2] < -1 or self._warps[i, 5] < -1:
-                # print(self._C_ZNCC[self._elements[i]])
-                # if self._mesh_order == 1:
-                #     n1 = self._nodes[self._elements[i]]
-                #     n2 = (
-                #         self._nodes[self._elements[i]]
-                #         + self._displacements[self._elements[i]]
-                #     )
-                #     fig, ax = plt.subplots()
-                #     image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
-                #     image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                #     image_gs = cv2.GaussianBlur(
-                #         image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
-                #     )
-                #     plt.imshow(image_gs, cmap="gray")
-                #     ax.plot(n1[[0, 1, 2, 0], 0], n1[[0, 1, 2, 0], 1], color="purple")
-                #     ax.plot(n2[[0, 1, 2, 0], 0], n2[[0, 1, 2, 0], 1], color="orange")
-                #     ax.scatter(n1[0, 0], n1[0, 1], color="r")
-                #     ax.scatter(n2[0, 0], n2[0, 1], color="r")
-                #     ax.scatter(n1[1, 0], n1[1, 1], color="b")
-                #     ax.scatter(n2[1, 0], n2[1, 1], color="b")
-                #     ax.scatter(n1[2, 0], n1[2, 1], color="g")
-                #     ax.scatter(n2[2, 0], n2[2, 1], color="g")
-                #     plt.show()
-                # else:
-                #     n1 = self._nodes[self._elements[i]]
-                #     n2 = (
-                #         self._nodes[self._elements[i]]
-                #         + self._displacements[self._elements[i]]
-                #     )
-                #     fig, ax = plt.subplots()
-                #     image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
-                #     image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                #     image_gs = cv2.GaussianBlur(
-                #         image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
-                #     )
-                #     plt.imshow(image_gs, cmap="gray")
-                #     ax.plot(
-                #         n1[[0, 3, 1, 4, 2, 5, 0], 0],
-                #         n1[[0, 3, 1, 4, 2, 5, 0], 1],
-                #         color="purple",
-                #     )
-                #     ax.plot(
-                #         n2[[0, 3, 1, 4, 2, 5, 0], 0],
-                #         n2[[0, 3, 1, 4, 2, 5, 0], 1],
-                #         color="orange",
-                #     )
-                #     ax.scatter(n1[0, 0], n1[0, 1], color="r")
-                #     ax.scatter(n2[0, 0], n2[0, 1], color="r")
-                #     ax.scatter(n1[1, 0], n1[1, 1], color="b")
-                #     ax.scatter(n2[1, 0], n2[1, 1], color="b")
-                #     ax.scatter(n1[2, 0], n1[2, 1], color="g")
-                #     ax.scatter(n2[2, 0], n2[2, 1], color="g")
-                #     ax.scatter(n1[3, 0], n1[3, 1], color="c")
-                #     ax.scatter(n2[3, 0], n2[3, 1], color="c")
-                #     ax.scatter(n1[4, 0], n1[4, 1], color="m")
-                #     ax.scatter(n2[4, 0], n2[4, 1], color="m")
-                #     ax.scatter(n1[5, 0], n1[5, 1], color="k")
-                #     ax.scatter(n2[5, 0], n2[5, 1], color="k")
-                #     plt.show()
                 if self._status == 0:
                     self._unsolvable = True
                     self._status = 6
@@ -1905,41 +1856,6 @@ class Mesh(MeshBase):
                 if gp.geometry.utilities.polysect(
                     self._nodes[self._elements[i]][[0, 3, 1, 4, 2, 5]]
                 ):
-                    # n1 = self._nodes[self._elements[i]]
-                    # n2 = (
-                    #     self._nodes[self._elements[i]]
-                    #     + self._displacements[self._elements[i]]
-                    # )
-                    # fig, ax = plt.subplots()
-                    # image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
-                    # image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                    # image_gs = cv2.GaussianBlur(
-                    #     image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1
-                    # )
-                    # plt.imshow(image_gs, cmap="gray")
-                    # ax.plot(
-                    #     n1[[0, 3, 1, 4, 2, 5, 0], 0],
-                    #     n1[[0, 3, 1, 4, 2, 5, 0], 1],
-                    #     color="purple",
-                    # )
-                    # ax.plot(
-                    #     n2[[0, 3, 1, 4, 2, 5, 0], 0],
-                    #     n2[[0, 3, 1, 4, 2, 5, 0], 1],
-                    #     color="orange",
-                    # )
-                    # ax.scatter(n1[0, 0], n1[0, 1], color="r")
-                    # ax.scatter(n2[0, 0], n2[0, 1], color="r")
-                    # ax.scatter(n1[1, 0], n1[1, 1], color="b")
-                    # ax.scatter(n2[1, 0], n2[1, 1], color="b")
-                    # ax.scatter(n1[2, 0], n1[2, 1], color="g")
-                    # ax.scatter(n2[2, 0], n2[2, 1], color="g")
-                    # ax.scatter(n1[3, 0], n1[3, 1], color="c")
-                    # ax.scatter(n2[3, 0], n2[3, 1], color="c")
-                    # ax.scatter(n1[4, 0], n1[4, 1], color="m")
-                    # ax.scatter(n2[4, 0], n2[4, 1], color="m")
-                    # ax.scatter(n1[5, 0], n1[5, 1], color="k")
-                    # ax.scatter(n2[5, 0], n2[5, 1], color="k")
-                    # plt.show()
                     if self._status == 0:
                         self._unsolvable = True
                         self._status = 6
@@ -1954,8 +1870,7 @@ class Mesh(MeshBase):
 
         """
         self._correlation_improvements()
-
-        flow, flow_ss, flow_id = self._flow()
+        flow, flow_id, flow_LQ, flow_IQR = self._flow() # flow_ss, flow_id = self._flow()
         R, R_id = self._R()
         full_id = np.unique(
             np.concatenate(
@@ -1970,11 +1885,36 @@ class Mesh(MeshBase):
         for j in full_id:
             try:
                 flow_j = self._flow_calc(j, exclude=full_id)
-                if (flow_j - np.mean(flow)) / np.std(flow) > -3 and j not in R_id:
+                if (flow_j > flow_LQ-2.5*flow_IQR) and j not in R_id:
                     exempt.append(j)
             except Exception:
                 pass
         full_id = np.setdiff1d(full_id, exempt, assume_unique=True)
+        ###################################
+        # fig, ax = plt.subplots()
+        # image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
+        # image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+        # plt.imshow(image_gs, cmap="gray")
+        # mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+        #     self._elements, self._nodes[:, 0], self._nodes[:, 1], self._mesh_order
+        # )
+        # for j in range(np.shape(x_p)[0]):
+        #     ax.plot(x_p[j], y_p[j], color="k", alpha=0.25, linewidth=0.5)
+        # triangulation = tri.Triangulation(self._nodes[:, 0], self._nodes[:, 1], mesh_triangulation)
+        # contours = ax.tricontourf(
+        #     triangulation,
+        #     np.sqrt(self._displacements[:,0]**2+self._displacements[:,1]**2), # flow, # 
+        #     alpha=0.5,
+        #     # levels=np.linspace(0,10, 11),
+        # )
+        # for k in range(len(self._nodes)):
+        #     if k in full_id:
+        #         print(k, self._C_ZNCC[k], self._nodes[k])
+        #         ax.arrow(self._nodes[k,0], self._nodes[k,1], self._displacements[k,0], self._displacements[k,1], color = "r", length_includes_head = True, width = 0.5)
+        #     else:
+        #         ax.arrow(self._nodes[k,0], self._nodes[k,1], self._displacements[k,0], self._displacements[k,1], color = "k", length_includes_head = True, width = 0.5)
+        ###################################
         # Correction procedure.
         for i in range(np.shape(full_id)[0]):
             # Subset instantiation.
@@ -2020,6 +1960,15 @@ class Mesh(MeshBase):
                 self._store_variables(idx=full_id[i], flag=-1)
             except Exception:
                 print(traceback.format_exc())
+        ##################################################
+        # for k in range(len(self._nodes)):
+        #     if k in full_id:
+        #         print(k, self._C_ZNCC[k], self._nodes[k])
+        #         ax.arrow(self._nodes[k,0], self._nodes[k,1], self._displacements[k,0], self._displacements[k,1], color = "g", length_includes_head = True, width = 0.5)
+        # ax.grid(False)
+        # fig.colorbar(contours, label= r"Resultant Displacement, $R$ ($px$)") # r"Flow, $f$ ($-$)") # 
+        # plt.show()
+        ##################################################
 
     def _correlation_improvements(self):
         """
@@ -2028,7 +1977,42 @@ class Mesh(MeshBase):
         czncc_id = self._corr()
         czncc_arg = np.argsort(self._C_ZNCC[czncc_id])
         unimproved = []
+        # print(np.round(self._C_ZNCC[czncc_id[czncc_arg]],4))
+        # self.data["solved"] = True
+        # self.data["nodes"] = self._nodes
+        # self.data["elements"] = self._elements
+        # subset_data = []
+        # for subset in self._subsets:
+        #     subset_data.append(subset.data)
+        # self.data.update({"results": {"C_ZNCC": self._C_ZNCC, "subsets": subset_data}})
+        # self.contour(
+        #     levels = [.90,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99,1.00], 
+        #     show = False, 
+        #     block = False, 
+        #     save = "./validation/out/correlation_smoothing/before_"+self._ID
+        # )
         for i in range(len(czncc_id)):
+            # if i == 0 and self._C_ZNCC[czncc_id[i]]<0.95:
+            #     fig, ax = plt.subplots()
+            #     image = cv2.imread(self.data["images"]["f_img"], cv2.IMREAD_COLOR)
+            #     image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            #     image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
+            #     plt.imshow(image_gs, cmap="gray")
+            #     mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+            #         self._elements, self._nodes[:, 0], self._nodes[:, 1], self._mesh_order
+            #     )
+            #     for j in range(np.shape(x_p)[0]):
+            #         ax.plot(x_p[j], y_p[j], color="k", alpha=0.25, linewidth=0.5)
+            #     triangulation = tri.Triangulation(self._nodes[:, 0], self._nodes[:, 1], mesh_triangulation)
+            #     contours = ax.tricontourf(
+            #         triangulation,
+            #         self._C_ZNCC,
+            #         alpha=0.5,
+            #         levels=[0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99,1.00],
+            #         extend="min",
+            #     )
+            #     fig.colorbar(contours, label=r"Zero-mean Normalised Cross Correlation Coefficient, $C_{ZNCC}$ ($-$)")
+            #     plt.show()
             n = np.setdiff1d(
                 self._connectivity(czncc_id[czncc_arg[i]], full=True),
                 np.concatenate((czncc_id[czncc_arg[i + 1 :]], unimproved)),
@@ -2070,6 +2054,16 @@ class Mesh(MeshBase):
             except Exception:
                 unimproved.append(czncc_id[czncc_arg[i]])
                 print(traceback.format_exc())
+        # subset_data = []
+        # for subset in self._subsets:
+        #     subset_data.append(subset.data)
+        # self.data.update({"results": {"C_ZNCC": self._C_ZNCC, "subsets": subset_data}})
+        # self.contour(
+        #     levels = [.90,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99,1.00], 
+        #     show = False, 
+        #     block = False, 
+        #     save = "./validation/out/correlation_smoothing/after_"+self._ID
+        # )
 
     def _corr(self):
         """
@@ -2077,9 +2071,9 @@ class Mesh(MeshBase):
         wild vector correction
         """
 
-        C_loc_UQ, C_loc_LQ = np.percentile(self._C_ZNCC, [75, 25])
-        C_loc_IQR = C_loc_UQ - C_loc_LQ
-        return np.argwhere(self._C_ZNCC < C_loc_LQ - 2.5 * C_loc_IQR).flatten()
+        C_UQ, C_LQ = np.percentile(self._C_ZNCC, [75, 25])
+        C_IQR = C_UQ - C_LQ
+        return np.argwhere(self._C_ZNCC < C_LQ - 2.5 * C_IQR).flatten()
 
     def _flow(self, full_id=[]):
         """
@@ -2092,9 +2086,9 @@ class Mesh(MeshBase):
         flow = np.zeros(len(self._subsets))
         for i in range(len(self._subsets)):
             flow[i] = self._flow_calc(i)
-        flow_ss = (flow - np.mean(flow)) / np.std(flow)
-
-        return flow, flow_ss, np.argwhere((flow_ss < -3) * (flow < 0.9)).flatten()
+        flow_UQ, flow_LQ = np.percentile(flow, [75, 25])
+        flow_IQR = flow_UQ-flow_LQ
+        return flow, np.argwhere(flow<flow_LQ-1.5*flow_IQR).flatten(), flow_LQ, flow_IQR
 
     def _flow_calc(self, i, exclude=[], displacement=None):
         """
@@ -2105,10 +2099,13 @@ class Mesh(MeshBase):
         if displacement is None:
             displacement = self._displacements[i]
         n = np.setdiff1d(self._connectivity(i, full=True), exclude, assume_unique=True)
-        v = np.mean(self._displacements[n], axis=0)
-        loc_unit_vec = v / np.sqrt(np.sum(v**2))
-        sub_unit_vec = displacement / np.sqrt(np.sum(displacement**2))
-        return np.vdot(sub_unit_vec, loc_unit_vec)
+        if n.size == 0:
+            return -1
+        else: 
+            v = np.mean(self._displacements[n], axis=0)
+            loc_unit_vec = v / np.sqrt(np.sum(v**2))
+            sub_unit_vec = displacement / np.sqrt(np.sum(displacement**2))
+            return np.vdot(sub_unit_vec, loc_unit_vec)
 
     def _R(self):
         """
@@ -2233,12 +2230,6 @@ class Mesh(MeshBase):
                 if self._subsets[idx].data["solved"]:  # Check against tolerance.
                     self._store_variables(idx=idx, flag=1)
                 elif self._subsets[idx].data["unsolvable"]:
-                    # print(idx)
-                    # fig,ax=plt.subplots()
-                    # ax.imshow(self._subsets[idx]._template._local_masked)
-                    # plt.show()
-                    # self._subsets[idx].inspect()
-                    # self._subsets[idx].convergence()
                     self._status = 5
                     self._unsolvable = True
                     self._unsolvable_idx = idx
@@ -2281,12 +2272,6 @@ class Mesh(MeshBase):
                     if self._subsets[idx].data["solved"]:  # Check against tolerance.
                         self._store_variables(idx=idx, flag=1)
                     elif self._subsets[idx].data["unsolvable"]:
-                        # print(idx)
-                        # fig,ax=plt.subplots()
-                        # ax.imshow(self._subsets[idx]._template._local_masked)
-                        # plt.show()
-                        # self._subsets[idx].inspect()
-                        # self._subsets[idx].convergence()
                         self._status = 5
                         self._unsolvable = True
                         self._unsolvable_idx = idx
@@ -2303,12 +2288,6 @@ class Mesh(MeshBase):
                         if self._subsets[idx].data["unsolvable"] or np.isnan(
                             self._subsets[idx].data["results"]["C_ZNCC"]
                         ):
-                            # print(idx)
-                            # fig,ax=plt.subplots()
-                            # ax.imshow(self._subsets[idx]._template._local_masked)
-                            # plt.show()
-                            # self._subsets[idx].inspect()
-                            # self._subsets[idx].convergence()
                             self._status = 5
                             self._unsolvable = True
                             self._unsolvable_idx = idx

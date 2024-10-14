@@ -293,7 +293,7 @@ class CalibrationBase(Object):
         )
         return c.flatten()
 
-    def calibrate(self, *, verbose=True, object=None):
+    def calibrate(self, *, verbose=True, object=None, override = False):
         if self.data["solved"] is not True:
             log.error(
                 "Calibration not yet solved therefore nothing to inspect. "
@@ -323,7 +323,6 @@ class CalibrationBase(Object):
             ),
             "TypeError",
         )
-
         if type(object) == dict:
             data = object
         else:
@@ -331,7 +330,7 @@ class CalibrationBase(Object):
 
         # Check if already calibrated.
         try:
-            if data["calibrated"] is True:
+            if data["calibrated"] is True and override is False:
                 return
         except Exception:
             pass
@@ -435,22 +434,22 @@ class CalibrationBase(Object):
                 if data["file_settings"]["save_by_reference"] is True:
                     for i in range(len(data["meshes"])):
                         mesh = object._load_mesh(i, obj=True, verbose=False)
-                        self.calibrate(object=mesh, verbose=False)
+                        self.calibrate(object=mesh, verbose=False, override = override)
                         object._save_mesh(mesh, i, verbose=False)
                         bar()
                 else:
                     for i in range(len(data["meshes"])):
-                        self.calibrate(object=data["meshes"][i], verbose=False)
+                        self.calibrate(object=data["meshes"][i], verbose=False, override = override)
                         bar()
             with alive_bar(
                 len(data["mesh_settings"]["exclusion_objs"]) + 1,
                 bar="blocks",
                 title="Calibrating Regions ...",
             ) as bar:
-                self.calibrate(object=data["mesh_settings"]["boundary_obj"])
+                self.calibrate(object=data["mesh_settings"]["boundary_obj"], override = override)
                 bar()
                 for i in range(len(data["mesh_settings"]["exclusion_objs"])):
-                    self.calibrate(object=data["mesh_settings"]["exclusion_objs"][i])
+                    self.calibrate(object=data["mesh_settings"]["exclusion_objs"][i], override = override)
                     bar()
 
             # Storing.
@@ -472,6 +471,18 @@ class CalibrationBase(Object):
                     "Nodes": Nodes[:, :2].reshape(shape),
                 }
             )
+    
+    def modify(self, *, dangles = np.zeros(3), centre = np.zeros(2)):
+        """
+        Public method to modify the external matrix via rotation and or/translation.
+        """
+        self.data["extrinsic_matrix"][:3,:3] = cv2.Rodrigues(
+            cv2.Rodrigues(
+                self.data["extrinsic_matrix"][:3,:3]
+            )[0].flatten() + dangles
+        )[0]
+        objpnt = self.i2o(imgpnts = np.asarray([centre]))[0,:2]
+        self.data["extrinsic_matrix"][:2,3] += objpnt
 
     def _report(self, msg, error_type):
         if msg and error_type != "Warning":
@@ -692,7 +703,7 @@ class Calibration(CalibrationBase):
 
         # Post-processing.
         self._extrinsic_matrix_generator()
-        self._camera_angles()
+        self._camera_angles = (cv2.Rodrigues(self._extmat[:3,:3])[0]).flatten()
         self._reprojection()
 
         # Store data.
@@ -703,11 +714,7 @@ class Calibration(CalibrationBase):
                 "intrinsic_matrix": self._intmat,
                 "extrinsic_matrix": self._extmat,
                 "distortion": self._dist,
-                "camera_angles": [
-                    self._alpha,
-                    self._beta,
-                    self._gamma,
-                ],
+                "camera_angles": self._camera_angles,
                 "projection": {
                     "imgpnts": self._imgpnts,
                     "objpnts": self._objpnts,
@@ -874,12 +881,6 @@ class Calibration(CalibrationBase):
         for i in range(np.shape(self._extmats)[0]):
             self._extmats[i, :3, :3], _ = cv2.Rodrigues(self._rot[i])
         self._extmat = self._extmats[self._index]
-
-    def _camera_angles(self):
-        self._beta = -np.arcsin(self._extmat[2, 0])
-        self._gamma = np.arcsin(self._extmat[2, 1] / np.cos(self._beta))
-        self._alpha = np.arcsin(self._extmat[1, 0] / np.cos(self._beta))
-
 
 class CalibrationResults(CalibrationBase):
     """

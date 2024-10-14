@@ -4,24 +4,23 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-matplotlib = "3.6.3"
 gmsh = "*"
 scipy = "*"
 opencv-contrib-python = "*"
-pyside6 = "6.4.2"
-alive-progress = "*"
 opencv-python = "*"
+pyside6 = "*"
+alive-progress = "*"
 numpyencoder = "*"
 flake8 = "*"
 black = "*"
 sphinx-autoapi = "*"
 pre-commit = "*"
-numpy = "*"
-pip = "*"
 pandas = "*"
 seaborn = "*"
 alphashape = "*"
 shapely = "*"
+numpy = "==1.23.3"
+matplotlib = "==3.6.3"
 geomat = "*"
 
 [dev-packages]
@@ -30,16 +29,14 @@ sphinxcontrib-bibtex = "*"
 sphinx-autoapi = "*"
 sphinx-copybutton = "*"
 scikit-build = "*"
-Sphinx = "*"
+sphinx = "*"
 sphinx-rtd-theme = "*"
 pytest = "*"
 flake8 = "*"
 black = "*"
 flake8-black = "*"
-geopyv = {editable = true, path = "."}
+geopyv = {file = ".", editable = true}
 
 [requires]
-python_version = "3"
-
-[pipenv]
-allow_prereleases = true
+python_version = "3.11"
+python_full_version = "3.11.6"

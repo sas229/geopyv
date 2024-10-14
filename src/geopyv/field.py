@@ -206,13 +206,17 @@ class FieldBase(Object):
     def contour(
         self,
         *,
-        quantity="warps",
-        mesh_index=None,
-        component=0,
-        imshow=True,
-        colorbar=True,
+        quantity = "u",
+        window = None,
+        series = None,
+        original = False,
+        exclusions = [],
+        absolute = False,
+        colorbar = True,
+        scale = "lin",
         ticks=None,
         alpha=0.75,
+        extend = None, 
         levels=None,
         axis=True,
         xlim=None,
@@ -230,8 +234,6 @@ class FieldBase(Object):
             Specifier for which metric to plot along the particle path.
         component : int, optional
             Specifier for which component of the metric to plot along the particle path.
-        imshow : bool, optional
-            Control whether the reference image is plotted.
             Defaults to True.
         colorbar : bool, optional
             Control whether the colour bar is plotted.
@@ -279,25 +281,19 @@ class FieldBase(Object):
                     quantity,
                     "quantity",
                     [
-                        "coordinates",
-                        "warps",
-                        "volumes",
-                        "stresses",
+                        "u",
+                        "v",
+                        "R",
+                        "ep_xy",
+                        "ep_vol",
+                        "p",
+                        "q",
+                        "work",
+                        "power"
                     ],
                 ),
                 "ValueError",
             )
-        self._report(gp.check._check_type(component, "component", [int]), "TypeError")
-        self._report(
-            gp.check._check_index(
-                component,
-                "component",
-                1,
-                self.data["particles"][0]["results"][quantity],
-            ),
-            "IndexError",
-        )
-        self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
         self._report(gp.check._check_type(colorbar, "colorbar", [bool]), "TypeError")
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(ticks, "ticks", types), "TypeError")
@@ -324,20 +320,23 @@ class FieldBase(Object):
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
         self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
         self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
-        if mesh_index is None:
-            mesh_index = self.data["number_images"] - 1
+
         log.info("Contour field...")
-        data = self.data
+
         fig, ax = gp.plots.contour_field(
-            data=data,
-            mesh_index=mesh_index,
+            data=self.data,
             quantity=quantity,
-            component=component,
-            imshow=imshow,
+            window = window, 
+            series = series,
+            original = original,
+            absolute = absolute,
+            exclusions = exclusions,
             colorbar=True,
+            scale = scale,
             ticks=ticks,
             alpha=alpha,
             levels=levels,
+            extend = extend, 
             axis=axis,
             xlim=xlim,
             ylim=ylim,
@@ -352,6 +351,8 @@ class FieldBase(Object):
         *,
         quantity="R",
         window=None,
+        scale = "lin",
+        absolute = False,
         imshow=True,
         colorbar=True,
         ticks=None,
@@ -421,7 +422,7 @@ class FieldBase(Object):
                 gp.check._check_value(
                     quantity,
                     "quantity",
-                    ["u", "v", "u_x", "e_xy", "v_y", "R"],
+                    ["u", "v", "u_x", "e_xy", "e_v", "v_y", "R"],
                 ),
                 "ValueError",
             )
@@ -456,6 +457,8 @@ class FieldBase(Object):
         fig, ax = gp.plots.accumulation_field(
             data=self.data,
             window=window,
+            absolute = absolute,
+            scale = scale, 
             quantity=quantity,
             imshow=imshow,
             colorbar=True,
@@ -535,14 +538,6 @@ class FieldBase(Object):
             gp.check._check_type(components, "components", [list, type(None)]),
             "TypeError",
         )
-        # if components:
-        #    for component in components:
-        #        self._report(
-        #            gp.check._check_index(
-        #                component, "component", 1, self.data["results"][quantity]
-        #            ),
-        #            "IndexError",
-        #        )
         types = [tuple, list, np.ndarray, type(None)]
         self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
         if xlim is not None:
@@ -595,6 +590,7 @@ class Field(FieldBase):
         volumes=None,
         stresses=np.zeros(6),
         strains=np.zeros(6),
+        depth = 1000,
         ID="",
     ):
         """
@@ -789,6 +785,7 @@ class Field(FieldBase):
         self._image_0 = self._cm.data["images"]["f_img"]
         self._track = track
         self._strains = strains
+        self._depth = depth
         self.solved = False
         self._unsolvable = False
         self._ID = ID
@@ -805,53 +802,39 @@ class Field(FieldBase):
 
         if coordinates is not None:
             _auto_distribute = False
-            # boundary_hull = sp.spatial.Delaunay(
-            #     self._cm.data[self._nref][self._cm.data["boundary"]]
-            # )
-            # exclusion_hulls = []
-            # for exclusion in self._cm.data[self._nref][self._cm.data["exclusions"]]:
-            #     exclusion_hulls.append(sp.spatial.Delaunay(exclusion))
-            # for coord in coordinates:
-            #     if boundary_hull.find_simplex(coord) < 0:
-            #         log.error(
-            #             (
-            #                 "User-specified coordinate {} "
-            #                 "outside mesh boundary:\n{}"
-            #             ).format(
-            #                 coord,
-            #                 self._cm.data[self._nref][self._cm.data["boundary"]]
-            #             )
-            #         )
-            #         raise ValueError(
-            #             (
-            #                 "User-specified coordinate {} outside mesh boundary:\n{}"
-            #             ).format(
-            #                 coord,
-            #                 self._cm.data[self._nref][self._cm.data["boundary"]]
-            #             )
-            #         )
-            #     for i in range(len(exclusion_hulls)):
-            #         if exclusion_hulls[i].find_simplex(coord) >= 0:
-            #             centre = np.round(
-            #                 gp.geometry.utilities.polycentroid(
-            #                     self._cm.data[self._nref][
-            #                         self._cm.data["exclusions"][i]
-            #                     ]
-            #                 ),
-            #                 2,
-            #             )
-            #             log.error(
-            #                 (
-            #                     "User-specified coordinate {} "
-            #                     "inside mesh exclusion centred at {}."
-            #                 ).format(coord, centre)
-            #             )
-            #             raise ValueError(
-            #                 (
-            #                     "User-specified coordinate {} "
-            #                     "inside mesh exclusion centred at {}."
-            #                 ).format(coord, centre)
-            #             )
+            boundary_hull = sp.spatial.Delaunay(
+                self._cm.data[self._nref][self._cm.data["boundary"]]
+            )
+            exclusion_hulls = []
+            for exclusion in self._cm.data[self._nref][self._cm.data["exclusions"]]:
+                exclusion_hulls.append(sp.spatial.Delaunay(exclusion))
+            for coord in coordinates:
+                if boundary_hull.find_simplex(coord) < 0:
+                    log.warning(
+                        (
+                            "User-specified coordinate {} "
+                            "outside mesh boundary:\n{}"
+                        ).format(
+                            coord,
+                            self._cm.data[self._nref][self._cm.data["boundary"]]
+                        )
+                    )
+                for i in range(len(exclusion_hulls)):
+                    if exclusion_hulls[i].find_simplex(coord) >= 0:
+                        centre = np.round(
+                            gp.geometry.utilities.polycentroid(
+                                self._cm.data[self._nref][
+                                    self._cm.data["exclusions"][i]
+                                ]
+                            ),
+                            2,
+                        )
+                        log.warning(
+                            (
+                                "User-specified coordinate {} "
+                                "inside mesh exclusion centred at {}."
+                            ).format(coord, centre)
+                        )
             if volumes is None:
                 volumes = np.ones(np.shape(coordinates)[0])
             self._target_particles = np.shape(coordinates)[0]
@@ -939,8 +922,12 @@ class Field(FieldBase):
                 "nodes": self._nodes,
                 "elements": self._elements,
                 "coordinates": self._coordinates,
+                "exclusions": self._exclusions,
+                "boundary": self._boundary,
                 "volumes": self._volumes,
+                "depth": self._depth,
                 "stresses": self._stresses,
+                "original_stresses": self._original_stresses,
                 "strains": self._strains,
             }
         else:
@@ -951,7 +938,10 @@ class Field(FieldBase):
             self._field = {
                 "coordinates": self._coordinates,
                 "volumes": self._volumes,
+                "depth": self._depth,
                 "stresses": self._stresses,
+                "original_stresses": self._original_stresses,
+                "strains": self._strains,
             }
 
         self.data = {
@@ -1013,16 +1003,21 @@ class Field(FieldBase):
         )  # Element connectivity array.
 
     def _distribute_particles(self):
+        """ 
+        
+        Private method to distribute particles across the defined region of interest
+        including attribution of volume. 
+        
+        """
         self._coordinates = np.mean(self._nodes[self._elements[:, :3]], axis=1)
         M = np.ones((len(self._elements[:, :3]), 3, 3))
         M[:, 1] = self._nodes[self._elements[:, :3]][:, :, 0]
         M[:, 2] = self._nodes[self._elements[:, :3]][:, :, 1]
-        self._volumes = abs(0.5 * np.linalg.det(M))
+        self._volumes = abs(0.5 * np.linalg.det(M))*self._depth
 
     def _update_cm(self, index):
         try:
             del self._cm
-            ("Success")
         except Exception:
             pass
         if self._series.data["type"] == "Sequence":
@@ -1042,6 +1037,7 @@ class Field(FieldBase):
         else:
             self._rm = self._series
 
+
     def _check_update(self, m):
         if int(
             re.findall(
@@ -1054,7 +1050,7 @@ class Field(FieldBase):
             del self._rm
             self._rm = self._series._load_mesh(m, obj=True, verbose=False)
 
-    def solve(self, *, model=None, state=None, parameters=None, factor=0):
+    def solve(self, *, model=None, state=None, parameters=None, factor=0, mu = 0.0, ref_par = None, true_incs = True, verbose = True):
         """
         Method to solve for the field.
 
@@ -1063,26 +1059,32 @@ class Field(FieldBase):
         solved : bool
             Boolean to indicate if the particle instances have been solved.
         """
+        solved = 1
         particle_no = np.shape(self._coordinates)[0]
+        self._factor = factor
+        self._mu = mu
+        self._ref_par = ref_par
+        self._true_incs = true_incs
         self._particles = np.empty(particle_no, dtype=dict)
         self._vol_totals = np.zeros(self.data["number_images"])
-        self._create_rm()
+        self._create_rm() 
         with alive_bar(
             particle_no,
             dual_line=True,
             bar="blocks",
             title="Instantiating particles ...",
         ) as bar:
-            for i in range(particle_no):
-                self._particles[i] = gp.particle.Particle(
+            for particle_index in range(particle_no):
+                self._particles[particle_index] = gp.particle.Particle(
                     series=self._series,
-                    coordinate=self._coordinates[i],
-                    volume=self._volumes[i],
-                    stress=self._stresses[i],
+                    coordinate=self._coordinates[particle_index],
+                    volume=self._volumes[particle_index], 
+                    stress=self._stresses[particle_index],
                     warp=self._strains,
+                    depth = self._depth,
                     track=self._track,
                     field=True,
-                    ID=str(i),
+                    ID=str(particle_index),
                 )
                 bar()
         with alive_bar(
@@ -1091,69 +1093,117 @@ class Field(FieldBase):
             bar="blocks",
             title="Solving particles for mesh...",
         ) as bar:
-            for i in range(self.data["number_images"] - 1):
-                self._update_cm(i)
-                self._check_update(i)
-                for j in range(particle_no):
-                    self.solved += self._particles[j]._strain_path_inc(
-                        i,
+            for mesh_index in range(self.data["number_images"] - 1):
+                self._update_cm(mesh_index)
+                self._check_update(mesh_index)
+                for particle_index in range(particle_no):
+                    solved *= self._particles[particle_index]._strain_path_inc(
+                        mesh_index,
                         self._cm,
                         self._rm,
                     )
-                    if i == self.data["number_images"] - 2:
-                        self.solved += self._particles[j].solve(
+                    if mesh_index == self.data["number_images"] - 2:
+                        solved *= self._particles[particle_index].solve(
                             model=model,
                             state=state,
                             parameters=parameters,
                             factor=factor,
+                            mu = mu,
+                            ref_par = ref_par,
+                            true_incs = true_incs,
+                            verbose = verbose
                         )
+                self.solved = solved
                 if bool(self.solved) is False:
                     self._unsolvable = True
                     self.data["unsolvable"] = self._unsolvable
                     return self.solved
                 bar()
-
-        for i in range(particle_no):
-            self._vol_totals += self._particles[i].data["results"]["volumes"]
+        for particle_index in range(particle_no):
+            self._vol_totals += self._particles[particle_index].data["results"]["volumes"]
 
         if model is not None:
             self._works = np.zeros(self.data["number_images"])
-            for i in range(particle_no):
-                self._works += self._particles[i].data["results"]["works"]
-            self.data.update({"works": self._works})
+            self._friction_works = np.zeros(self.data["number_images"])
+            for particle_index in range(particle_no):
+                self._works += self._particles[particle_index].data["results"]["works"]
+                self._friction_works += self._particles[particle_index].data["results"]["friction_works"]
+            self.data.update(
+                {
+                    "works": self._works,
+                    "friction_works": self._friction_works
+                }
+            )
 
         self.data.update(
             {
                 "particles": self._particles,
                 "volumes": self._vol_totals,
                 "reference_update_register": self._reference_update_register,
+                "factor": self._factor,
+                "mu": self._mu,
+                "ref_par": self._ref_par,
+                "true_incs": self._true_incs
             }
         )
         self.solved = True
         self.data["solved"] = self.solved
         return self.solved
 
-    def stress(self, model=None, state=None, parameters=None):
-        self.solved = False
-        self.data["solved"] = self.solved
+    def stress(
+        self, 
+        *,
+        model=None, 
+        state=None, 
+        parameters=None, 
+        factor = 1.0, 
+        mu = 0.0, 
+        ref_par = None, 
+        true_incs = True, 
+        verbose = True
+    ):
+        self._factor = factor
+        self._mu = mu
+        self._ref_par = ref_par
+        self._true_incs = true_incs
         particle_no = np.shape(self._coordinates)[0]
-        for j in range(particle_no):
-            self.solved += self._particles[j].solve(
-                model=model,
-                state=state,
-                parameters=parameters,
-            )
+        with alive_bar(
+            particle_no,
+            dual_line=True,
+            bar="blocks",
+            title="Generating stress field...",
+            disable=not verbose,
+        ) as bar:
+            for particle_index in range(particle_no):
+                self.solved *= self._particles[particle_index].solve(
+                    model=model,
+                    state=state,
+                    parameters=parameters,
+                    factor = factor,
+                    mu = mu,
+                    ref_par = ref_par,
+                    true_incs = true_incs, 
+                    verbose = verbose,
+                )
+                bar()
         if bool(self.solved) is False:
             self._unsolvable = True
             self.data["unsolvable"] = self._unsolvable
             return self.solved
         self._works = np.zeros(self.data["number_images"])
+        self._friction_works = np.zeros(self.data["number_images"])
         for i in range(particle_no):
             self._works += self._particles[i].data["results"]["works"]
+            self._friction_works += self._particles[i].data["results"]["friction_works"]
         self.data.update(
             {
                 "works": self._works,
-                "particles": self._particles.data,
+                "particles": self._particles,
+                "friction_works": self._friction_works,
+                "factor": self._factor,
+                "mu": self._mu,
+                "ref_par": self._ref_par,
+                "true_incs": self._true_incs
             }
         )
         self.solved = True
@@ -1164,6 +1214,7 @@ class Field(FieldBase):
         """
         Private method to define the initial stress state.
         """
+        self._original_stresses = stresses
         if np.shape(stresses)[0] == np.shape(self._coordinates)[0]:
             self._stresses = stresses
         elif np.shape(stresses)[0] == 2:
@@ -1270,3 +1321,76 @@ class FieldResults(FieldBase):
     def __init__(self, data):
         """Initialisation of geopyv FieldResults class."""
         self.data = data
+
+    def regenerate(self,*,series = None):
+        field = gp.field.Field(
+            series = series,
+            target_particles = self.data["target_particles"],
+            track = self.data["track"],
+            stresses = self.data["field"]["original_stresses"],
+            strains = self.data["field"]["strains"],
+            depth = self.data["field"]["depth"],
+            ID=self.data["ID"],
+        )
+        if "nodes" in self.data["field"].keys():
+            field._nodes = self.data["field"]["nodes"]
+            field._elements = self.data["field"]["elements"]
+            field._coordinates = self.data["field"]["coordinates"]
+            field._volumes = self.data["field"]["volumes"]
+            field._field = {
+                "nodes": field._nodes,
+                "elements": field._elements,
+                "coordinates": field._coordinates,
+                "volumes": field._volumes,
+                "depth": field._depth,
+                "stresses": field._stresses,
+                "original_stresses": field._original_stresses,
+                "strains": field._strains,
+            }
+        else:
+            field._coordinates = self.data["field"]["coordinates"]
+            field._volumes = self.data["field"]["volumes"]
+            field._field = {
+                "coordinates": field._coordinates,
+                "volumes": field._volumes,
+                "depth": field._depth,
+                "stresses": field._stresses,
+                "original_stresses": field._original_stresses,
+                "strains": field._strains,
+            }
+
+        field.solved = self.data["solved"]
+        field._calibrated = self.data["calibrated"]
+        field._particles = self.data["particles"]
+        field._vol_totals = self.data["volumes"]
+        field._reference_update_register = self.data["reference_update_register"]
+        field._factor = self.data["factor"]
+        field._mu = self.data["mu"]
+        field._ref_par = self.data["ref_par"]
+        field._true_incs = self.data["true_incs"]
+
+        field.data.update(
+            {
+                "solved": field.solved,
+                "calibrated": field._calibrated,
+                "field": field._field,
+                "particles": field._particles,
+                "volumes": field._vol_totals,
+                "reference_update_register": field._reference_update_register,
+                "particles": field._particles,
+                "factor": field._factor,
+                "mu": field._mu,
+                "ref_par": field._ref_par,
+                "true_incs": field._true_incs
+            }
+        ) 
+        try:
+            field._works = self.data["works"]
+            field._friction_works = self.data["friction_works"]
+            field.data["works"] = field._works
+            field.data["friction_works"] = field._friction_works
+        except Exception:
+            pass
+
+        return field
+        

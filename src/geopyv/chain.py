@@ -8,6 +8,7 @@ import numpy as np
 import geopyv as gp
 from geopyv.object import Object
 from alive_progress import alive_bar
+import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -148,7 +149,10 @@ class Chain(ChainBase):
         variances=None,
         noise=None,
         prior=None,
-        ext_works=None,
+        smooth = [],
+        time = None,
+        external_power = None,
+        save = None,
         verbose=True,
     ):
         """
@@ -165,7 +169,9 @@ class Chain(ChainBase):
         self._variances = variances
         self._noise = noise
         self._prior = prior
-        self._ext_works = ext_works
+        self._save = save
+        self._time = time
+        self._ext_power = external_power
         self.data.update(
             {
                 "model": self._model,
@@ -174,15 +180,13 @@ class Chain(ChainBase):
                 "variances": self._variances,
                 "noise": self._noise,
                 "prior": self._prior,
-                "ext_works": self._ext_works,
+                "time": self._time,
+                "ext_power": self._ext_power,
             }
         )
-        self._field.stress(model=model, state=state, parameters=parameters)
-        ll = self._evaluation()
         accepted = 0
         rejected = 0
-        s = parameters[5]
-        k = parameters[6]
+        self.Hrs = []
         with alive_bar(
             self._sample_no,
             dual_line=True,
@@ -190,9 +194,32 @@ class Chain(ChainBase):
             title="MCMC MH sampling...",
             disable=not verbose,
         ) as bar:
+            bar.text("Solving initial field...")
+            self._field.stress(
+                model=model, 
+                state=state, 
+                parameters=parameters, 
+                factor = self._field._factor,
+                mu = self._field._mu,
+                ref_par = self._field._ref_par, 
+                true_incs = self._field._true_incs,
+                verbose = False
+            )
+            ll = self._evaluation(smooth)
+            accepted += 1
+            self._s_c[0] = parameters[5]
+            self._k_c[0] = parameters[6]
+            self._a_c[0] = 1
+            bar()
+            bar.text(
+                ("Iteration: {},\tAccepted Ratio: {}\t").format(
+                    accepted + rejected,
+                    round(accepted / (accepted + rejected), 2),
+                )
+            )
             while accepted < self._sample_no:
-                s_star = np.random.normal(loc=s, scale=self._variances[0])
-                k_star = np.random.normal(loc=k, scale=self._variances[1])
+                s_star = np.random.normal(loc=self._s_c[accepted-1], scale=self._variances[0])
+                k_star = np.random.normal(loc=self._k_c[accepted-1], scale=self._variances[1])
                 if not self._prior_check(s_star=s_star, k_star=k_star):
                     rejected += 1
                     bar.text(
@@ -205,17 +232,29 @@ class Chain(ChainBase):
                 parameters[5] = s_star
                 state[1] = s_star
                 parameters[6] = k_star
-                self._field.stress(model=model, state=state, parameters=parameters)
-                ll_star = self._evaluation()
-                Hr = ll / ll_star
-                if 1 < Hr or np.random.uniform(low=0.0, high=1.0) <= Hr:
-                    s = s_star
-                    k = k_star
-                    ll = ll_star
-                    self._s_c[accepted] = s
-                    self._k_c[accepted] = k
-                    self._a_c[accepted] = accepted / max(accepted + rejected, 1)
+                self._field.stress(
+                    model=model, 
+                    state=state, 
+                    parameters=parameters, 
+                    factor = self._field._factor,
+                    mu = self._field._mu,
+                    ref_par = self._field._ref_par, 
+                    true_incs = self._field._true_incs,
+                    verbose = False
+                )
+                ll_star = self._evaluation(smooth)
+                print("LL: {}, LL*: {}".format(np.round(ll,4), np.round(ll_star,4)))
+                Hr = 1/(ll_star / ll) 
+                self.Hrs.append(Hr)
+                level = np.random.uniform(low=0.0, high=1.0)
+                print("Hr: {}, bar: {}".format(np.round(Hr,4), np.round(level,4)))
+                if 1 < Hr or level <= Hr:
+                    print()
                     accepted += 1
+                    ll = ll_star
+                    self._s_c[accepted-1] = parameters[5]
+                    self._k_c[accepted-1] = parameters[6]
+                    self._a_c[accepted-1] = accepted / (accepted + rejected)
                     bar()
                     bar.text(
                         ("Iteration: {},\tAccepted Ratio: {}\t").format(
@@ -223,16 +262,27 @@ class Chain(ChainBase):
                             round(accepted / (accepted + rejected), 2),
                         )
                     )
+                    if accepted % 100 == 0 and self._save is not None:
+                        self.data.update(
+                            {
+                                "solved": True,
+                                "k_c": self._k_c,
+                                "s_c": self._s_c,
+                                "a_c": self._a_c,
+                                "Hrs": self.Hrs
+                            }
+                        )
+                        gp.io.save(object = self, filename = self._save, verbose = False)
                 else:
                     rejected += 1
                     bar.text(
-                        ("Iteration: {},\tAccepted Ratio: {}\t").format(
+                        ("Iteration: {},    Accepted Ratio: {}\t").format(
                             accepted + rejected,
                             round(accepted / (accepted + rejected), 2),
                         )
                     )
         log.info(
-            ("Iteration: {},\tAccepted Ratio: {}\t").format(
+            ("Iteration: {},    Accepted Ratio: {}\t").format(
                 accepted + rejected, round(accepted / (accepted + rejected), 2)
             )
         )
@@ -243,16 +293,25 @@ class Chain(ChainBase):
                 "k_c": self._k_c,
                 "s_c": self._s_c,
                 "a_c": self._a_c,
+                "Hrs": self.Hrs
             }
         )
 
-    def _evaluation(self):
-        int_works = self._field._works
-        N = np.shape(int_works)[0]
+    def _evaluation(self, smooth):
+        # Evaluate internal and friction power. 
+        int_power = np.zeros(len(self._field._works))
+        frc_power = np.zeros(len(self._field._friction_works))
+        int_power[1:] = self._field._works[1:]/np.diff(self._time)*1000
+        frc_power[1:] = self._field._friction_works[1:]/np.diff(self._time)*1000
+        for index in smooth:
+            int_power[index] = 0.5*(int_power[index-1] + int_power[index+1])
+            frc_power[index] = 0.5*(frc_power[index-1] + frc_power[index+1])
+        print("Power difference: {}".format(np.sum((int_power - (self._ext_power + frc_power)) ** 2)))
+        # Evaluate log-likelihood
         ll = (
-            -0.5 * N * np.log(2 * np.pi * self._noise)
-            - 0.5 * N * self._noise**2
-            - 2 * np.sum((int_works - self._ext_works) ** 2)
+            -0.5 * len(int_power) * np.log(2 * np.pi * self._noise)
+            - 0.5 / self._noise
+            * np.sum((int_power - (self._ext_power + frc_power)) ** 2)
         )
         return ll
 

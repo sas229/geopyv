@@ -28,7 +28,7 @@ class SubsetBase(Object):
 
         """
 
-    def inspect(self, warp=False, show=True, block=True, save=None):
+    def inspect(self, show=True, block=True, save=None):
         """
 
         Method to show the subset and associated quality metrics using
@@ -63,39 +63,18 @@ class SubsetBase(Object):
         """
 
         # Check input.
-        self._report(gp.check._check_type(warp, "warp", [bool]), "TypeError")
-        if warp:
-            # Check if solved.
-            if self.data["solved"] is not True:
-                log.error(
-                    "Subset not yet solved therefore no warp data to plot. "
-                    "First, run :meth:`~geopyv.subset.Subset.solve()` to solve."
-                )
-                raise ValueError(
-                    "Mesh not yet solved therefore no warp data to plot. "
-                    "First, run :meth:`~geopyv.subset.Subset.solve()` to solve."
-                )
         self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
         self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
         self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
 
         # Inspect subset.
-        if warp:
-            fig, ax = gp.plots.inspect_subset_warp(
-                data=self.data,
-                mask=None,
-                show=show,
-                block=block,
-                save=save,
-            )
-        else:
-            fig, ax = gp.plots.inspect_subset(
-                data=self.data,
-                mask=None,
-                show=show,
-                block=block,
-                save=save,
-            )
+        fig, ax = gp.plots.inspect_subset(
+            data=self.data,
+            mask=None,
+            show=show,
+            block=block,
+            save=save,
+        )
         return fig, ax
 
     def convergence(self, show=True, block=True, save=None):
@@ -287,6 +266,13 @@ class Subset(SubsetBase):
         elif self._report(gp.check._check_axis(f_coord, "f_coord", 0, [2]), "Warning"):
             selector = gp.gui.selectors.coordinate.CoordinateSelector()
             f_coord = selector.select(f_img, template)
+        else:
+            check = True
+            while check:
+                check = self._border_check(f_coord, f_img, template)
+                if check:
+                    selector = gp.gui.selectors.coordinate.CoordinateSelector()
+                    f_coord = selector.select(f_img, template) 
         check = gp.check._check_type(ID, "ID", [str])
         if check:
             try:
@@ -302,33 +288,33 @@ class Subset(SubsetBase):
         self._template = template
         self._ID = ID
 
-        # Check subset is entirely within the reference image.
-        self._x = self._f_coord[0]
-        self._y = self._f_coord[1]
-        subset_list = np.array(
-            [
-                [
-                    self._x - self._template.size,
-                    self._y - self._template.size,
-                ],
-                [
-                    self._x + self._template.size,
-                    self._y + self._template.size,
-                ],
-                [
-                    self._x - self._template.size,
-                    self._y + self._template.size,
-                ],
-                [
-                    self._x + self._template.size,
-                    self._y - self._template.size,
-                ],
-            ]
-        )
-        if np.any(subset_list < 0):
-            raise ValueError(
-                "Subset reference partially falls outside reference image."
-            )
+        # # Check subset is entirely within the reference image.
+        # self._x = self._f_coord[0]
+        # self._y = self._f_coord[1]
+        # subset_list = np.array(
+        #     [
+        #         [
+        #             self._x - self._template.size,
+        #             self._y - self._template.size,
+        #         ],
+        #         [
+        #             self._x + self._template.size,
+        #             self._y + self._template.size,
+        #         ],
+        #         [
+        #             self._x - self._template.size,
+        #             self._y + self._template.size,
+        #         ],
+        #         [
+        #             self._x + self._template.size,
+        #             self._y - self._template.size,
+        #         ],
+        #     ]
+        # )
+        # if np.any(subset_list < 0):
+        #     raise ValueError(
+        #         "Subset reference partially falls outside reference image."
+        #     )
 
         # Initialise subset.
         self._get_initial_guess_size()
@@ -375,6 +361,39 @@ class Subset(SubsetBase):
             },
         }
         log.debug("Initialised geopyv Subset object.")
+
+    def _border_check(self, f_coord, f_img, template):
+        # Check subset is entirely within the reference image.
+        self._x = f_coord[0]
+        self._y = f_coord[1]
+        subset_list = np.array(
+            [
+                [
+                    self._x - template.size,
+                    self._y - template.size,
+                ],
+                [
+                    self._x + template.size,
+                    self._y + template.size,
+                ],
+                [
+                    self._x - template.size,
+                    self._y + template.size,
+                ],
+                [
+                    self._x + template.size,
+                    self._y - template.size,
+                ],
+            ]
+        )
+        if np.any(subset_list < 0):
+            log.warning(
+                "Subset reference partially falls outside reference image.\n"
+                "Reselect reference coordinate."
+            )
+            return True
+        else:
+            return False
 
     def solve(
         self,

@@ -7,6 +7,7 @@ import logging
 import sys
 import cv2
 import matplotlib
+from matplotlib import ticker
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 from matplotlib.collections import LineCollection
@@ -22,6 +23,7 @@ plt.rcParams["axes.prop_cycle"] = plt.cycler(
 )
 plt.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
+matplotlib.rcParams['font.size'] = 14
 # plt.rcParams['axes.grid'] = True
 
 log = logging.getLogger(__name__)
@@ -221,7 +223,7 @@ def convergence_subset(data, show, block, save):
     ax[1].set_xlim(1, max_iterations)
     ax[1].set_ylim(0.0, 1)
     ax[1].set_yticks(np.linspace(0.0, 1.0, 6))
-    ax[1].set_xticks(np.linspace(1, max_iterations, max_iterations))
+    # ax[1].set_xticks(np.linspace(1, max_iterations, max_iterations))
     ax[0].legend(frameon=False)
     plt.tight_layout()
 
@@ -430,11 +432,16 @@ def contour_mesh(
                 value.append(np.sqrt(s["results"]["u"] ** 2 + s["results"]["v"] ** 2))
             elif quantity == "size":
                 value.append(s["template"]["size"])
+            elif quantity == "ep_xy":
+                value.append(-float(s["results"]["p"][3] + s["results"]["p"][4])/2)
             else:
                 value.append(s["results"][quantity])
         value = np.asarray(value)
     elif view == "particle":
-        field = gp.field.Field(series=obj, coordinates=nodes)
+        if obj.data["calibrated"] is True:
+            field = gp.field.Field(series=obj, coordinates=data["Nodes"])
+        else: 
+            field = gp.field.Field(series=obj, coordinates=data["nodes"])
         field.solve()
         value = np.zeros(np.shape(nodes)[0])
         if quantity == "u":
@@ -468,6 +475,8 @@ def contour_mesh(
         elif quantity == "ep_vol":
             for i in range(len(field.data["particles"])):
                 value[i] = field.data["particles"][i].data["results"]["vol_strains"][-1]
+    else:
+        value = data["results"]["Displacements"][:,0]
 
     if len(value) == len(nodes):
         # Set levels and extend.
@@ -479,6 +488,8 @@ def contour_mesh(
                 extend = "max"
             elif np.min(value) < np.min(levels):
                 extend = "min"
+        extend = "both"
+        
         # Plot contours.
         triangulation = tri.Triangulation(nodes[:, 0], nodes[:, 1], mesh_triangulation)
         contours = ax.tricontourf(
@@ -514,9 +525,20 @@ def contour_mesh(
         elif quantity == "norm":
             label = r"$\Delta$ Norm (-)"
         elif quantity == "u":
-            label = r"Horizontal Displacement, $u$ ($px$)"
+            if obj.data["calibrated"] is True:
+                label = r"Horizontal Displacement, $u$ ($mm$)" # r"Instantaneous Horizontal Velocity, $\dot{u}$ ($mm/s$)" # 
+            else:
+                label = r"Horizontal Displacement, $u$ ($px$)"
         elif quantity == "v":
-            label = r"Vertical Displacement, $v$ ($px$)"
+            if obj.data["calibrated"] is True:
+                label = r"Vertical Displacement, $v$ ($mm$)" # r"Instantaneous Vertical Velocity, $\dot{v}$ ($mm/s$)" # 
+            else:
+                label = r"Vertical Displacement, $v$ ($px$)"
+        elif quantity == "R":
+            if obj.data["calibrated"] is True:
+                label = r"Displacement Magnitude, $R$ ($mm$)" # r"Instantaneous Velocity Magnitude, $\dot{R}$ ($mm/s$)" 
+            else:
+                label = r"Displacement Magnitude, $v$ ($px$)"
         elif quantity == "u_x":
             label = r"Horizontal Deformation Gradient, $du/dx$ ($-$)"
         elif quantity == "v_x":
@@ -530,9 +552,9 @@ def contour_mesh(
         elif quantity == "ep_yy":
             label = r"Vertical Normal Strain, $\epsilon_{yy}$ ($-$)"
         elif quantity == "ep_xy":
-            label = r"Shear Strain, $\epsilon_{xy}$ ($-$)"
+            label = r"Shear Strain, $\epsilon_{xy}$ ($-$)" # r"Shear Strain Rate, $\dot{\epsilon}_{xy}$ ($s^{-1}$)" # 
         elif quantity == "ep_vol":
-            label = r"Volumetric Strain, $\epsilon_{vol}$ ($-$)"
+            label = r"Volumetric Strain, $\epsilon_v$ ($-$)" # r"Volumetric Strain Rate, $\dot{\epsilon}_{v}$ ($s^{-1}$)"
         else:
             label = quantity
         fig.colorbar(contours, label=label, ticks=ticks)
@@ -734,6 +756,9 @@ def inspect_mesh(data, show, block, save):
     fig, ax = plt.subplots(num=title)
     for i in range(np.shape(x_p)[0]):
         ax.plot(x_p[i], y_p[i], color="b", alpha=1.0, linewidth=1.0)
+    centres = np.mean(nodes[elements], axis = 1)
+    for i in range(len(elements)):
+        ax.annotate(str(i), (centres[i,0], centres[i,1]), (centres[i,0], centres[i,1]), va = "center", ha = "center", color = "r")
     ax.imshow(
         image,
         cmap="gist_gray",
@@ -1074,17 +1099,20 @@ def inspect_field(data, mesh, show, block, save):
 
     return fig, ax
 
-
 def contour_field(
     data,
-    mesh_index,
     quantity,
-    component,
-    imshow,
+    window, 
+    series,
+    original,
+    exclusions,
+    absolute, 
     colorbar,
+    scale,
     ticks,
     alpha,
     levels,
+    extend,
     axis,
     xlim,
     ylim,
@@ -1094,195 +1122,346 @@ def contour_field(
 ):
     # Plot setup.
     title = "Contour"
-    fig, ax = plt.subplots(num=title)
 
-    points = np.zeros((len(data["particles"]), 3))
-    for i in range(len(data["particles"])):
-        points[i, :2] = data["particles"][i]["plotting_coordinates"][mesh_index]
-        points[i, 2] = data["particles"][i]["results"][quantity][mesh_index, component]
+    fig, ax = plt.subplots(num=title)   
 
-    # Show image in background.
-    if imshow is True:
-        image = cv2.imread(data["image_0"], cv2.IMREAD_COLOR)
+    # Plot image.
+    if series is not None:
+        if series.data["type"] == "Sequence":
+            if window is None:
+                idx = -1
+                window = np.asarray([-2,-1])
+            elif original is True:
+                idx = window[0]
+            else: 
+                idx = window[1]
+            mesh = series._load_mesh(idx, obj = True, verbose = False)
+        else:
+            if original is True:
+                idx = 0
+            else:
+                idx = 1
+            mesh = series
+            window = np.asarray([0,1])
+        if original is True:
+            image_path = mesh.data["images"]["f_img"]
+        else:
+            image_path = mesh.data["images"]["g_img"]
+        image = cv2.imread(image_path, cv2.IMREAD_COLOR)
         image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
-        plt.imshow(image_gs, cmap="gray")
+        ax.imshow(image_gs, cmap="gray")
     else:
+        if window is None:
+            window = np.asarray([-2,-1])
+            idx = -1
+        elif original is True:
+            idx = window[0]
+        else: 
+            idx = window[1]
         ax.set_aspect("equal", "box")
+
+    # Create plotting coordinates and values.
+    coordinates = np.zeros((len(data["particles"]),2))
+    if series is not None:
+        for i in range(len(data["particles"])):
+            coordinates[i] = data["particles"][i].data["plotting_coordinates"][idx]
+    else:
+        for i in range(len(data["particles"])):
+            coordinates[i] = data["particles"][i].data["results"]["coordinates"][idx]
+    
+    # Values. 
+    values = np.zeros(len(data["particles"]))
+    if window is not None:
+        if quantity == "u":
+            if absolute is True:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        abs(
+                            np.diff(
+                                data["particles"][i].data["results"]["warps"][window[0] : window[1]+1, 0]
+                            )
+                        )
+                    )
+            else: 
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        np.diff(
+                            data["particles"][i].data["results"]["warps"][window[0] : window[1]+1, 0]
+                        )
+                    )
+        elif quantity == "v":
+            if absolute is True:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        abs(
+                            np.diff(
+                                data["particles"][i].data["results"]["warps"][window[0] : window[1]+1, 1]
+                            )
+                        )
+                    )
+            else: 
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        np.diff(
+                            data["particles"][i].data["results"]["warps"][window[0] : window[1]+1, 1]
+                        )
+                    )
+        elif quantity == "R":
+            for i in range(len(data["particles"])):
+                values[i] = np.sum(
+                    np.sqrt(
+                        np.sum(
+                            np.diff(
+                                data["particles"][i].data["results"]["warps"][
+                                    window[0] : window[1]+1, :2
+                                ],
+                                axis = 0 
+                            )**2,
+                            axis = 1
+                        )
+                    ),
+                    axis = 0
+                )
+        elif quantity == "ep_xy":
+            if absolute is True:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        abs(
+                            np.diff(
+                                (
+                                    data["particles"][i].data["results"]["warps"][
+                                        window[0] : window[1]+1, 3
+                                    ]
+                                    + data["particles"][i].data["results"]["warps"][
+                                        window[0] : window[1]+1, 4
+                                    ]
+                                )/2
+                            )                        
+                        )
+                    )
+            else:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        np.diff(
+                            (
+                                data["particles"][i].data["results"]["warps"][
+                                    window[0] : window[1]+1, 3
+                                ]
+                                + data["particles"][i].data["results"]["warps"][
+                                    window[0] : window[1]+1, 4
+                                ]
+                            )/2
+                        )                        
+                    )
+        elif quantity == "ep_vol":
+            if absolute is True:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        abs(
+                            np.diff(
+                                data["particles"][i].data["results"]["vol_strains"][window[0] : window[1]+1]
+                            )
+                        )
+                    )
+            else:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        np.diff(
+                            data["particles"][i].data["results"]["vol_strains"][window[0] : window[1]+1]
+                        )
+                    )
+        elif quantity == "p":
+            for i in range(len(data["particles"])):
+                values[i] = data["particles"][i].data["results"]["mean_effective_stresses"][window[1]]
+        elif quantity == "q":
+            for i in range(len(data["particles"])):
+                values[i] = data["particles"][i].data["results"]["deviatoric_stresses"][window[1]]
+        elif quantity == "work":
+            if absolute == True:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        abs(
+                            data["particles"][i].data["results"]["works"][window[0]:window[1]]
+                        )  
+                    )
+            else:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        data["particles"][i].data["results"]["works"][window[0]:window[1]]
+                    )
+        elif quantity == "power":
+            if absolute == True: 
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        abs(
+                            data["particles"][i].data["results"]["powers"][window[0]:window[1]]
+                        )  
+                    )
+            else:
+                for i in range(len(data["particles"])):
+                    values[i] = np.sum(
+                        data["particles"][i].data["results"]["powers"][window[0]:window[1]]
+                    )
+        else:
+            pass
+
+    # Meshing for plotting. 
+    delaunay = spsp.Delaunay(coordinates)
+    elements = delaunay.simplices
+    centres = np.mean(coordinates[elements], axis = 1)
+    removal = []
+    for i in range(len(exclusions)):
+        hull = spsp.Delaunay(coordinates[exclusions[i]])
+        removal.append(np.argwhere(hull.find_simplex(centres)>=0).flatten())
+    if removal != []:
+        removal = np.concatenate(removal).ravel()
+        elements = np.delete(elements, removal, axis = 0)
+
+    mesh_triangulation, x_p, y_p = gp.geometry.utilities.plot_triangulation(
+        elements, coordinates[:, 0], coordinates[:, 1], 1
+    )
+    triangulation = tri.Triangulation(coordinates[:, 0], coordinates[:, 1], mesh_triangulation)
 
     # Set levels and extend.
-    extend = "neither"
-    value = points[:, 2]
-    if not isinstance(levels, type(None)):
-        if np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
-            extend = "both"
-        elif np.max(value) > np.max(levels):
-            extend = "max"
-        elif np.min(value) < np.min(levels):
-            extend = "min"
-    extend = "both"
-
-    contours = ax.tricontourf(
-        points[:, 0],
-        points[:, 1],
-        points[:, 2],
-        alpha=alpha,
-        levels=levels,
-        extend=extend,
-    )
-
-    if colorbar is True:
-        if quantity == "iterations":
-            label = "Iterations (-)"
-        elif quantity == "C_ZNCC":
-            label = r"$C_{ZNCC}$ (-)"
-        elif quantity == "norm":
-            label = r"$\Delta$ Norm (-)"
-        else:
-            label = quantity
-        fig.colorbar(contours, label=label, ticks=ticks)
-
-    # Axis control.
-    if axis is False:
-        ax.set_axis_off()
-
-    # Limit control.
-    if xlim is not None:
-        ax.set_xlim(xlim)
-    if ylim is not None:
-        ax.set_ylim(ylim)
-    # Save
-    if save is not None:
-        plt.savefig(save, dpi=600)
-
-    # Show or close.
-    if show is True:
-        plt.show(block=block)
+    if extend is None:
+        extend = "neither"
+        if not isinstance(levels, type(None)):
+            if np.max(values) > np.max(levels) and np.min(values) < np.min(levels):
+                extend = "both"
+            elif np.max(values) > np.max(levels):
+                extend = "max"
+            elif np.min(values) < np.min(levels):
+                extend = "min"
+    
+    # Plot.
+    if scale == "log":
+        ticks = ticker.LogLocator()
+        contours = ax.tricontourf(
+            triangulation,
+            values,
+            alpha=alpha,
+            locator= ticks,
+            levels=levels,
+            extend=extend,
+        )
+        
     else:
-        plt.close(fig)
+        contours = ax.tricontourf(
+            triangulation,
+            values,
+            alpha=alpha,
+            levels=levels,
+            extend=extend,
+        )
 
-    return fig, ax
-
-
-def accumulation_field(
-    data,
-    quantity,
-    window,
-    imshow,
-    colorbar,
-    ticks,
-    alpha,
-    levels,
-    axis,
-    xlim,
-    ylim,
-    show,
-    block,
-    save,
-):
-    if window is None:
-        window = (0, data["number_images"])
-    value = np.zeros((np.shape(data["particles"])[0]))
-    plotting_coordinates = np.zeros((np.shape(data["particles"])[0], 2))
-    for i in range(np.shape(data["particles"])[0]):
+    # Colourbar. 
+    if colorbar is True:
         if quantity == "u":
-            value[i] = np.sum(
-                # abs(
-                data["particles"][i].data["results"]["warps"][window[0] : window[1], 0]
-                # )
-            )
+            if absolute:
+                if np.diff(window)[0]!=1:
+                    if data["calibrated"] is True:
+                        label = r"Absolute Accumulated Horizontal Displacement, $\Sigma|\Delta u|$ ($mm$)"
+                    else:
+                        label = r"Absolute Accumulated Horizontal Displacement, $\Sigma|\Delta u|$ ($px$)"
+                else:
+                    if data["calibrated"] is True:
+                        label = r"Absolute Horizontal Displacement Increment, $|\Delta u|$ ($mm$)"
+                    else:
+                        label = r"Absolute Horizontal Displacement Increment, $|\Delta u|$ ($px$)"
+            else:
+                if np.diff(window)[0]!=1:
+                    if data["calibrated"] is True:
+                        label = r"Accumulated Horizontal Displacement, $\Sigma\Delta u$ ($mm$)"
+                    else:
+                        label = r"Accumulated Horizontal Displacement, $\Sigma\Delta u$ ($px$)"
+                else:
+                    if data["calibrated"] is True:
+                        label = r"Horizontal Displacement Increment, $\Delta u$ ($mm$)"
+                    else:
+                        label = r"Horizontal Displacement Increment, $\Delta u$ ($px$)"
+
         elif quantity == "v":
-            value[i] = np.sum(
-                # abs(
-                data["particles"][i].data["results"]["warps"][window[0] : window[1], 1]
-                # )
-            )
-        elif quantity == "u_x":
-            value[i] = np.sum(
-                # abs(
-                data["particles"][i].data["results"]["warps"][window[0] : window[1], 2]
-                # )
-            )
-        elif quantity == "e_xy":
-            value[i] = np.sum(
-                # abs
-                (
-                    data["particles"][i].data["results"]["warps"][
-                        window[0] : window[1], 3
-                    ]
-                    + data["particles"][i].data["results"]["warps"][
-                        window[0] : window[1], 4
-                    ]
-                )
-                / 2
-            )
-        elif quantity == "v_y":
-            value[i] = np.sum(
-                # abs(
-                data["particles"][i].data["results"]["warps"][window[0] : window[1], 5]
-                # )
-            )
+            if absolute:
+                if np.diff(window) != 1:
+                    if data["calibrated"] is True:
+                        label = r"Absolute Accumulated Vertical Displacement, $\Sigma|\Delta v|$ ($mm$)"
+                    else:
+                        label = r"Absolute Accumulated Vertical Displacement, $\Sigma|\Delta v|$ ($px$)"
+                else:
+                    if data["calibrated"] is True:
+                        label = r"Absolute Vertical Displacement Increment, $|\Delta v|$ ($mm$)"
+                    else:
+                        label = r"Absolute Vertical Displacement Increment, $|\Delta v|$ ($px$)"
+            else:
+                if np.diff(window)[0]!=1:
+                    if data["calibrated"] is True:
+                        label = r"Accumulated Vertical Displacement, $\Sigma\Delta v$ ($mm$)"
+                    else:
+                        label = r"Accumulated Vertical Displacement, $\Sigma\Delta v$ ($px$)"
+                else:
+                    if data["calibrated"] is True:
+                        label = r"Vertical Displacement Increment, $\Delta v$ ($mm$)"
+                    else:
+                        label = r"Vertical Displacement Increment, $\Delta v$ ($px$)"
+
         elif quantity == "R":
-            value[i] == np.sum(
-                np.sqrt(
-                    data["particles"][i].data["results"]["warps"][
-                        window[0] : window[1], 0
-                    ]
-                    ** 2
-                    + data["particles"][i].data["results"]["warps"][
-                        window[0] : window[1], 1
-                    ]
-                    ** 2
-                )
-            )
-        plotting_coordinates[i] = data["particles"][i].data["plotting_coordinates"][0]
+            if np.diff(window)[0]!=1:
+                if data["calibrated"] is True:
+                    label = r"Absolute Accumulated Displacement, $\Sigma \Delta R$ ($mm$)"
+                else:
+                    label = r"Absolute Accumulated Displacement, $\Sigma \Delta R$ ($px$)"
+            else:
+                if data["calibrated"] is True:
+                    label = r"Absolute Displacement Increment, $ \Delta R$ ($mm$)"
+                else:
+                    label = r"Absolute Displacement Increment, $\Delta R$ ($px$)"
 
-    # Plot setup.
-    title = "Accumulation"
-    fig, ax = plt.subplots(num=title)
+        elif quantity == "ep_xy":
+            if absolute:
+                if np.diff(window)[0]!=1:
+                    label = r"Absolute Accumulated Shear Strain, $\Sigma|\Delta \epsilon_{xy}|$ ($-$)"
+                else:
+                    label = r"Absolute Shear Strain Increment, $|\Delta \epsilon_{xy}|$ ($-$)"
+            else:
+                if np.diff(window)[0]!=1:
+                    label = r"Accumulated Shear Strain, $\Sigma\Delta \epsilon_{xy}$ ($-$)"
+                else:
+                    label = r"Shear Strain Increment, $\Delta \epsilon_{xy}$ ($-$)"
 
-    # Show image in background.
-    if imshow is True:
-        image = cv2.imread(data["image_0"], cv2.IMREAD_COLOR)
-        image_gs = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        image_gs = cv2.GaussianBlur(image_gs, ksize=(5, 5), sigmaX=1.1, sigmaY=1.1)
-        plt.imshow(image_gs, cmap="gray")
-    else:
-        ax.set_aspect("equal", "box")
+        elif quantity == "ep_vol":
+            if absolute:
+                if np.diff(window)[0]!=1:
+                    label = r"Accumulated Absolute Volumetric"+"\n"+r"Strain Increments, $\Sigma|\Delta \epsilon_{v}|$ ($-$)"
+                else:
+                    label = r"Absolute Volumetric Strain Increment, $|\Delta \epsilon_{v}|$ ($-$)"
+            else:
+                if np.diff(window)[0]!=1:
+                    label = r"Accumulated Volumetric Strain, $\Sigma\Delta \epsilon_{v}$ ($-$)"
+                else:
+                    label = r"Volumetric Strain Increment, $\Delta \epsilon_{v}$ ($-$)"
 
-    extend = "neither"
-    if not isinstance(levels, type(None)):
-        if np.max(value) > np.max(levels) and np.min(value) < np.min(levels):
-            extend = "both"
-        elif np.max(value) > np.max(levels):
-            extend = "max"
-        elif np.min(value) < np.min(levels):
-            extend = "min"
-    extend = "both"
+        elif quantity == "p":
+            label = r"Mean Effective Stress, $p'$ ($kPa$)"
 
-    contours = ax.tricontourf(
-        plotting_coordinates[:, 0],
-        plotting_coordinates[:, 1],
-        value,
-        alpha=alpha,
-        levels=levels,
-        extend=extend,
-    )
+        elif quantity == "q":
+            label = r"Deviatoric Stress, $q$ ($kPa$)"
+        elif quantity == "work":
+            if np.diff(window)[0]!=1:
+                label = r"Accumulated Internal Work, $\Sigma\Delta W_I$ ($J$)"
+            else:
+                label = r"Internal Work Increment, $\Delta W_I$ ($J$)"
+        elif quantity == "power":
+            if np.diff(window)[0]!=1:
+                label = r"Accumulated Internal Power, $\Sigma\Delta P_I$ ($W$)"
+            else:
+                label = r"Internal Power Increment, $\Delta P_I$ ($W$)"
+        else:
+            label = ""
 
-    if colorbar is True:
-        qs = np.asarray(["u", "v", "u_x", "e_xy", "v_y", "R"])
-        labels = [
-            r"Accumulated horizontal displacement, $U$ ($mm$)",
-            r"Accumulated vertical displacement, $V$ ($mm$)",
-            r"Accumulated horizontal normal strain, $dU/dX$ ($-$)",
-            r"Accumulated shear strain, $\epsilon_{xy}$ ($-$)",
-            r"Accumulated vertical normal strain, $dV/dY$ ($-$)",
-            r"Accumulated absolute displacement, $R$ ($mm$)",
-        ]
-        label = labels[np.argwhere(quantity == qs)[0][0]]
         fig.colorbar(contours, label=label, ticks=ticks)
 
-    # Axis control.
+        # Axis control.
     if axis is False:
         ax.set_axis_off()
 
@@ -1352,7 +1531,7 @@ def standard_error_validation(
         for j in range(np.shape(data["applied"][i])[0]):
             if component == 12:
                 series[j, 0] = (
-                    180 / np.pi * abs(np.arccos(data["speckle"].data["pm"][j + 1, 2]))
+                    360*data["speckle"].data["mult"][j+1] 
                 )
             elif component == 13:
                 series[j, 0] = abs(data["speckle"].data["pm"][j + 1, 3])
@@ -1486,7 +1665,7 @@ def mean_error_validation(
         for j in range(np.shape(data["applied"][i])[0]):
             if component == 12:
                 series[j, 0] = (
-                    180 / np.pi * abs(np.arccos(data["speckle"].data["pm"][j + 1, 2]))
+                    360*data["speckle"].data["mult"][j+1]
                 )
             elif component == 13:
                 series[j, 0] = abs(data["speckle"].data["pm"][j + 1, 3])
@@ -1553,6 +1732,418 @@ def mean_error_validation(
 
     return fig, ax
 
+def noise_standard_error_validation(
+    data,
+    component,
+    observing,
+    xlim,
+    ylim,
+    scale,
+    plot,
+    show,
+    block,
+    save,
+    xlabel,
+    ylabel,
+):
+    labels = [
+        r"Horizontal displacement, $u$ ($px$)",
+        r"Vertical displacement, $v$ ($px$)",
+        r"Horizontal normal strain, $\epsilon_{xx}$ ($-$)",
+        r"Shear strain component, $dv/dx$ ($-$)",
+        r"Shear strain component, $du/dy$ ($-$)",
+        r"Vertical normal strain, $\epsilon_{yy}$ ($-$)",
+        r"Strain gradient component, $d^2u/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2u/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2v/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2u/dy^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dy^2$ ($-$)",
+        r"Rotation, $\theta$ ($^o$)",
+        r"Pure shear strain, $\epsilon_{xy}$ ($-$)",
+    ]
+    axes_titles = [
+        r"(a) $1^{st}$ Order Subsets, $1^{st}$ Order Mesh", 
+        r"(b) $2^{nd}$ Order Subsets, $1^{st}$ Order Mesh", 
+        r"(c) $1^{st}$ Order Subsets, $2^{nd}$ Order Mesh", 
+        r"(d) $2^{nd}$ Order Subsets, $2^{nd}$ Order Mesh",
+    ]
+    colours = ["r", "b", "g", "y", "orange", "purple", "k"]
+    markers = [
+        "o",
+        "^",
+        "s",
+        "v",
+    ]
+    title = r"Standard error: component = {component}".format(
+        component=labels[component]
+    )
+    fig, ax = plt.subplots(2,2, figsize = (12,8), num=title)
+    for i in range(len(data["applied"])):
+        series = np.zeros((np.shape(data["applied"][i])[0], 2))
+        for j in range(np.shape(data["applied"][i])[0]):
+            if component == 12:
+                series[j, 0] = (
+                    360 * data["speckle"].data["mult"][j+1]
+                )
+            elif component == 13:
+                series[j, 0] = abs(data["speckle"].data["pm"][j + 1, 3])
+            else:
+                series[j, 0] = abs(data["speckle"].data["pm"][j + 1, component])
+            if observing is not None:
+                series[j, 1] = np.std(
+                    np.sqrt(
+                        (
+                            data["applied"][i][j, :, observing]
+                            - data["observed"][i][j, :, observing]
+                        )
+                        ** 2
+                    )
+                )
+            else:
+                series[j, 1] = np.std(
+                    np.sqrt(
+                        np.sum(
+                            (
+                                data["applied"][i][j, :, :2]
+                                - data["observed"][i][j, :, :2]
+                            )
+                            ** 2,
+                            axis=-1,
+                        )
+                    )
+                )
+        if i%4 == 3:
+            label = data["labels"][i//4]
+        else:
+            label = None
+        if plot == "scatter":
+            ax[i//2-2*(i//4),i%2].scatter(
+                series[:, 0],
+                series[:, 1],
+                facecolors="none",
+                edgecolors=colours[i//4],
+                marker=markers[i//4],
+                label=label,
+            )
+        elif plot == "line":
+            ax[i//2-2*(i//4),i%2].plot(
+                series[:, 0],
+                series[:, 1],
+                color=colours[i//4],
+                label=label,
+            )
+    # General formatting.
+    # Legend.
+    ax[1,1].legend(bbox_to_anchor=(1.0, 1.0), loc="upper left", borderaxespad=0)
+
+    for i in range(4):
+        # Logscale.
+        ax[i//2-2*(i//4),i%2].set_xscale(scale)
+        ax[i//2-2*(i//4),i%2].set_yscale("log")
+        ax[i//2-2*(i//4),i%2].grid(which="both")
+        ax[i//2-2*(i//4),i%2].set_axisbelow(True)
+
+        # Limit control.
+        if xlim is not None:
+            ax[i//2-2*(i//4),i%2].set_xlim(xlim)
+        if ylim is not None:
+            ax[i//2-2*(i//4),i%2].set_ylim(ylim)
+
+        # Axis labels.
+        if xlabel is None:
+            ax[i//2-2*(i//4),i%2].set_xlabel(r"{}".format(labels[component]))
+        else:
+            ax[i//2-2*(i//4),i%2].set_xlabel(xlabel)
+        if ylabel is None:
+            if observing is not None:
+                ax[i//2-2*(i//4),i%2].set_ylabel(r"Error, $\Delta$" + labels[observing])
+            else:
+                ax[i//2-2*(i//4),i%2].set_ylabel(r"Standard error, $\rho_{px}$ ($px$)")
+        else:
+            ax[i//2-2*(i//4),i%2].set_ylabel(ylabel)
+        ax[i//2-2*(i//4),i%2].grid(which = "both", axis = "both")
+        ax[i//2-2*(i//4),i%2].set_title(axes_titles[i])
+    plt.tight_layout()
+    plt.show()
+    # Save.
+    if save is not None:
+        plt.savefig(save, bbox_inches="tight", dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def noise_mean_error_validation(
+    data,
+    component,
+    xlim,
+    ylim,
+    scale,
+    plot,
+    show,
+    block,
+    save,
+):
+    labels = [
+        r"Horizontal displacement, $u$ ($px$)",
+        r"Vertical displacement, $v$ ($px$)",
+        r"Horizontal normal strain, $\epsilon_{xx}$ ($-$)",
+        r"Shear strain component, $dv/dx$ ($-$)",
+        r"Shear strain component, $du/dy$ ($-$)",
+        r"Vertical normal strain, $\epsilon_{yy}$ ($-$)",
+        r"Strain gradient component, $d^2u/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2u/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2v/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2u/dy^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dy^2$ ($-$)",
+        r"Rotation, $\theta$ ($^o$)",
+        r"Pure shear strain, $\epsilon_{xy}$ ($-$)",
+    ]
+    axes_titles = [
+        r"(a) $1^{st}$ Order Subsets, $1^{st}$ Order Mesh", 
+        r"(b) $2^{nd}$ Order Subsets, $1^{st}$ Order Mesh", 
+        r"(c) $1^{st}$ Order Subsets, $2^{nd}$ Order Mesh", 
+        r"(d) $2^{nd}$ Order Subsets, $2^{nd}$ Order Mesh",
+    ]
+    colours = ["r", "b", "g", "y", "orange", "purple", "k"]
+    markers = [
+        "o",
+        "^",
+        "s",
+        "v",
+    ]
+    title = r"Mean error: component = {component}".format(component=labels[component])
+    fig, ax = plt.subplots(2,2, figsize = (12,8), num=title)
+    for i in range(len(data["applied"])):
+        series = np.zeros((np.shape(data["applied"][i])[0], 2))
+        for j in range(np.shape(data["applied"][i])[0]):
+            if component == 12:
+                series[j, 0] = (
+                    360 * data["speckle"].data["mult"][j+1]
+                )
+            elif component == 13:
+                series[j, 0] = abs(data["speckle"].data["pm"][j + 1, 3])
+            else:
+                series[j, 0] = abs(data["speckle"].data["pm"][j + 1, component])
+            series[j, 1] = np.mean(
+                np.sqrt(
+                    np.sum(
+                        (data["applied"][i][j, :, :2] - data["observed"][i][j, :, :2])
+                        ** 2,
+                        axis=-1,
+                    )
+                )
+            )
+        if i%4 == 3:
+            label = data["labels"][i//4]
+        else:
+            label = None
+        if plot == "scatter":
+            ax[i//2-2*(i//4),i%2].scatter(
+                series[:, 0],
+                series[:, 1],
+                facecolors="none",
+                edgecolors=colours[i//4],
+                marker=markers[i//4],
+                label=label,
+            )
+        elif plot == "line":
+            ax[i//2-2*(i//4),i%2].plot(
+                series[:, 0],
+                series[:, 1],
+                color=colours[i//4],
+                label=label,
+            )
+
+    # General formatting.
+    # Legend.
+    ax[1,1].legend(bbox_to_anchor=(1.0, 1.0), loc="upper left", borderaxespad=0)
+
+    for i in range(4):
+        # Logscale.
+        ax[i//2-2*(i//4),i%2].set_xscale(scale)
+        ax[i//2-2*(i//4),i%2].set_yscale("log")
+        ax[i//2-2*(i//4),i%2].grid(which="both")
+        ax[i//2-2*(i//4),i%2].set_axisbelow(True)
+
+        # Limit control.
+        if xlim is not None:
+            ax[i//2-2*(i//4),i%2].set_xlim(xlim)
+        if ylim is not None:
+            ax[i//2-2*(i//4),i%2].set_ylim(ylim)
+
+        # Axis labels.
+        ax[i//2-2*(i//4),i%2].set_xlabel(r"{}".format(labels[component]))
+        ax[i//2-2*(i//4),i%2].set_ylabel(r"Mean absolute error, $\mu_{px}$ ($px$)")
+        ax[i//2-2*(i//4),i%2].grid(which = "both", axis = "both")
+        ax[i//2-2*(i//4),i%2].set_title(axes_titles[i])
+    plt.tight_layout()
+    # Save.
+    if save is not None:
+        plt.savefig(save, bbox_inches="tight", dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+def strain_error_validation(
+    data,
+    component,
+    xlim,
+    ylim,
+    scale,
+    plot,
+    show,
+    block,
+    save,
+):
+    labels = [
+        r"Horizontal displacement, $u$ ($px$)",
+        r"Vertical displacement, $v$ ($px$)",
+        r"Horizontal normal strain, $\epsilon_{xx}$ ($-$)",
+        r"Shear strain component, $dv/dx$ ($-$)",
+        r"Shear strain component, $du/dy$ ($-$)",
+        r"Vertical normal strain, $\epsilon_{yy}$ ($-$)",
+        r"Strain gradient component, $d^2u/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dx^2$ ($-$)",
+        r"Strain gradient component, $d^2u/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2v/dxdy$ ($-$)",
+        r"Strain gradient component, $d^2u/dy^2$ ($-$)",
+        r"Strain gradient component, $d^2v/dy^2$ ($-$)",
+        r"Rotation, $\theta$ ($^o$)",
+        r"Pure shear strain, $\epsilon_{xy}$ ($-$)",
+    ]
+    colours = ["r", "b", "g", "y", "orange", "purple", "k"]
+    markers = [
+        "o",
+        "^",
+        "s",
+        "v",
+    ]
+    title = r"Standard error: component = {component}".format(
+        component=labels[component]
+    )
+    fig, ax = plt.subplots(3,1, figsize = (8,12), num=title)
+    for i in range(len(data["applied"])):
+        series = np.zeros((np.shape(data["applied"][i])[0], 4))
+        for j in range(np.shape(data["applied"][i])[0]):
+            series[j,0] = data["speckle"].data["noisem"][j+1,0]
+            series[j, 1] = np.std(
+                np.sqrt(
+                    np.sum(
+                        (
+                            data["applied"][i][j, :, :2]
+                            - data["observed"][i][j, :, :2]
+                        )
+                        ** 2,
+                        axis=-1,
+                    )
+                )
+            )
+            series[j, 2] = np.std(
+                    np.sqrt(
+                        (
+                            (data["applied"][i][j, :, 3] + data["applied"][i][j, :, 4])/2
+                            - (data["observed"][i][j, :, 3] + data["observed"][i][j, :, 4])/2
+                        )
+                        ** 2
+                    )
+                )
+            series[j, 3] = np.std(
+                    np.sqrt(
+                        (
+                            ((1 - data["applied"][i][j, :, 2])*(1 - data["applied"][i][j, :, 5]) - data["applied"][i][j, :, 3]*data["applied"][i][j, :, 4] - 1)
+                            - ((1 - data["observed"][i][j, :, 2])*(1 - data["observed"][i][j, :, 5]) - data["observed"][i][j, :, 3]*data["observed"][i][j, :, 4] - 1)
+                        )
+                        ** 2
+                    )
+                )
+
+        if plot == "scatter":
+            ax[0].scatter(
+                series[:, 0],
+                series[:, 1],
+                facecolors="none",
+                edgecolors=colours[i],
+                marker=markers[i],
+            )
+            ax[1].scatter(
+                series[:, 0],
+                series[:, 2],
+                facecolors="none",
+                edgecolors=colours[i],
+                marker=markers[i],
+                label=data["labels"][i],
+            )
+            ax[2].scatter(
+                series[:, 0],
+                series[:, 3],
+                facecolors="none",
+                edgecolors=colours[i],
+                marker=markers[i],
+            )
+        elif plot == "line":
+            ax[0].plot(
+                series[:, 0],
+                series[:, 1],
+                color=colours[i],
+            )
+            ax[1].plot(
+                series[:, 0],
+                series[:, 2],
+                color=colours[i],
+                label=data["labels"][i],
+            )
+            ax[2].plot(
+                series[:, 0],
+                series[:, 3],
+                color=colours[i],
+            )
+    # General formatting.
+    # Legend.
+    ax[1].legend(bbox_to_anchor=(.0, 1.), loc="upper left", borderaxespad=0)
+    ax[2].set_xlabel(r"Additive Noise, $\rho$ ($px$)") 
+    ax[0].set_ylabel(r"Standard error, $\rho_{px}$ ($px$)")
+    ax[1].set_ylabel(r"Shear Strain Error, $|\Delta\epsilon_{xy}|$ ($-$)")
+    ax[2].set_ylabel(r"Volumetric Strain Error, $|\Delta\epsilon_{vol}|$ ($-$)")
+
+    for i in range(3):
+        # Logscale.
+        ax[i].set_xscale(scale)
+        ax[i].set_yscale("log")
+        ax[i].grid(which="both")
+        ax[i].set_axisbelow(True)
+
+        # Limit control.
+        if xlim is not None:
+            ax[i].set_xlim(xlim)
+        if ylim is not None:
+            ax[i].set_ylim(ylim)
+        ax[i].grid(which = "both", axis = "both")
+
+    plt.tight_layout()
+    # Save.
+    if save is not None:
+        plt.savefig(save, bbox_inches="tight", dpi=600)
+
+    # Show or close.
+    if show is True:
+        plt.show(block=block)
+    else:
+        plt.close(fig)
+
+    return fig, ax
 
 def spatial_error_validation(
     data,

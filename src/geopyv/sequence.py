@@ -894,7 +894,7 @@ class Sequence(SequenceBase):
         guide=True,
         override=False,
         sequential=False,
-        sync=False,
+        sync=True,
         dense=False,
         subset_size_limits=None,
         _f_index=0,

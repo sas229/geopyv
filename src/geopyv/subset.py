@@ -221,14 +221,14 @@ class Subset(SubsetBase):
         coord : `numpy.ndarray` (x, y), optional
             Subset coordinates.
         f_img : geopyv.image.Image, optional
-            Reference image of geopyv.image.Image class, instantiated by
-            :mod:`~geopyv.image.Image`.
+            Reference image instantiated by :mod:`~geopyv.image.Image`.
         g_img : geopyv.image.Image, optional
-            Target image of geopyv.imageImage class, instantiated by
-            :mod:`~geopyv.image.Image`.
+            Target image object instantiated by :mod:`~geopyv.image.Image`.
         template : geopyv.templates.Template, optional
             Subset template object, instantiated by
             :mod:`~geopyv.templates.Circle` or :mod:`~geopyv.templates.Square`.
+        ID : str 
+            Identification.
 
 
         Attributes

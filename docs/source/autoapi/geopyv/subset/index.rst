@@ -24,7 +24,7 @@ Classes
 
 
 
-.. py:class:: Subset(*, f_coord=None, f_img=None, g_img=None, template=None)
+.. py:class:: Subset(*, f_coord=None, f_img=None, g_img=None, template=None, ID = "")
 
    Bases: :py:obj:`SubsetBase`
 
@@ -32,15 +32,15 @@ Classes
 
    :param coord: Subset coordinates.
    :type coord: `numpy.ndarray` (x, y), optional
-   :param f_img: Reference image of geopyv.image.Image class, instantiated by
-                 :mod:`~geopyv.image.Image`.
+   :param f_img: Reference image object instantiated by :mod:`~geopyv.image.Image`.
    :type f_img: geopyv.image.Image, optional
-   :param g_img: Target image of geopyv.imageImage class, instantiated by
-                 :mod:`~geopyv.image.Image`.
+   :param g_img: Target image object instantiated by :mod:`~geopyv.image.Image`.
    :type g_img: geopyv.image.Image, optional
    :param template: Subset template object, instantiated by
                     :mod:`~geopyv.templates.Circle` or :mod:`~geopyv.templates.Square`.
    :type template: geopyv.templates.Template, optional
+   :param ID: Identification. 
+   :type ID: str, optional
 
    .. attribute:: data
 
@@ -55,28 +55,27 @@ Classes
 
       :type: bool
 
-   .. py:method:: solve(*, max_norm=0.001, max_iterations=15, order=1, p_0=None, tolerance=0.7, method='ICGN')
+   .. py:method:: solve(*, max_norm=1e-5, max_iterations=50, order=1, warp_0=np.zeros(6), tolerance=0.75, method="ICGN")
 
       Method to solve for the subset displacements using the various methods.
 
       :param max_norm: Exit criterion for norm of increment in warp function. Defaults to
-                       value of :math:`1 \cdot 10^{-3}`.
+                       value of :math:`1 \cdot 10^{-5}`.
       :type max_norm: float, optional
       :param max_iterations: Exit criterion for number of Gauss-Newton iterations. Defaults to
                              value of 50.
       :type max_iterations: int, optional
-      :param order: Warp function order. Options are 1 and 2.
+      :param order: Warp function order e.g. 1 corresponds to :math:`1^{st}` order (linear) deformation. Options are 1 and 2.
       :type order: int
-      :param p_0: 1D array of warp function parameters with `float` type.
-      :type p_0: ndarray, optional
-      :param tolerance: Correlation coefficient tolerance. Defaults to a value of 0.7.
+      :param warp_0: 1D array of warp function parameters with `float` type. numpy.ndarray(6) for :math:`1^{st}` order, numpy.ndarray(12) for :math:`2^{nd}` order 
+      :type warp_0: numpy.ndarray, optional
+      :param tolerance: Correlation coefficient tolerance. Defaults to a value of 0.75.
       :type tolerance: float, optional
-      :param method: Solution method. Options are FAGN and ICGN. Default is ICGN since
+      :param method: Solution method. Options are "FAGN" and "ICGN". Default is "ICGN" since
                      it is faster.
       :type method: str
 
-      :returns: **solved** -- Boolean to indicate if the subset instance has been solved.
-      :rtype: `bool`
+      :returns: **solved** (`bool`) -- Boolean to indicate if the subset instance has been solved.
 
       .. note::
           * The warp function parameter array can be used to precondition
@@ -100,7 +99,7 @@ Classes
 
    Bases: :py:obj:`geopyv.object.Object`
 
-   Base class object initialiser.
+   Subset base class object initialiser.
 
    :param object_type: Object type.
    :type object_type: str
@@ -171,7 +170,8 @@ Classes
 
    .. attribute:: data
 
-      geopyv data dict from Subset object.
+      Data object containing all settings and results. See the data
+      structure :ref:`here <subset_data_structure>`.
 
       :type: dict
 

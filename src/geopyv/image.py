@@ -23,7 +23,7 @@ class Image(Object):
         Parameters
         ----------
         filepath : str
-            Path to image.
+            Relative path to the image file.
         border : int
             Bi-quintic B-spline interpolation border. Defaults to a value of 20.
 

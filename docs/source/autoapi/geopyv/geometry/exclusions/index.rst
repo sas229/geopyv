@@ -1,11 +1,11 @@
-:py:mod:`geopyv.geometry.exclusions`
+:py:mod:`geopyv.geometry.region`
 ====================================
 
-.. py:module:: geopyv.geometry.exclusions
+.. py:module:: geopyv.geometry.region
 
 .. autoapi-nested-parse::
 
-   Exclusions module for geopyv.
+   Region module for geopyv.
 
 
 
@@ -18,10 +18,11 @@ Functions
 
 .. autoapisummary::
 
-   geopyv.geometry.exclusions.circular_exclusion
-   geopyv.geometry.exclusions.circular_exclusion_list
-
-
+   geopyv.geometry.region.Circle
+   geopyv.geometry.region.Path
+   geopyv.geometry.region.Region
+   geopyv.geometry.region.RegionBase
+   geopyv.geometry.region.RegionResults
 
 .. py:function:: circular_exclusion(coord, radius, size)
 

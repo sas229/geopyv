@@ -346,137 +346,10 @@ class FieldBase(Object):
         )
         return fig, ax
 
-    def accumulation(
-        self,
-        *,
-        quantity="R",
-        window=None,
-        scale = "lin",
-        absolute = False,
-        imshow=True,
-        colorbar=True,
-        ticks=None,
-        alpha=0.75,
-        levels=None,
-        axis=True,
-        xlim=None,
-        ylim=None,
-        show=True,
-        block=True,
-        save=None,
-    ):
-        """
-        Method to plot an incremental quantity along the particle position path.
-
-        Parameters
-        ----------
-        quantity : str, optional
-            Specifier for which metric to plot along the particle path.
-        component : int, optional
-            Specifier for which component of the metric to plot along the particle path.
-        imshow : bool, optional
-            Control whether the reference image is plotted.
-            Defaults to True.
-        colorbar : bool, optional
-            Control whether the colour bar is plotted.
-            Defaults to True.
-        ticks : list, optional
-            Overwrite default colourbar ticks.
-            Defaults to None.
-        alpha : float, optional
-            Control contour opacity. Must be between 0.0-1.0.
-            Defaults to 0.75.
-        axis : bool, optional
-            Control whether the axes are plotted.
-            Defaults to True.
-        xlim : array-like, optional
-            Set the plot x-limits (lower_limit,upper_limit).
-            Defaults to None.
-        ylim : array-like, optional
-            Set the plot y-limits (lower_limit,upper_limit).
-            Defaults to None.
-        show : bool, optional
-            Control whether the plot is displayed.
-            Defaults to True.
-        block : bool, optional
-            Control whether the plot blocks execution until closed.
-            Defaults to False.
-        save : str, optional
-            Name to use to save plot. Uses default extension of `.png`.
-        """
-
-        # Check if solved.
-        if self.data["solved"] is not True:
-            log.error(
-                "Particle not yet solved therefore no convergence data to plot. "
-                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
-            )
-            raise ValueError(
-                "Particle not yet solved therefore no convergence data to plot. "
-                "First, run :meth:`~geopyv.particle.Particle.solve()` to solve."
-            )
-        # Check input.
-        self._report(gp.check._check_type(quantity, "quantity", [str]), "TypeError")
-        if quantity:
-            self._report(
-                gp.check._check_value(
-                    quantity,
-                    "quantity",
-                    ["u", "v", "u_x", "e_xy", "e_v", "v_y", "R"],
-                ),
-                "ValueError",
-            )
-        self._report(gp.check._check_type(imshow, "imshow", [bool]), "TypeError")
-        self._report(gp.check._check_type(colorbar, "colorbar", [bool]), "TypeError")
-        types = [tuple, list, np.ndarray, type(None)]
-        self._report(gp.check._check_type(ticks, "ticks", types), "TypeError")
-        check = gp.check._check_type(alpha, "alpha", [float])
-        if check:
-            try:
-                alpha = float(alpha)
-                self._report(gp.check._conversion(alpha, "alpha", float), "Warning")
-            except Exception:
-                self._report(check, "TypeError")
-        self._report(gp.check._check_range(alpha, "alpha", 0.0, 1.0), "ValueError")
-        types = [int, tuple, list, np.ndarray, type(None)]
-        self._report(gp.check._check_type(levels, "levels", types), "TypeError")
-        self._report(gp.check._check_type(axis, "axis", [bool]), "TypeError")
-        types = [tuple, list, np.ndarray, type(None)]
-        self._report(gp.check._check_type(xlim, "xlim", types), "TypeError")
-        if xlim is not None:
-            self._report(gp.check._check_dim(xlim, "xlim", 1), "ValueError")
-            self._report(gp.check._check_axis(xlim, "xlim", 0, [2]), "ValueError")
-        self._report(gp.check._check_type(ylim, "ylim", types), "TypeError")
-        if ylim is not None:
-            self._report(gp.check._check_dim(ylim, "ylim", 1), "ValueError")
-            self._report(gp.check._check_axis(ylim, "ylim", 0, [2]), "ValueError")
-        self._report(gp.check._check_type(show, "show", [bool]), "TypeError")
-        self._report(gp.check._check_type(block, "block", [bool]), "TypeError")
-        self._report(gp.check._check_type(save, "save", [str, type(None)]), "TypeError")
-
-        fig, ax = gp.plots.accumulation_field(
-            data=self.data,
-            window=window,
-            absolute = absolute,
-            scale = scale, 
-            quantity=quantity,
-            imshow=imshow,
-            colorbar=True,
-            ticks=ticks,
-            alpha=alpha,
-            levels=levels,
-            axis=axis,
-            xlim=xlim,
-            ylim=ylim,
-            show=show,
-            block=block,
-            save=save,
-        )
-        return fig, ax
-
     def history(
         self,
-        particle_index,
+        *,
+        particle_index = 0,
         quantity="warps",
         components=None,
         xlim=None,
@@ -599,7 +472,9 @@ class Field(FieldBase):
         Parameters
         ----------
         series : gp.sequence.Sequence object or gp.mesh.Mesh object
-            The base series for field object interpolation.
+            The subject series object instantiated by :mod:
+            `~geopyv.mesh.Mesh` or :mod:`~geopyv.sequence.Sequence` for field
+            object interpolation.
         target_particles : int, optional
             Target number of particles. Defaults to a value of 1000.
         track : bool, optional
@@ -625,6 +500,8 @@ class Field(FieldBase):
                     to the boundary definition.
             (6,)  - uniform stress field.
             Defaults to np.zeros(6).
+        ID : str 
+            Identification.
 
         Note ::
         Two kwargs groups for particle distribution:

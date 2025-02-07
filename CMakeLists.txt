@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -DEIGEN_DONT_PARALLELIZE")
 message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 
+# Add dependencies
+add_subdirectory(${PROJECT_SOURCE_DIR}/external)
+
 # Install the Python package files (e.g. pure Python modules)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/geopyv/
   DESTINATION geopyv

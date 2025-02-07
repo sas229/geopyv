@@ -11,9 +11,9 @@ from geopyv.object import Object
 import re
 from alive_progress import alive_bar
 import math
-from geomat.abstract import Elastoplastic  # noqa: F401
-from geomat.utilities import Derivatives  # noqa: F401
-from geomat.models import LinearElastic, MCC, SMCC, C2MC, EMC  # noqa: F401
+# from geomat.abstract import Elastoplastic  # noqa: F401
+# from geomat.utilities import Derivatives  # noqa: F401
+# from geomat.models import LinearElastic, MCC, SMCC, C2MC, EMC  # noqa: F401
 import matplotlib.pyplot as plt  # noqa: F401
 import traceback
 log = logging.getLogger(__name__)

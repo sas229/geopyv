@@ -1,12 +1,6 @@
 [build-system]
-requires = [
-    "setuptools",
-    "wheel",
-    "scikit-build",
-    "cmake",
-    "ninja"
-]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "geopyv"
@@ -25,8 +19,42 @@ classifiers = [
 ]
 
 dependencies = [
+    "gmsh",
+    "scipy",
+    "opencv-contrib-python",
+    "pyside6",
+    "alive-progress",
+    "pandas",
+    "seaborn",
+    "shapely",
+    "numpy",
+    "matplotlib",
+    # "geomat"
 ]
 
-[project.urls]
-"Homepage" = "https://github.com/sas229/geopyv"
-"Bug Tracker" = "https://github.com/sas229/geopyv/issues"
+[project.optional-dependencies]
+dev = [
+    "ipykernel",
+    "sphinxcontrib-bibtex",
+    "sphinx-autoapi",
+    "sphinx-copybutton",
+    "sphinx",
+    "sphinx-rtd-theme",
+    "pre-commit",
+    "pytest",
+    "flake8",
+    "black",
+    "flake8-black"
+]
+
+[tool.scikit-build]
+minimum-version = "0.5"
+
+[tool.scikit-build.wheel]
+packages = ["geopyv"]
+cmake = true
+
+[tool.scikit-build.sdist]
+include = [
+    "basictest.py"
+]

@@ -1,9 +1,0 @@
-include .gitignore
-include .gitmodules
-include CMakeLists.txt
-include LICENSE
-include Pipfile
-include Pipfile.lock
-include README.md
-include basictest.py
-exclude MANIFEST.in

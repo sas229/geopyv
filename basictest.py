@@ -4,36 +4,38 @@ import cv2
 from cv2 import aruco
 import matplotlib.pyplot as plt
 
-# # Subset test.
-# # Subset setup.
-# ref = gp.image.Image("./images/compression/compression_0.jpg")
-# tar = gp.image.Image("./images/compression/compression_1.jpg")
-# template = gp.templates.Circle(50)
-# 
-# # Subset instantiation.
-# subset = gp.subset.Subset(
-#     f_img=ref, 
-#     g_img=tar, 
-#     f_coord=np.asarray([500, 500]), 
-#     template=template
-# )
-# 
+# Subset test.
+# Subset setup.
+ref = gp.image.Image("./images/compression/compression_0.jpg")
+tar = gp.image.Image("./images/compression/compression_1.jpg")
+template = gp.templates.Circle(50)
+
+# Subset instantiation.
+subset = gp.subset.Subset(
+    f_img=ref, 
+    g_img=tar, 
+    f_coord=np.asarray([500, 500]), 
+    template=template
+)
+
 # # Subset inspection.
 # subset.inspect()
-# 
-# # Subset solving.
-# subset.solve()
-# 
+
+# Subset solving.
+subset.solve()
+
+print(subset.data)
+
 # # Other subset methods.
 # subset.convergence()
-# 
+
 # # Save subset to pyv file.
 # gp.io.save(object=subset, filename="test")
 # del subset
-# 
+
 # # Load subset test.
 # subset = gp.io.load(filename="test")
-# 
+
 # # Mesh test.
 # # Mesh setup.
 # ref = gp.image.Image("./images/compression/compression_0.jpg")
@@ -129,69 +131,69 @@ import matplotlib.pyplot as plt
 # # If you supply a subset index that is out of range you get a ValueError.
 # mesh.convergence(subset_index=4000)
 
-# Sequence test.
-# Sequence setup.
-template = gp.templates.Circle(50)
-boundary_obj = gp.geometry.region.Path(
-    nodes=np.asarray([[200.0, 200.0], [200.0, 800.0], [800.0, 800.0], [800.0, 200.0]]),
-    hard=False,
-)
-exclusion_objs = []
-exclusion_objs.append(
-    gp.geometry.region.Circle(
-        centre=np.asarray([700.0, 700.0]),
-        radius=50.0,
-        size=20.0,
-        option="F",
-        hard=True,
-    )
-)
-seed = np.asarray([501, 501.0])
-seed_warp = np.zeros(6)
-alpha = 0.2
+# # Sequence test.
+# # Sequence setup.
+# template = gp.templates.Circle(50)
+# boundary_obj = gp.geometry.region.Path(
+#     nodes=np.asarray([[200.0, 200.0], [200.0, 800.0], [800.0, 800.0], [800.0, 200.0]]),
+#     hard=False,
+# )
+# exclusion_objs = []
+# exclusion_objs.append(
+#     gp.geometry.region.Circle(
+#         centre=np.asarray([700.0, 700.0]),
+#         radius=50.0,
+#         size=20.0,
+#         option="F",
+#         hard=True,
+#     )
+# )
+# seed = np.asarray([501, 501.0])
+# seed_warp = np.zeros(6)
+# alpha = 0.2
 
-# Sequence instantiation.
-sequence = gp.sequence.Sequence(
-    image_dir="images/compression/",
-    common_name = "compression", # Use if multiple image sets share a folder.
-    target_nodes=1000,
-    boundary_obj=boundary_obj,
-    exclusion_objs=exclusion_objs,
-    save_by_reference=False, # True if saving meshes individually.
-    ID = "0"
-)
+# # Sequence instantiation.
+# sequence = gp.sequence.Sequence(
+#     image_dir="images/compression/",
+#     common_name = "compression", # Use if multiple image sets share a folder.
+#     target_nodes=1000,
+#     boundary_obj=boundary_obj,
+#     exclusion_objs=exclusion_objs,
+#     save_by_reference=False, # True if saving meshes individually.
+#     ID = "0"
+# )
 
-# Sequence solving.
-sequence.solve(
-    seed_coord=seed, 
-    seed_warp=seed_warp,
-    template=template,
-    adaptive_iterations=2,
-    mesh_order = 2, # 1st or 2nd order.
-    subset_order = 1, # 1st or 2nd order.
-    guide = True, # Seed preconditioning by previous mesh.
-    dense = True, # Adaptivity type. 
-    method="ICGN",
-    alpha=alpha,
-    seed_tolerance = 0.9,
-    tolerance=0.75,
-    sync=True,
-)
+# # Sequence solving.
+# sequence.solve(
+#     seed_coord=seed, 
+#     seed_warp=seed_warp,
+#     template=template,
+#     adaptive_iterations=2,
+#     mesh_order = 2, # 1st or 2nd order.
+#     subset_order = 1, # 1st or 2nd order.
+#     guide = True, # Seed preconditioning by previous mesh.
+#     dense = True, # Adaptivity type. 
+#     method="ICGN",
+#     alpha=alpha,
+#     seed_tolerance = 0.9,
+#     tolerance=0.75,
+#     sync=True,
+# )
 
-# Sequence saving.
-gp.io.save(object=sequence, filename="sequence")
-del sequence
+# # Sequence saving.
+# gp.io.save(object=sequence, filename="sequence")
+# del sequence
 
-# Sequence loading.
-sequence = gp.io.load(filename="sequence")
+# # Sequence loading.
+# sequence = gp.io.load(filename="sequence")
 
-# Other sequence methods (plot functionality).
-sequence.inspect(mesh_index=0)
-sequence.inspect(mesh_index=3, subset_index=20)
-sequence.convergence(mesh_index=1)
-sequence.convergence(mesh_index=2, subset_index=4)
-sequence.contour(mesh_index=1, quantity="R", mesh=True)
-sequence.quiver(mesh_index=3)
+# # Other sequence methods (plot functionality).
+# sequence.inspect(mesh_index=0)
+# sequence.inspect(mesh_index=3, subset_index=20)
+# sequence.convergence(mesh_index=1)
+# sequence.convergence(mesh_index=2, subset_index=4)
+# sequence.contour(mesh_index=1, quantity="R", mesh=True)
+# sequence.quiver(mesh_index=3)
 # 
 # # Calibration.
 # # So far, subset, mesh and sequence have been operating on the raw image data.

@@ -140,5 +140,7 @@ main.py
 *.pyv
 .pypirc
 
-# Draft folder
+# Folders
 /draft
+/pybind11
+/.stfolder

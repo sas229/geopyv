@@ -41,7 +41,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: wheelhouse-${{ github.run_id }}
+          name: wheelhouse-${{ github.run_id }}-${{ github.sha }}
           path: ./wheelhouse/*.whl
 
   build_sdist:
@@ -56,7 +56,7 @@ jobs:
       - name: Upload source distribution
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: sdist-${{ github.run_id }}
+          name: sdist-${{ github.run_id }}-${{ github.sha }}
           path: dist/*.tar.gz
 
   upload_pypi:
@@ -66,7 +66,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: sdist-${{ github.run_id }}
+          name: sdist-${{ github.run_id }}-${{ github.sha }}
           path: dist
 
       - uses: pypa/gh-action-pypi-publish@v1.12.3

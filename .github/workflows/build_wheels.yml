@@ -16,6 +16,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -34,7 +40,6 @@ jobs:
         with:
           name: wheels
           path: wheelhouse/*.whl
-
 
   build_sdist:
     name: Build source distribution
@@ -58,7 +63,6 @@ jobs:
         with:
           name: sdist
           path: dist/*.tar.gz
-
 
   upload_pypi:
     needs: [build_wheels, build_sdist]

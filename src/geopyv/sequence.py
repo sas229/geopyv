@@ -462,6 +462,8 @@ class SequenceBase(Object):
 
         # Load/access selected mesh object.
         mesh_obj = self._load_mesh(mesh_index, obj=True)
+        if self.data["file_settings"]["save_by_reference"] is False:
+            mesh_obj = gp.mesh.MeshResults(mesh_obj)
 
         log.info(
             "Generating {quantity} contour plot for mesh {mesh}...".format(
